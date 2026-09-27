@@ -106,10 +106,10 @@ async function loadAccounts() {
         <td>${escapeHtml(a.Email)}</td>
         <td>${escapeHtml(a.Location || 'Not provided')}</td>
         <td>
-          <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.id === data.current_user_id ? 'disabled title="You cannot archive yourself"' : ''}>Archive</button>
+          <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.id === data.current_user_id ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>Archive</button>
         </td>
       </tr>
-    `).join('') || '<tr><td colspan="3" class="text-muted">No administrators yet.</td></tr>';
+    `).join('') || '<tr><td colspan="4" class="text-muted">No administrators yet.</td></tr>';
   }
 
   document.querySelectorAll('.delete-btn').forEach(btn => {
