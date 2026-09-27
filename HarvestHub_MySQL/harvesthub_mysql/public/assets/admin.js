@@ -498,36 +498,82 @@ function sortTable(columnIndex, headerEl) {
   rowsArray.forEach(row => tbody.appendChild(row));
 }
 
-
 // ---------- Chart.js Graph & Report Export Logic ----------
 async function renderActivityGraph() {
-  const ctx = document.getElementById('activityChart');
-  if (!ctx) return; // Only run on the dashboard page
+  const plotCtx = document.getElementById('plotChart');
+  const exchangeCtx = document.getElementById('exchangeChart');
+  const resourceCtx = document.getElementById('resourceChart');
+  
+  if (!plotCtx || !exchangeCtx || !resourceCtx) return; 
 
-  const res = await fetch('api.php?action=activity_data');
+  const res = await fetch('api.php?action=dashboard_charts');
   const data = await res.json();
   if (!data.ok) return;
 
-  new Chart(ctx, {
+  // Orangey-Brown Palette (Based on original graph)
+  const brownMain = '#a8562e';   // Original graph color (Primary)
+  const brownLight = '#d69777';  // Soft terracotta (Secondary)
+  const brownPale = '#f3e3d8';   // Pale peach from your CSS badges (Tertiary)
+
+  // 1. Plot Utilization (Doughnut)
+  new Chart(plotCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Occupied', 'Available', 'Pending Applications'],
+      datasets: [{
+        data: [data.plots.Occupied, data.plots.Available, data.plots.Pending],
+        backgroundColor: [brownMain, brownLight, brownPale],
+        borderWidth: 1,
+        borderColor: '#ffffff'
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // 2. Exchange Market (Doughnut)
+  new Chart(exchangeCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Active Listings', 'Completed Trades'],
+      datasets: [{
+        data: [data.exchange.Active, data.exchange.Completed],
+        backgroundColor: [brownMain, brownLight],
+        borderWidth: 1,
+        borderColor: '#ffffff'
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // 3. Resource Inventory (Grouped Bar)
+  new Chart(resourceCtx, {
     type: 'bar',
     data: {
-      labels: data.labels,
-      datasets: [{
-        label: 'Total Platform Actions',
-        data: data.values,
-        backgroundColor: '#a8562e',
-        borderRadius: 4
-      }]
+      labels: data.resources.labels,
+      datasets: [
+        {
+          label: 'Available in Shed',
+          data: data.resources.available,
+          backgroundColor: brownLight,
+          borderRadius: 4
+        },
+        {
+          label: 'Currently Borrowed',
+          data: data.resources.borrowed,
+          backgroundColor: brownMain,
+          borderRadius: 4
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      }
     }
   });
 }
-
 
 // ---------- SINGLE INITIALIZATION BLOCK ----------
 document.addEventListener('DOMContentLoaded', () => {
@@ -627,26 +673,79 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 4. Export Report Button
+  // 4. Export Report Button (CSV)
   const exportBtn = document.getElementById('export-report-btn');
   if (exportBtn) {
     exportBtn.addEventListener('click', async () => {
-      const res = await fetch('api.php?action=stats');
-      const data = await res.json();
-      if (!data.ok) return;
+      exportBtn.disabled = true;
+      exportBtn.textContent = 'Exporting...';
 
-      let csvContent = "data:text/csv;charset=utf-8,Metric,Value\n";
-      for (const [key, value] of Object.entries(data.stats)) {
-        csvContent += `${key.replace('_', ' ').toUpperCase()},${value}\n`;
+      try {
+        const [statsRes, chartsRes] = await Promise.all([
+          fetch('api.php?action=stats'),
+          fetch('api.php?action=dashboard_charts')
+        ]);
+        const statsData = await statsRes.json();
+        const chartsData = await chartsRes.json();
+
+        if (!statsData.ok || !chartsData.ok) throw new Error();
+
+        // Build a highly readable, sectioned CSV array
+        let csv = [];
+        
+        // --- 1. Top KPI Stats ---
+        csv.push("--- SYSTEM OVERVIEW ---,");
+        csv.push("Metric,Value");
+        for (const [key, value] of Object.entries(statsData.stats)) {
+          csv.push(`"${key.replace(/_/g, ' ').toUpperCase()}",${value}`);
+        }
+        csv.push(","); // Blank row for spacing
+
+        // --- 2. Plot Utilization ---
+        csv.push("--- PLOT UTILIZATION ---,");
+        csv.push("Status,Count");
+        for (const [key, value] of Object.entries(chartsData.plots)) {
+           csv.push(`"${key.toUpperCase()}",${value}`);
+        }
+        csv.push(",");
+
+        // --- 3. Exchange Market ---
+        csv.push("--- EXCHANGE MARKET ---,");
+        csv.push("Status,Count");
+        for (const [key, value] of Object.entries(chartsData.exchange)) {
+           csv.push(`"${key.toUpperCase()}",${value}`);
+        }
+        csv.push(",");
+
+        // --- 4. Resource Inventory ---
+        csv.push("--- RESOURCE INVENTORY ---,,");
+        csv.push("Resource,Available in Shed,Currently Borrowed");
+        const r = chartsData.resources;
+        for (let i = 0; i < r.labels.length; i++) {
+           // Groups the tool name, available count, and borrowed count nicely into 3 columns
+           csv.push(`"${r.labels[i]}",${r.available[i]},${r.borrowed[i]}`);
+        }
+
+        // Generate a Blob with a UTF-8 BOM (\uFEFF) to force Excel to format it cleanly
+        const blob = new Blob(["\uFEFF" + csv.join("\n")], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `HarvestHub_Analytics_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Clean up memory
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+      } catch (e) {
+        showToast('Failed to export data.', 'danger');
+      } finally {
+        exportBtn.disabled = false;
+        exportBtn.textContent = 'Export CSV';
       }
-      
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `HarvestHub_Report_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
     });
   }
 

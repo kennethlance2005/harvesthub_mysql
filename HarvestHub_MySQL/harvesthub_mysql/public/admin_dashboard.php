@@ -34,11 +34,33 @@ $navTitle = 'System Dashboard';
 
       <div class="stat-grid" id="stats-row" style="margin-bottom: 28px;"></div>
 
-      <div class="panel">
-        <p class="panel-title">Platform Activity Graph</p>
-        <div style="position: relative; height: 350px; width: 100%;">
-          <canvas id="activityChart"></canvas>
-        </div>
+      <!-- Analytics Grid -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; margin-bottom: 24px;">
+          
+          <!-- Plots Doughnut -->
+          <div class="panel">
+              <p class="panel-title">Plot Utilization</p>
+              <div style="position: relative; height: 260px; width: 100%;">
+                  <canvas id="plotChart"></canvas>
+              </div>
+          </div>
+
+          <!-- Exchange Doughnut -->
+          <div class="panel">
+              <p class="panel-title">Exchange Market</p>
+              <div style="position: relative; height: 260px; width: 100%;">
+                  <canvas id="exchangeChart"></canvas>
+              </div>
+          </div>
+
+          <!-- Resources Bar -->
+          <div class="panel" style="grid-column: 1 / -1;">
+              <p class="panel-title">Resource Inventory Levels</p>
+              <div style="position: relative; height: 320px; width: 100%;">
+                  <canvas id="resourceChart"></canvas>
+              </div>
+          </div>
+
       </div>
 
     </main>

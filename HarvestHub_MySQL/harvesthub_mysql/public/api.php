@@ -1309,15 +1309,34 @@ try {
             respond(['ok' => true]);
         }
 
-        case 'activity_data': {
+        case 'dashboard_charts': {
             requireJsonRole('admin');
-            $stats = [
-                'Crop Logs' => (int) $pdo->query("SELECT COUNT(*) FROM CROP_LOG")->fetchColumn(),
-                'Plot Applications' => (int) $pdo->query("SELECT COUNT(*) FROM PLOT_APPLICATION")->fetchColumn(),
-                'Tool Requests' => (int) $pdo->query("SELECT COUNT(*) FROM RESOURCE_TXN")->fetchColumn(),
-                'Exchange Listings' => (int) $pdo->query("SELECT COUNT(*) FROM EXCHANGE_LISTING")->fetchColumn(),
+            
+            // 1. Plot Utilization
+            $plots = [
+                'Occupied' => (int) $pdo->query("SELECT COUNT(*) FROM PLOT WHERE Status = 'Occupied'")->fetchColumn(),
+                'Available' => (int) $pdo->query("SELECT COUNT(*) FROM PLOT WHERE Status = 'Available'")->fetchColumn(),
+                'Pending' => (int) $pdo->query("SELECT COUNT(*) FROM PLOT_APPLICATION WHERE Status = 'Pending'")->fetchColumn()
             ];
-            respond(['ok' => true, 'labels' => array_keys($stats), 'values' => array_values($stats)]);
+
+            // 2. Exchange Market
+            $exchange = [
+                'Active' => (int) $pdo->query("SELECT COUNT(*) FROM EXCHANGE_LISTING WHERE ListingID NOT IN (SELECT ListingID FROM EXCHANGE_ORDER)")->fetchColumn(),
+                'Completed' => (int) $pdo->query("SELECT COUNT(*) FROM EXCHANGE_ORDER")->fetchColumn()
+            ];
+
+            // 3. Resource Inventory (Per Item)
+            $resourcesRaw = $pdo->query("SELECT Name, TotalQty, AvailableQty FROM RESOURCE ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
+            $resources = [ 'labels' => [], 'available' => [], 'borrowed' => [] ];
+            
+            foreach ($resourcesRaw as $r) {
+                $resources['labels'][] = $r['Name'];
+                $resources['available'][] = (int)$r['AvailableQty'];
+                // Borrowed is Total minus Available
+                $resources['borrowed'][] = (int)$r['TotalQty'] - (int)$r['AvailableQty'];
+            }
+
+            respond(['ok' => true, 'plots' => $plots, 'exchange' => $exchange, 'resources' => $resources]);
         }
 
         default:
