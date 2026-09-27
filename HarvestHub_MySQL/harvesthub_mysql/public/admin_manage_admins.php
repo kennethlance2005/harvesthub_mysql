@@ -67,14 +67,14 @@ $navTitle = 'Manage Administrators';
                 </div>
                 <div class="field" style="margin: 0; grid-column: 2 / 4;">
                     <label>Temporary Password</label>
-                    <input type="password" id="new-admin-pass" placeholder="Min. 8 characters" required>
-                </div>
-
-                <!-- Row 3: Password hint aligned under Temporary Password, spanning across Location + Age -->
-                <div style="grid-column: 2 / 4; margin-top: -4px; margin-bottom: 8px;">
-                    <p class="field-hint" style="text-align: left; margin: 0; color: var(--ink-600); font-size: 0.78rem; line-height: 1.4;">
-                        * Password must be at least 8 characters with an uppercase, lowercase, number, and special character.
-                    </p>
+                  <input type="password" id="new-admin-pass" placeholder="Min. 8 characters" autocomplete="new-password" minlength="8" required>
+                  <ul id="admin-password-reqs" class="password-reqs password-reqs--columns" aria-live="polite">
+                    <li data-requirement="length" class="invalid">At least 8 characters</li>
+                    <li data-requirement="upper" class="invalid">At least 1 uppercase letter</li>
+                    <li data-requirement="lower" class="invalid">At least 1 lowercase letter</li>
+                    <li data-requirement="number" class="invalid">At least 1 number</li>
+                    <li data-requirement="special" class="invalid">At least 1 special character</li>
+                  </ul>
                 </div>
 
                 <!-- Row 4: Submit button spanning across all columns (full width of the form) -->
@@ -94,7 +94,7 @@ $navTitle = 'Manage Administrators';
             </div>
             <div class="table-wrap">
               <table class="data-table">
-                <thead><tr><th>Name</th><th>Email</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Actions</th></tr></thead>
                 <tbody id="admins-table"></tbody>
               </table>
             </div>

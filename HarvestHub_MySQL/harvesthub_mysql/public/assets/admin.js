@@ -101,9 +101,10 @@ async function loadAccounts() {
   const adminsTable = document.getElementById('admins-table');
   if (adminsTable) {
     adminsTable.innerHTML = data.admins.map(a => `
-      <tr data-name="${escapeHtml(a.Name)}">
+      <tr data-name="${escapeHtml(a.Name)}" data-location="${escapeHtml(a.Location || '')}">
         <td>${escapeHtml(a.Name)}</td>
         <td>${escapeHtml(a.Email)}</td>
+        <td>${escapeHtml(a.Location || 'Not provided')}</td>
         <td>
           <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.id === data.current_user_id ? 'disabled title="You cannot archive yourself"' : ''}>Archive</button>
         </td>
@@ -458,14 +459,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 3. Create Admin Form Logic
   const createAdminForm = document.getElementById('create-admin-form');
+  const adminPasswordInput = document.getElementById('new-admin-pass');
+  const adminPasswordReqs = document.getElementById('admin-password-reqs');
+  const adminPasswordRules = [
+    ['length', value => value.length >= 8],
+    ['upper', value => /[A-Z]/.test(value)],
+    ['lower', value => /[a-z]/.test(value)],
+    ['number', value => /\d/.test(value)],
+    ['special', value => /[\W_]/.test(value)],
+  ];
+
+  function updateAdminPasswordRequirements() {
+    if (!adminPasswordInput || !adminPasswordReqs) return;
+
+    adminPasswordRules.forEach(([name, test]) => {
+      const item = adminPasswordReqs.querySelector(`[data-requirement="${name}"]`);
+      const valid = test(adminPasswordInput.value);
+      item.classList.toggle('valid', valid);
+      item.classList.toggle('invalid', !valid);
+    });
+  }
+
+  if (adminPasswordInput && adminPasswordReqs) {
+    adminPasswordInput.addEventListener('focus', () => adminPasswordReqs.classList.add('active'));
+    adminPasswordInput.addEventListener('input', updateAdminPasswordRequirements);
+    adminPasswordInput.addEventListener('blur', () => {
+      const isValid = adminPasswordRules.every(([, test]) => test(adminPasswordInput.value));
+      if (adminPasswordInput.value === '' || isValid) adminPasswordReqs.classList.remove('active');
+    });
+  }
+
   if (createAdminForm) {
     createAdminForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      const password = document.getElementById('new-admin-pass').value;
-      const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,}$/;
-
-      if (!passwordRegex.test(password)) {
+      const password = adminPasswordInput.value;
+      const isPasswordValid = adminPasswordRules.every(([, test]) => test(password));
+      if (!isPasswordValid) {
+        updateAdminPasswordRequirements();
+        if (adminPasswordReqs) adminPasswordReqs.classList.add('active');
+        if (adminPasswordInput) adminPasswordInput.focus();
         showToast('Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.', 'danger');
         return;
       }
@@ -489,6 +522,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.ok) {
         showToast('Administrator account created successfully!', 'success');
         createAdminForm.reset();
+        updateAdminPasswordRequirements();
+        if (adminPasswordReqs) adminPasswordReqs.classList.remove('active');
         loadAccounts();
       } else {
         showToast(data.error || 'Failed to create account.', 'danger');

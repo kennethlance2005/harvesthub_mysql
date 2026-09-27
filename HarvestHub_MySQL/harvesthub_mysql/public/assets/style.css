@@ -1249,6 +1249,18 @@ table.data-table {
   display: block; 
 }
 
+.password-reqs--columns.active {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+}
+
+@media (max-width: 540px) {
+  .password-reqs--columns.active {
+    grid-template-columns: 1fr;
+  }
+}
+
 .password-reqs li {
   color: #d9534f; /* Red for missing requirements */
   margin-bottom: 5px;

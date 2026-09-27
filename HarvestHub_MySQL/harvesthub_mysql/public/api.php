@@ -1091,7 +1091,7 @@ try {
             $user = requireJsonRole('admin');
             $gardeners = $pdo->query("SELECT GardenerID AS id, Name, Email, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM COMMUNITY_GARDENER WHERE Status = 'Active' ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
             $coordinators = $pdo->query("SELECT CoordID AS id, Name, Email, Shift, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM GARDEN_COORDINATOR WHERE Status = 'Active' ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
-            $admins = $pdo->query("SELECT AdminID AS id, Name, Email FROM SYSTEM_ADMINISTRATOR WHERE Status = 'Active' ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
+            $admins = $pdo->query("SELECT AdminID AS id, Name, Email, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM SYSTEM_ADMINISTRATOR WHERE Status = 'Active' ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
             
             respond(['ok' => true, 'current_user_id' => $user['id'], 'gardeners' => $gardeners, 'coordinators' => $coordinators, 'admins' => $admins]);
         }
@@ -1202,7 +1202,11 @@ try {
                     ]);
                 respond(['ok' => true]);
             } catch (PDOException $e) {
-                respond(['ok' => false, 'error' => 'That email is already in use.'], 409);
+                if ((int)($e->errorInfo[1] ?? 0) === 1062) {
+                    respond(['ok' => false, 'error' => 'That email is already in use.'], 409);
+                }
+                error_log($e->getMessage());
+                respond(['ok' => false, 'error' => 'Could not create administrator. Please try again.'], 500);
             }
         }
         
@@ -1238,7 +1242,7 @@ try {
             requireJsonRole('admin');
             $gardeners = $pdo->query("SELECT GardenerID AS id, Name, Email, 'Customer' as Role, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location, '—' as Shift FROM COMMUNITY_GARDENER WHERE Status = 'Archived'");
             $coords = $pdo->query("SELECT CoordID AS id, Name, Email, 'Staff' as Role, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location, Shift FROM GARDEN_COORDINATOR WHERE Status = 'Archived'");
-            $admins = $pdo->query("SELECT AdminID AS id, Name, Email, 'Admin' as Role, '—' AS Location, '—' as Shift FROM SYSTEM_ADMINISTRATOR WHERE Status = 'Archived'");
+            $admins = $pdo->query("SELECT AdminID AS id, Name, Email, 'Admin' as Role, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location, '—' as Shift FROM SYSTEM_ADMINISTRATOR WHERE Status = 'Archived'");
             
             $all = array_merge($gardeners->fetchAll(PDO::FETCH_ASSOC), $coords->fetchAll(PDO::FETCH_ASSOC), $admins->fetchAll(PDO::FETCH_ASSOC));
             respond(['ok' => true, 'accounts' => $all]);

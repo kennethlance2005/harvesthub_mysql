@@ -24,6 +24,8 @@ CREATE TABLE SYSTEM_ADMINISTRATOR (
     Name         VARCHAR(120)  NOT NULL,
     Email        VARCHAR(190)  NOT NULL UNIQUE,
     PasswordHash VARCHAR(255)  NOT NULL,
+    Age          INT           NULL,
+    Location     VARCHAR(60)   NULL,
     Status       VARCHAR(20)   NOT NULL DEFAULT 'Active'
 ) ENGINE=InnoDB;
 
