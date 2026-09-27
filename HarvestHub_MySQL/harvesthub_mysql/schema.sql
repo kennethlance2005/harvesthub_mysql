@@ -138,12 +138,17 @@ CREATE TABLE RESOURCE_TXN (
     GardenerID  INT          NOT NULL,
     CoordID     INT          NULL,
     ResourceID  INT          NOT NULL,
+    PltID       INT          NULL,
     Qty         INT          NOT NULL,
     Status      VARCHAR(20)  NOT NULL DEFAULT 'Requested',
     RequestedAt DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ApprovedAt  DATETIME     NULL,
+    ReturnRequestedAt DATETIME NULL,
+    ReturnedAt  DATETIME     NULL,
     FOREIGN KEY (GardenerID) REFERENCES COMMUNITY_GARDENER(GardenerID),
     FOREIGN KEY (CoordID) REFERENCES GARDEN_COORDINATOR(CoordID),
-    FOREIGN KEY (ResourceID) REFERENCES RESOURCE(ResourceID)
+    FOREIGN KEY (ResourceID) REFERENCES RESOURCE(ResourceID),
+    FOREIGN KEY (PltID) REFERENCES PLOT(PltID)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS PERSONAL_INVENTORY (

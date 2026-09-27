@@ -678,7 +678,7 @@ try {
         case 'my_resource_requests': {
             $user = requireJsonRole('customer');
             $stmt = $pdo->prepare("
-                SELECT T.TxnID, R.Name, T.Qty, T.Status, T.RequestedAt
+                SELECT T.TxnID, R.Name, T.Qty, T.Status, T.RequestedAt, T.ApprovedAt, T.ReturnRequestedAt
                 FROM RESOURCE_TXN T JOIN RESOURCE R ON R.ResourceID = T.ResourceID
                 WHERE T.GardenerID = ? ORDER BY T.RequestedAt DESC
             ");
@@ -694,15 +694,21 @@ try {
                 respond(['ok' => false, 'error' => 'Invalid transaction.'], 422);
             }
 
-            // Updates the transaction status to 'Returned' only if they own it and it is currently 'Approved'
-            $stmt = $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Returned' WHERE TxnID = ? AND GardenerID = ? AND Status = 'Approved'");
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("SELECT ResourceID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ? AND GardenerID = ? FOR UPDATE");
             $stmt->execute([(int) $txnId, $user['id']]);
-
-            if ($stmt->rowCount() > 0) {
-                respond(['ok' => true]);
-            } else {
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row || !in_array($row['Status'], ['Approved', 'Return Requested'], true)) {
+                $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'Could not return this item.'], 400);
             }
+
+            $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Returned', ReturnedAt = NOW() WHERE TxnID = ?")
+                ->execute([(int) $txnId]);
+            $pdo->prepare('UPDATE RESOURCE SET AvailableQty = LEAST(TotalQty, AvailableQty + ?) WHERE ResourceID = ?')
+                ->execute([(int) $row['Qty'], (int) $row['ResourceID']]);
+            $pdo->commit();
+            respond(['ok' => true]);
         }
 
         // ---------------------------------------------------------
@@ -868,6 +874,19 @@ try {
             respond(['ok' => true, 'transactions' => $rows]);
         }
 
+        case 'add_resource': {
+            requireJsonRole('staff');
+            $name = trim($_POST['name'] ?? '');
+            $qty = $_POST['qty'] ?? '';
+            if ($name === '' || mb_strlen($name) > 80 || !ctype_digit((string) $qty) || (int) $qty < 1 || (int) $qty > 100000) {
+                respond(['ok' => false, 'error' => 'Enter an item name and a quantity from 1 to 100,000.'], 422);
+            }
+
+            $pdo->prepare('INSERT INTO RESOURCE (Name, TotalQty, AvailableQty) VALUES (?, ?, ?)')
+                ->execute([$name, (int) $qty, (int) $qty]);
+            respond(['ok' => true]);
+        }
+
         case 'process_resource_txn': {
             $user = requireJsonRole('staff');
             $txnId = $_POST['txn_id'] ?? '';
@@ -876,7 +895,7 @@ try {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
             }
 
-            $txn = $pdo->prepare("SELECT ResourceID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ?");
+            $txn = $pdo->prepare("SELECT GardenerID, ResourceID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ?");
             $txn->execute([(int) $txnId]);
             $row = $txn->fetch(PDO::FETCH_ASSOC);
             if (!$row || $row['Status'] !== 'Requested') respond(['ok' => false, 'error' => 'Already processed.'], 409);
@@ -889,8 +908,11 @@ try {
 
                 $pdo->prepare("UPDATE RESOURCE SET AvailableQty = AvailableQty - ? WHERE ResourceID = ?")
                     ->execute([$row['Qty'], $row['ResourceID']]);
-                $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Approved', CoordID = ? WHERE TxnID = ?")
-                    ->execute([$user['id'], (int) $txnId]);
+                $plot = $pdo->prepare("SELECT PltID FROM PLOT WHERE GardenerID = ? AND Status = 'Occupied' ORDER BY PltID LIMIT 1");
+                $plot->execute([(int) $row['GardenerID']]);
+                $plotId = $plot->fetchColumn();
+                $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Approved', CoordID = ?, PltID = ?, ApprovedAt = NOW() WHERE TxnID = ?")
+                    ->execute([$user['id'], $plotId === false ? null : (int) $plotId, (int) $txnId]);
             } else {
                 $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Rejected', CoordID = ? WHERE TxnID = ?")
                     ->execute([$user['id'], (int) $txnId]);
@@ -963,16 +985,89 @@ try {
             requireJsonRole('staff');
             $rows = $pdo->query("
                 SELECT R.ResourceID, R.Name, R.TotalQty, R.AvailableQty,
-                       GROUP_CONCAT(CONCAT(G.Name, ' (', T.Qty, ')') SEPARATOR ', ') AS Borrowers
+                       G.Name AS BorrowerName, T.TxnID, T.Qty AS BorrowedQty, T.Status AS BorrowerStatus,
+                       COALESCE(AssignedPlot.Label, CurrentPlot.Label) AS PlotLabel
                 FROM RESOURCE R
                 LEFT JOIN RESOURCE_TXN T
-                  ON T.ResourceID = R.ResourceID AND T.Status = 'Approved'
+                  ON T.ResourceID = R.ResourceID AND T.Status IN ('Approved', 'Return Requested')
                 LEFT JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID
-                GROUP BY R.ResourceID, R.Name, R.TotalQty, R.AvailableQty
+                LEFT JOIN PLOT AssignedPlot ON AssignedPlot.PltID = T.PltID
+                LEFT JOIN PLOT CurrentPlot ON CurrentPlot.PltID = (
+                    SELECT MIN(P2.PltID) FROM PLOT P2
+                    WHERE P2.GardenerID = T.GardenerID AND P2.Status = 'Occupied'
+                )
                 ORDER BY R.Name
-            ")
-                ->fetchAll(PDO::FETCH_ASSOC);
-            respond(['ok' => true, 'resources' => $rows]);
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            $resources = [];
+            foreach ($rows as $row) {
+                $resourceId = (int) $row['ResourceID'];
+                if (!isset($resources[$resourceId])) {
+                    $resources[$resourceId] = [
+                        'ResourceID' => $resourceId,
+                        'Name' => $row['Name'],
+                        'TotalQty' => (int) $row['TotalQty'],
+                        'AvailableQty' => (int) $row['AvailableQty'],
+                        'Borrowers' => [],
+                    ];
+                }
+                if ($row['TxnID'] !== null) {
+                    $resources[$resourceId]['Borrowers'][] = [
+                        'TxnID' => (int) $row['TxnID'],
+                        'Name' => $row['BorrowerName'],
+                        'Qty' => (int) $row['BorrowedQty'],
+                        'Status' => $row['BorrowerStatus'],
+                        'PlotLabel' => $row['PlotLabel'],
+                    ];
+                }
+            }
+            respond(['ok' => true, 'resources' => array_values($resources)]);
+        }
+
+        case 'resource_records': {
+            requireJsonRole('staff');
+            $rows = $pdo->query("
+                SELECT T.TxnID, R.Name AS ResourceName, G.Name AS GardenerName,
+                       COALESCE(AssignedPlot.Label, CurrentPlot.Label) AS PlotLabel,
+                       'Borrowed' AS Action, COALESCE(T.ApprovedAt, T.RequestedAt) AS OccurredAt
+                FROM RESOURCE_TXN T
+                JOIN RESOURCE R ON R.ResourceID = T.ResourceID
+                JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID
+                LEFT JOIN PLOT AssignedPlot ON AssignedPlot.PltID = T.PltID
+                LEFT JOIN PLOT CurrentPlot ON CurrentPlot.PltID = (
+                    SELECT MIN(P2.PltID) FROM PLOT P2
+                    WHERE P2.GardenerID = T.GardenerID AND P2.Status = 'Occupied'
+                )
+                WHERE T.Status IN ('Approved', 'Return Requested', 'Returned')
+                UNION ALL
+                SELECT T.TxnID, R.Name AS ResourceName, G.Name AS GardenerName,
+                       COALESCE(AssignedPlot.Label, CurrentPlot.Label) AS PlotLabel,
+                       'Returned' AS Action, COALESCE(T.ReturnedAt, T.RequestedAt) AS OccurredAt
+                FROM RESOURCE_TXN T
+                JOIN RESOURCE R ON R.ResourceID = T.ResourceID
+                JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID
+                LEFT JOIN PLOT AssignedPlot ON AssignedPlot.PltID = T.PltID
+                LEFT JOIN PLOT CurrentPlot ON CurrentPlot.PltID = (
+                    SELECT MIN(P2.PltID) FROM PLOT P2
+                    WHERE P2.GardenerID = T.GardenerID AND P2.Status = 'Occupied'
+                )
+                WHERE T.Status = 'Returned'
+                ORDER BY OccurredAt DESC, TxnID DESC
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            respond(['ok' => true, 'records' => $rows]);
+        }
+
+        case 'request_resource_return': {
+            $user = requireJsonRole('staff');
+            $txnId = $_POST['txn_id'] ?? '';
+            if (!ctype_digit((string) $txnId)) {
+                respond(['ok' => false, 'error' => 'Invalid transaction.'], 422);
+            }
+            $stmt = $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Return Requested', ReturnRequestedAt = NOW(), CoordID = ? WHERE TxnID = ? AND Status = 'Approved'");
+            $stmt->execute([$user['id'], (int) $txnId]);
+            if ($stmt->rowCount() < 1) {
+                respond(['ok' => false, 'error' => 'This item is no longer awaiting return.'], 409);
+            }
+            respond(['ok' => true]);
         }
 
             // ---------------------------------------------------------

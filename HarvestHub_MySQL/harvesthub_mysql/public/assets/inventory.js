@@ -99,8 +99,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const reqList = document.getElementById('my-requests-list');
             const invList = document.getElementById('my-inventory-list');
 
-            const pendingRequests = dataReq.requests.filter(r => r.Status !== 'Approved');
-            const borrowedItems = dataReq.requests.filter(r => r.Status === 'Approved');
+            const pendingRequests = dataReq.requests.filter(r => ['Requested', 'Rejected'].includes(r.Status));
+            const borrowedItems = dataReq.requests.filter(r => ['Approved', 'Return Requested'].includes(r.Status));
             const personalItems = dataPers.items;
 
             // Render Pending Requests
@@ -128,10 +128,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="inventory-item" data-search="${escapeHtml(r.Name).toLowerCase()}" style="display:flex; justify-content: space-between; align-items:center; border-bottom: 1px solid #e2e8f0; padding: 12px 0;">
                         <div>
                             <strong>${escapeHtml(String(r.Qty))}x ${escapeHtml(r.Name)}</strong>
-                            <span class="badge badge-brown" style="margin-left: 8px; font-size: 0.7rem;">Borrowed</span><br>
-                            <span class="text-muted" style="font-size: 0.8em;">Approved ${new Date(r.RequestedAt).toLocaleDateString()}</span>
+                            <span class="badge ${r.Status === 'Return Requested' ? 'badge-brown' : 'badge-green'}" style="margin-left: 8px; font-size: 0.7rem;">${r.Status === 'Return Requested' ? 'Return requested' : 'Borrowed'}</span><br>
+                            <span class="text-muted" style="font-size: 0.8em;">${r.Status === 'Return Requested' ? 'The coordinator has requested this item back.' : `Approved ${new Date(r.ApprovedAt || r.RequestedAt).toLocaleDateString()}`}</span>
                         </div>
-                        <button class="btn btn-accent btn-sm return-btn" data-txn="${r.TxnID}" style="width: 85px;">Return</button>
+                        <button class="btn btn-accent btn-sm return-btn" data-txn="${r.TxnID}" style="width: 100px;">Return item</button>
                     </div>
                 `).join('');
             }

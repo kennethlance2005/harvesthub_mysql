@@ -11,7 +11,7 @@ $user = requireRole('staff');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=9">
+<link rel="stylesheet" href="assets/style.css?v=10">
 </head>
 <body>
 <div class="app-layout">
@@ -42,9 +42,16 @@ $user = requireRole('staff');
             <button class="btn btn-accent btn-sm" type="submit">Search</button>
           </form>
         </div>
+        <form class="inventory-add-form" id="add-resource-form">
+          <label for="resource-name">Add an item</label>
+          <input id="resource-name" name="name" type="text" maxlength="80" placeholder="Resource name" required>
+          <label for="resource-qty">Quantity</label>
+          <input id="resource-qty" name="qty" type="number" min="1" max="100000" value="1" required>
+          <button class="btn btn-accent btn-sm" type="submit">Add item</button>
+        </form>
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>Resource</th><th>Total</th><th>Available</th><th>Borrowed by</th></tr></thead>
+            <thead><tr><th>Resource</th><th>Total</th><th>Available</th><th>Borrower assignments</th></tr></thead>
             <tbody id="resources-table"></tbody>
           </table>
         </div>
@@ -53,6 +60,6 @@ $user = requireRole('staff');
   </div>
 </div>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=3"></script>
+<script src="assets/staff.js?v=4"></script>
 </body>
 </html>

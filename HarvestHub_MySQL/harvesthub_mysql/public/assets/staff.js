@@ -209,22 +209,93 @@ async function loadResources() {
   renderCoordinatorOverview();
 }
 
+async function loadResourceRecords() {
+  const listEl = document.getElementById('resource-records-list');
+  if (!listEl) return;
+  const res = await fetch('api.php?action=resource_records');
+  const data = await res.json();
+  if (!data.ok) {
+    listEl.innerHTML = '<p class="text-muted">Could not load inventory records.</p>';
+    return;
+  }
+  renderResourceRecords(data.records);
+}
+
+async function addResource(name, qty) {
+  const data = await postAction('add_resource', { name, qty });
+  if (!data.ok) {
+    showToast(data.error || 'Could not add item.', 'danger');
+    return;
+  }
+  document.getElementById('resource-name').value = '';
+  document.getElementById('resource-qty').value = '1';
+  showToast('Item added to inventory.', 'success');
+  loadResources();
+}
+
+async function requestResourceReturn(txnId) {
+  const data = await postAction('request_resource_return', { txn_id: txnId });
+  if (!data.ok) {
+    showToast(data.error || 'Could not request this return.', 'danger');
+    return;
+  }
+  showToast('Return request sent to the borrower.', 'success');
+  loadResources();
+  loadResourceRecords();
+}
+
 function renderResources() {
   const tableEl = document.getElementById('resources-table');
   if (!tableEl) return;
   const query = document.getElementById('all-resources-search').value.trim().toLowerCase();
   const filtered = resources.filter(resource =>
-    matchesSearch(resource.Name, query) || matchesSearch(resource.Borrowers, query));
+    matchesSearch(resource.Name, query) || resource.Borrowers.some(borrower =>
+      matchesSearch(borrower.Name, query) || matchesSearch(borrower.PlotLabel, query)));
 
   const rows = filtered.map(resource => `
     <tr>
       <td>${escapeHtml(resource.Name)}</td>
       <td>${escapeHtml(String(resource.TotalQty))}</td>
       <td>${escapeHtml(String(resource.AvailableQty))}</td>
-      <td>${resource.Borrowers ? escapeHtml(resource.Borrowers) : '<span class="text-muted">None</span>'}</td>
+      <td><div class="borrower-assignments">${resource.Borrowers.length ? resource.Borrowers.map(borrower => `
+        <div class="borrower-assignment">
+          <div><strong>${escapeHtml(borrower.Name)}</strong> <span class="text-muted">· ${escapeHtml(String(borrower.Qty))}x · ${escapeHtml(borrower.PlotLabel || 'No plot assigned')}</span>
+            ${borrower.Status === 'Return Requested' ? '<span class="badge badge-brown">Return requested</span>' : ''}
+          </div>
+          ${borrower.Status === 'Approved'
+            ? `<button class="btn btn-ghost btn-sm request-return-btn" type="button" data-id="${borrower.TxnID}">Request return</button>`
+            : ''}
+        </div>
+      `).join('') : '<span class="text-muted">No current borrowers</span>'}</div></td>
     </tr>
   `).join('');
   tableEl.innerHTML = rows || '<tr><td colspan="4" class="text-muted">No resources match your search.</td></tr>';
+  tableEl.querySelectorAll('.request-return-btn').forEach(button => {
+    button.addEventListener('click', () => requestResourceReturn(button.dataset.id));
+  });
+}
+
+function renderResourceRecords(records) {
+  const listEl = document.getElementById('resource-records-list');
+  if (!listEl) return;
+  listEl.innerHTML = records.length ? records.map(record => `
+    <article class="record-entry ${record.Action === 'Returned' ? 'record-returned' : 'record-borrowed'}">
+      <div class="record-entry-marker" aria-hidden="true"></div>
+      <div class="record-entry-content">
+        <div class="record-entry-head">
+          <strong>${escapeHtml(record.ResourceName)}</strong>
+          <span class="badge ${record.Action === 'Returned' ? 'badge-green' : 'badge-brown'}">${escapeHtml(record.Action)}</span>
+        </div>
+        <p>${escapeHtml(record.GardenerName)} <span class="text-muted">· ${escapeHtml(record.PlotLabel || 'No plot assigned')}</span></p>
+        <time datetime="${escapeHtml(String(record.OccurredAt).replace(' ', 'T'))}">${escapeHtml(formatRecordDate(record.OccurredAt))}</time>
+      </div>
+    </article>
+  `).join('') : '<p class="text-muted">No inventory transactions have been recorded.</p>';
+}
+
+function formatRecordDate(value) {
+  const date = new Date(String(value).replace(' ', 'T'));
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 
 function renderCoordinatorOverview() {
@@ -259,6 +330,13 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     renderResources();
   });
+  document.getElementById('add-resource-form')?.addEventListener('submit', event => {
+    event.preventDefault();
+    addResource(
+      document.getElementById('resource-name').value.trim(),
+      document.getElementById('resource-qty').value
+    );
+  });
   document.getElementById('plot-status-filter')?.addEventListener('change', event => {
     renderPlots(event.target.value);
   });
@@ -267,4 +345,5 @@ document.addEventListener('DOMContentLoaded', () => {
   if (isDashboard || document.getElementById('resource-txns-list')) loadResourceTxns();
   if (isDashboard || document.getElementById('plot-map')) loadPlots();
   if (isDashboard || document.getElementById('resources-table')) loadResources();
+  if (document.getElementById('resource-records-list')) loadResourceRecords();
 });

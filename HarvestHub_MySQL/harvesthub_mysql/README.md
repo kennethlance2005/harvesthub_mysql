@@ -27,6 +27,19 @@ runtime anymore.
 4. `db_config.php` already matches XAMPP's defaults (host `localhost`,
    user `root`, empty password) — no editing needed for local use.
 
+### Updating an existing database
+The coordinator inventory records require additional transaction columns.
+Run this once in phpMyAdmin's SQL tab for an existing installation; fresh
+installations receive the columns from `schema.sql` automatically:
+```sql
+ALTER TABLE RESOURCE_TXN
+  ADD COLUMN PltID INT NULL AFTER ResourceID,
+  ADD COLUMN ApprovedAt DATETIME NULL AFTER RequestedAt,
+  ADD COLUMN ReturnRequestedAt DATETIME NULL AFTER ApprovedAt,
+  ADD COLUMN ReturnedAt DATETIME NULL AFTER ReturnRequestedAt,
+  ADD CONSTRAINT fk_resource_txn_plot FOREIGN KEY (PltID) REFERENCES PLOT(PltID);
+```
+
 ### Real hosting (later)
 1. Create a MySQL database through your host's control panel (cPanel,
    Plesk, etc.) and note the host, database name, username, and
@@ -83,6 +96,7 @@ Administrator approves them from the Admin dashboard.
 | `staff_dashboard.php` | Garden Coordinator | Overview of pending requests, available plots, and resources |
 | `staff_plots.php` | Garden Coordinator | Review plot applications and unassignment requests; create/delete plots and view their status on the plot map |
 | `staff_inventory.php` | Garden Coordinator | Approve/reject resource requests and view inventory and borrowers |
+| `staff_records.php` | Garden Coordinator | Review the chronological resource borrow and return timeline |
 | `customer_dashboard.php` | Community Gardener | View/apply for/unassign a plot, log crops, request resources, the Produce Exchange Board (search/filter/sort, post & claim listings) |
 
 ## What changed in this version

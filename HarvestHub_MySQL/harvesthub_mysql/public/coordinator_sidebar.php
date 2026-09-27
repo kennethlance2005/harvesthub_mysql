@@ -6,6 +6,7 @@
     <a href="staff_dashboard.php" class="sidebar-link <?= $currentPage === 'staff_dashboard.php' ? 'active' : '' ?>">Dashboard</a>
     <a href="staff_plots.php" class="sidebar-link <?= $currentPage === 'staff_plots.php' ? 'active' : '' ?>">Plots</a>
     <a href="staff_inventory.php" class="sidebar-link <?= $currentPage === 'staff_inventory.php' ? 'active' : '' ?>">Inventory</a>
+    <a href="staff_records.php" class="sidebar-link <?= $currentPage === 'staff_records.php' ? 'active' : '' ?>">Records</a>
   </nav>
   <div class="sidebar-footer"><a href="logout.php" class="sidebar-link coordinator-logout">Log Out</a></div>
 </aside>

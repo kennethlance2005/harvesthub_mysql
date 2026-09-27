@@ -1406,15 +1406,45 @@ table.data-table {
 .plot-tile-gardener { margin: auto 0 0; color: var(--ink-600); font-size: 0.88rem; overflow-wrap: anywhere; }
 .plot-tile .btn { align-self: start; }
 .plot-map-empty { grid-column: 1 / -1; }
+.inventory-add-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 18px; padding: 14px 16px; background: var(--cream-100); border: 1px solid var(--line); }
+.inventory-add-form label { color: var(--ink-600); font-size: 0.82rem; font-weight: 600; }
+.inventory-add-form input { min-height: 38px; width: min(100%, 250px); padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink-900); font: inherit; }
+.inventory-add-form input[type="number"] { width: 100px; }
+.borrower-assignments { display: grid; gap: 8px; }
+.borrower-assignment { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.borrower-assignment:last-child { border-bottom: 0; }
+.borrower-assignment > div { min-width: 0; }
+.borrower-assignment .text-muted { display: inline; overflow-wrap: anywhere; }
+.borrower-assignment .badge { margin-left: 6px; }
+.borrower-assignment .btn { flex: 0 0 auto; }
+.records-section { max-width: 900px; }
+.records-timeline { position: relative; padding-left: 28px; }
+.records-timeline::before { position: absolute; top: 12px; bottom: 12px; left: 8px; width: 1px; background: var(--line); content: ""; }
+.record-entry { position: relative; padding: 0 0 26px; }
+.record-entry:last-child { padding-bottom: 0; }
+.record-entry-marker { position: absolute; top: 6px; left: -25px; width: 11px; height: 11px; border: 2px solid var(--cream-100); border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.record-returned .record-entry-marker { background: var(--green-700); box-shadow: 0 0 0 1px var(--green-700); }
+.record-entry-content { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.record-entry-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.record-entry-head strong { color: var(--green-900); font-family: var(--font-display); font-size: 1.05rem; }
+.record-entry-content p { margin: 8px 0 5px; }
+.record-entry-content time { color: var(--ink-600); font-size: 0.82rem; }
 
 @media (max-width: 900px) {
   .coordinator-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .borrower-assignment { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 768px) {
   .coordinator-sidebar { min-height: auto; }
   .coordinator-main { min-height: auto; }
   .coordinator-page { padding: 28px 20px 44px; }
+  .inventory-add-form { align-items: stretch; }
+  .inventory-add-form label { flex-basis: 100%; }
+  .inventory-add-form input { flex: 1 1 180px; }
+  .inventory-add-form input[type="number"] { flex: 0 1 100px; }
+  .coordinator-section .table-wrap { overflow-x: auto; }
+  .coordinator-section .data-table { min-width: 760px; }
 }
 
 @media (max-width: 480px) {
