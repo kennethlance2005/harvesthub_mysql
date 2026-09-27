@@ -109,6 +109,39 @@ function requireJsonRole(string $role): array {
     return $user;
 }
 
+// Adds an approved quantity onto the gardener's existing borrower assignment for
+// this resource (if one already exists) instead of creating a second row, so a
+// gardener only ever has one "Approved" line per resource with the totals summed.
+function mergeOrCreateApprovalRow(PDO $pdo, int $gardenerId, int $resourceId, int $qty, int $coordId, ?int $pltId): void {
+    $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Approved' FOR UPDATE");
+    $existing->execute([$gardenerId, $resourceId]);
+    $existingId = $existing->fetchColumn();
+
+    if ($existingId) {
+        $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = Qty + ?, ApprovedAt = NOW() WHERE TxnID = ?")
+            ->execute([$qty, (int) $existingId]);
+    } else {
+        $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, CoordID, ResourceID, PltID, Qty, Status, ApprovedAt) VALUES (?, ?, ?, ?, ?, 'Approved', NOW())")
+            ->execute([$gardenerId, $coordId, $resourceId, $pltId, $qty]);
+    }
+}
+
+// Same idea for return requests: fold the requested-back quantity into the
+// gardener's existing "Return Requested" row for this resource, if any.
+function mergeOrCreateReturnRequestRow(PDO $pdo, int $gardenerId, int $resourceId, int $qty, int $coordId, ?int $pltId): void {
+    $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Return Requested' FOR UPDATE");
+    $existing->execute([$gardenerId, $resourceId]);
+    $existingId = $existing->fetchColumn();
+
+    if ($existingId) {
+        $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = Qty + ?, ReturnRequestedAt = NOW(), CoordID = ? WHERE TxnID = ?")
+            ->execute([$qty, $coordId, (int) $existingId]);
+    } else {
+        $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, CoordID, ResourceID, PltID, Qty, Status, ApprovedAt, ReturnRequestedAt) VALUES (?, ?, ?, ?, ?, 'Return Requested', NOW(), NOW())")
+            ->execute([$gardenerId, $coordId, $resourceId, $pltId, $qty]);
+    }
+}
+
 // Whitelisted sort options for the Exchange Board
 const SORT_OPTIONS = [
     'newest'   => 'L.CreatedAt DESC',
@@ -670,21 +703,36 @@ try {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
             }
 
+            $pdo->beginTransaction();
+
             $res = $pdo->prepare("
                 SELECT GREATEST(0, R.TotalQty - COALESCE((
                     SELECT SUM(T.Qty) FROM RESOURCE_TXN T
                     WHERE T.ResourceID = R.ResourceID AND T.Status IN ('Approved', 'Return Requested')
                 ), 0)) AS AvailableQty
-                FROM RESOURCE R WHERE R.ResourceID = ?
+                FROM RESOURCE R WHERE R.ResourceID = ? FOR UPDATE
             ");
             $res->execute([(int) $resourceId]);
             $available = $res->fetchColumn();
             if ($available === false || (int) $qty > (int) $available) {
+                $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'Not enough of that resource available.'], 409);
             }
 
-            $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, ResourceID, Qty, Status) VALUES (?, ?, ?, 'Requested')")
-                ->execute([$user['id'], (int) $resourceId, (int) $qty]);
+            // If this gardener already has a pending request for the same resource,
+            // combine the new quantity into it instead of creating a second request.
+            $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Requested' FOR UPDATE");
+            $existing->execute([$user['id'], (int) $resourceId]);
+            $existingTxnId = $existing->fetchColumn();
+
+            if ($existingTxnId) {
+                $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = Qty + ? WHERE TxnID = ?")
+                    ->execute([(int) $qty, (int) $existingTxnId]);
+            } else {
+                $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, ResourceID, Qty, Status) VALUES (?, ?, ?, 'Requested')")
+                    ->execute([$user['id'], (int) $resourceId, (int) $qty]);
+            }
+            $pdo->commit();
             respond(['ok' => true]);
         }
 
@@ -906,8 +954,21 @@ try {
                 respond(['ok' => false, 'error' => 'Enter an item name and a quantity from 1 to 100,000.'], 422);
             }
 
-            $pdo->prepare('INSERT INTO RESOURCE (Name, TotalQty, AvailableQty) VALUES (?, ?, ?)')
-                ->execute([$name, (int) $qty, (int) $qty]);
+            $pdo->beginTransaction();
+            // If a resource with the same name already exists, add to that row
+            // instead of creating a duplicate entry.
+            $existing = $pdo->prepare('SELECT ResourceID FROM RESOURCE WHERE LOWER(Name) = LOWER(?) FOR UPDATE');
+            $existing->execute([$name]);
+            $existingId = $existing->fetchColumn();
+
+            if ($existingId) {
+                $pdo->prepare('UPDATE RESOURCE SET TotalQty = TotalQty + ?, AvailableQty = AvailableQty + ? WHERE ResourceID = ?')
+                    ->execute([(int) $qty, (int) $qty, (int) $existingId]);
+            } else {
+                $pdo->prepare('INSERT INTO RESOURCE (Name, TotalQty, AvailableQty) VALUES (?, ?, ?)')
+                    ->execute([$name, (int) $qty, (int) $qty]);
+            }
+            $pdo->commit();
             respond(['ok' => true]);
         }
 
@@ -928,6 +989,24 @@ try {
                 respond(['ok' => false, 'error' => 'Already processed.'], 409);
             }
 
+            $requestedQty = (int) $row['Qty'];
+
+            // A combined request can be processed partially: the coordinator picks
+            // how many units this decision applies to. Whatever is left over stays
+            // on the original row as a still-pending "Requested" entry, so it can
+            // be decided on later instead of being auto-approved/auto-rejected.
+            $chosenQtyRaw = $_POST['qty'] ?? $requestedQty;
+            if (!ctype_digit((string) $chosenQtyRaw)) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'Invalid quantity.'], 422);
+            }
+            $chosenQty = (int) $chosenQtyRaw;
+            if ($chosenQty < 1 || $chosenQty > $requestedQty) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => "Choose a quantity between 1 and {$requestedQty}."], 422);
+            }
+            $remainder = $requestedQty - $chosenQty;
+
             if ($decision === 'approve') {
                 $res = $pdo->prepare('SELECT TotalQty FROM RESOURCE WHERE ResourceID = ? FOR UPDATE');
                 $res->execute([$row['ResourceID']]);
@@ -939,23 +1018,45 @@ try {
                 $active = $pdo->prepare("SELECT COALESCE(SUM(Qty), 0) FROM RESOURCE_TXN WHERE ResourceID = ? AND Status IN ('Approved', 'Return Requested')");
                 $active->execute([(int) $row['ResourceID']]);
                 $availableQty = max(0, (int) $totalQty - (int) $active->fetchColumn());
-                if ((int) $row['Qty'] > $availableQty) {
+                if ($chosenQty > $availableQty) {
                     $pdo->rollBack();
-                    respond(['ok' => false, 'error' => 'Not enough stock left to approve.'], 409);
+                    respond(['ok' => false, 'error' => 'Not enough stock left to approve that many.'], 409);
                 }
 
                 $plot = $pdo->prepare("SELECT PltID FROM PLOT WHERE GardenerID = ? AND Status = 'Occupied' ORDER BY PltID LIMIT 1");
                 $plot->execute([(int) $row['GardenerID']]);
                 $plotId = $plot->fetchColumn();
-                $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Approved', CoordID = ?, PltID = ?, ApprovedAt = NOW() WHERE TxnID = ?")
-                    ->execute([$user['id'], $plotId === false ? null : (int) $plotId, (int) $txnId]);
+                $plotId = $plotId === false ? null : (int) $plotId;
+
+                // Fold the approved amount into the gardener's existing borrower
+                // assignment for this resource rather than adding a new row.
+                mergeOrCreateApprovalRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $chosenQty, (int) $user['id'], $plotId);
+
+                if ($remainder > 0) {
+                    // Leave the rest of the request pending — don't reject it.
+                    $pdo->prepare('UPDATE RESOURCE_TXN SET Qty = ? WHERE TxnID = ?')
+                        ->execute([$remainder, (int) $txnId]);
+                } else {
+                    // Nothing left over — the original "Requested" row has been
+                    // fully folded into the approval above and is no longer needed.
+                    $pdo->prepare('DELETE FROM RESOURCE_TXN WHERE TxnID = ?')->execute([(int) $txnId]);
+                }
+
                 $active->execute([(int) $row['ResourceID']]);
                 $availableQty = max(0, (int) $totalQty - (int) $active->fetchColumn());
                 $pdo->prepare('UPDATE RESOURCE SET AvailableQty = ? WHERE ResourceID = ?')
                     ->execute([$availableQty, (int) $row['ResourceID']]);
             } else {
-                $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Rejected', CoordID = ? WHERE TxnID = ?")
-                    ->execute([$user['id'], (int) $txnId]);
+                if ($remainder > 0) {
+                    // Leave the rest of the request pending — don't approve it.
+                    $pdo->prepare('UPDATE RESOURCE_TXN SET Qty = ? WHERE TxnID = ?')
+                        ->execute([$remainder, (int) $txnId]);
+                    $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, CoordID, ResourceID, Qty, Status) VALUES (?, ?, ?, ?, 'Rejected')")
+                        ->execute([(int) $row['GardenerID'], (int) $user['id'], (int) $row['ResourceID'], $chosenQty]);
+                } else {
+                    $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Rejected', CoordID = ? WHERE TxnID = ?")
+                        ->execute([$user['id'], (int) $txnId]);
+                }
             }
             $pdo->commit();
             respond(['ok' => true]);
@@ -1104,11 +1205,41 @@ try {
             if (!ctype_digit((string) $txnId)) {
                 respond(['ok' => false, 'error' => 'Invalid transaction.'], 422);
             }
-            $stmt = $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Return Requested', ReturnRequestedAt = NOW(), CoordID = ? WHERE TxnID = ? AND Status = 'Approved'");
-            $stmt->execute([$user['id'], (int) $txnId]);
-            if ($stmt->rowCount() < 1) {
+
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("SELECT GardenerID, ResourceID, PltID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ? FOR UPDATE");
+            $stmt->execute([(int) $txnId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row || $row['Status'] !== 'Approved') {
+                $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'This item is no longer awaiting return.'], 409);
             }
+
+            // The coordinator can choose to request back only part of a combined
+            // borrower assignment; the rest stays with the gardener as approved.
+            $borrowedQty = (int) $row['Qty'];
+            $returnQtyRaw = $_POST['qty'] ?? $borrowedQty;
+            if (!ctype_digit((string) $returnQtyRaw)) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'Invalid return quantity.'], 422);
+            }
+            $returnQty = (int) $returnQtyRaw;
+            if ($returnQty < 1 || $returnQty > $borrowedQty) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => "Choose a quantity between 1 and {$borrowedQty}."], 422);
+            }
+
+            $pltId = $row['PltID'] === null ? null : (int) $row['PltID'];
+            mergeOrCreateReturnRequestRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $returnQty, (int) $user['id'], $pltId);
+
+            $remaining = $borrowedQty - $returnQty;
+            if ($remaining > 0) {
+                $pdo->prepare('UPDATE RESOURCE_TXN SET Qty = ? WHERE TxnID = ?')->execute([$remaining, (int) $txnId]);
+            } else {
+                $pdo->prepare('DELETE FROM RESOURCE_TXN WHERE TxnID = ?')->execute([(int) $txnId]);
+            }
+
+            $pdo->commit();
             respond(['ok' => true]);
         }
 

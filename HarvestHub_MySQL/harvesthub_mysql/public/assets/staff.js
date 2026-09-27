@@ -73,6 +73,8 @@ function renderResourceTransactions() {
         <div class="action-row-sub">${escapeHtml(String(txn.Qty))}x ${escapeHtml(txn.ResourceName)}</div>
       </div>
       <div class="action-row-actions">
+        <label class="sr-only" for="approve-qty-${txn.TxnID}">Quantity for this decision</label>
+        <input type="number" class="qty-choice-input" id="approve-qty-${txn.TxnID}" min="1" max="${txn.Qty}" value="${txn.Qty}" title="Quantity to approve or reject — the rest stays pending">
         <button class="btn btn-accent btn-sm approve-txn" data-id="${txn.TxnID}">Approve</button>
         <button class="btn btn-ghost btn-sm reject-txn" data-id="${txn.TxnID}">Reject</button>
       </div>
@@ -84,9 +86,15 @@ function renderResourceTransactions() {
   emptyEl.hidden = filtered.length > 0;
 
   listEl.querySelectorAll('.approve-txn').forEach(btn =>
-    btn.addEventListener('click', () => processResourceTxn(btn.dataset.id, 'approve')));
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(`approve-qty-${btn.dataset.id}`);
+      processResourceTxn(btn.dataset.id, 'approve', input ? input.value : undefined);
+    }));
   listEl.querySelectorAll('.reject-txn').forEach(btn =>
-    btn.addEventListener('click', () => processResourceTxn(btn.dataset.id, 'reject')));
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(`approve-qty-${btn.dataset.id}`);
+      processResourceTxn(btn.dataset.id, 'reject', input ? input.value : undefined);
+    }));
 }
 
 async function postAction(action, params) {
@@ -127,8 +135,10 @@ async function loadResourceTxns() {
   renderCoordinatorOverview();
 }
 
-async function processResourceTxn(txnId, decision) {
-  const data = await postAction('process_resource_txn', { txn_id: txnId, decision });
+async function processResourceTxn(txnId, decision, qty) {
+  const params = { txn_id: txnId, decision };
+  if (qty) params.qty = qty;
+  const data = await postAction('process_resource_txn', params);
   if (data.ok) {
     showToast(`Request ${decision === 'approve' ? 'approved' : 'rejected'}.`, 'success');
     loadResourceTxns();
@@ -233,8 +243,10 @@ async function addResource(name, qty) {
   loadResources();
 }
 
-async function requestResourceReturn(txnId) {
-  const data = await postAction('request_resource_return', { txn_id: txnId });
+async function requestResourceReturn(txnId, qty) {
+  const params = { txn_id: txnId };
+  if (qty) params.qty = qty;
+  const data = await postAction('request_resource_return', params);
   if (!data.ok) {
     showToast(data.error || 'Could not request this return.', 'danger');
     return;
@@ -265,7 +277,11 @@ function renderResources() {
             ${borrower.Status === 'Return Requested' ? '<span class="borrower-return-status">Return requested</span>' : ''}
           </div>
           ${borrower.Status === 'Approved'
-            ? `<button class="btn btn-sm btn-return-request request-return-btn" type="button" data-id="${borrower.TxnID}">Request return</button>`
+            ? `<div class="return-request-control">
+                <label class="sr-only" for="return-qty-${borrower.TxnID}">Quantity to request back</label>
+                <input type="number" class="qty-choice-input" id="return-qty-${borrower.TxnID}" min="1" max="${borrower.Qty}" value="${borrower.Qty}" title="Quantity to request back">
+                <button class="btn btn-sm btn-return-request request-return-btn" type="button" data-id="${borrower.TxnID}">Request return</button>
+              </div>`
             : ''}
         </div>
       `).join('') : '<span class="borrower-empty-state">No current borrowers</span>'}</div></td>
@@ -273,7 +289,10 @@ function renderResources() {
   `).join('');
   tableEl.innerHTML = rows || '<tr><td colspan="4" class="text-muted">No resources match your search.</td></tr>';
   tableEl.querySelectorAll('.request-return-btn').forEach(button => {
-    button.addEventListener('click', () => requestResourceReturn(button.dataset.id));
+    button.addEventListener('click', () => {
+      const input = document.getElementById(`return-qty-${button.dataset.id}`);
+      requestResourceReturn(button.dataset.id, input ? input.value : undefined);
+    });
   });
 }
 

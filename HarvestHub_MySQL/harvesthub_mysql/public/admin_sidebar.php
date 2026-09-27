@@ -7,6 +7,7 @@ $managePages = ['admin_manage_gardeners.php', 'admin_manage_coordinators.php', '
 $isManageActive = in_array($currentPage, $managePages);
 ?>
 <aside class="sidebar">
+  <div class="sidebar-inner">
   <div class="sidebar-brand">
     <span class="sprout">🌱</span> HarvestHub
   </div>
@@ -51,6 +52,7 @@ $isManageActive = in_array($currentPage, $managePages);
   <div class="sidebar-footer">
     <a href="logout.php" class="sidebar-link" style="color: #fca5a5;">Log Out</a>
   </div>
+  </div>
 </aside>
 
 <script>
@@ -68,4 +70,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// Fade the top nav to a translucent look once the page is scrolled;
+// keep it solid while at the very top.
+(function () {
+  var nav = document.querySelector('.sidebar');
+  if (!nav) return;
+  function onScroll() {
+    nav.classList.toggle('is-scrolled', window.scrollY > 8);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
 </script>

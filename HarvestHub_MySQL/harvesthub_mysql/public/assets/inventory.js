@@ -99,24 +99,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const reqList = document.getElementById('my-requests-list');
             const invList = document.getElementById('my-inventory-list');
 
-            const pendingRequests = dataReq.requests.filter(r => ['Requested', 'Rejected'].includes(r.Status));
+            const pendingRequests = dataReq.requests.filter(r => ['Requested', 'Rejected', 'Approved', 'Return Requested'].includes(r.Status));
             const borrowedItems = dataReq.requests.filter(r => ['Approved', 'Return Requested'].includes(r.Status));
             const personalItems = dataPers.items;
 
-            // Render Pending Requests
+            // Render Request Tracker (Requested, Rejected, and Approved)
             if (pendingRequests.length === 0) {
                 reqList.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">No pending requests.</p>';
             } else {
-                const badgeClass = { Requested: 'badge-brown', Rejected: 'badge-neutral' };
-                reqList.innerHTML = pendingRequests.map(r => `
+                const badgeClass = { Requested: 'badge-brown', Rejected: 'badge-neutral', Approved: 'badge-green', 'Return Requested': 'badge-brown' };
+                reqList.innerHTML = pendingRequests.map(r => {
+                    const dateLabel = r.Status === 'Approved' || r.Status === 'Return Requested'
+                        ? `Approved ${new Date(r.ApprovedAt || r.RequestedAt).toLocaleDateString()}`
+                        : `Requested ${new Date(r.RequestedAt).toLocaleDateString()}`;
+                    return `
                     <div style="display:flex; justify-content: space-between; align-items:center; border-bottom: 1px solid #e2e8f0; padding: 12px 0;">
                         <div>
                             <strong>${escapeHtml(String(r.Qty))}x ${escapeHtml(r.Name)}</strong><br>
-                            <span class="text-muted" style="font-size: 0.8em;">Requested ${new Date(r.RequestedAt).toLocaleDateString()}</span>
+                            <span class="text-muted" style="font-size: 0.8em;">${dateLabel}</span>
                         </div>
                         <span class="badge ${badgeClass[r.Status] || 'badge-neutral'}">${escapeHtml(r.Status)}</span>
                     </div>
-                `).join('');
+                `;
+                }).join('');
             }
 
             // Render Combined Inventory

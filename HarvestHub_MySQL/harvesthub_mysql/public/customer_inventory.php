@@ -106,6 +106,6 @@ $navTitle = 'Resource Inventory';
 
 <script src="assets/app.js"></script>
 <!-- Bumped version number to guarantee the new layout scripts load -->
-<script src="assets/inventory.js?v=5"></script>
+<script src="assets/inventory.js?v=6"></script>
 </body>
 </html>
