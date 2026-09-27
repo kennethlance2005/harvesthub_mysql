@@ -60,6 +60,6 @@ $user = requireRole('staff');
   </div>
 </div>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=5"></script>
+<script src="assets/staff.js?v=6"></script>
 </body>
 </html>

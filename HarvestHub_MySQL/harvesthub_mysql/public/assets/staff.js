@@ -200,13 +200,20 @@ async function deletePlot(plotId, label) {
 }
 
 async function loadResources() {
-  const res = await fetch('api.php?action=all_resources');
-  const data = await res.json();
-  if (!data.ok) return;
+  try {
+    const res = await fetch('api.php?action=all_resources');
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load resource inventory.');
 
-  resources = data.resources;
-  renderResources();
-  renderCoordinatorOverview();
+    resources = data.resources;
+    renderResources();
+    renderCoordinatorOverview();
+    return true;
+  } catch (error) {
+    const tableEl = document.getElementById('resources-table');
+    if (tableEl) tableEl.innerHTML = '<tr><td colspan="4" class="text-muted">Could not load resource inventory.</td></tr>';
+    return false;
+  }
 }
 
 async function loadResourceRecords() {
@@ -229,8 +236,12 @@ async function addResource(name, qty) {
   }
   document.getElementById('resource-name').value = '';
   document.getElementById('resource-qty').value = '1';
-  showToast('Item added to inventory.', 'success');
-  loadResources();
+  const loaded = await loadResources();
+  if (loaded) {
+    showToast('Item added to inventory.', 'success');
+  } else {
+    showToast('Item was added, but the inventory could not be refreshed.', 'danger');
+  }
 }
 
 async function requestResourceReturn(txnId) {
