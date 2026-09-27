@@ -19,10 +19,12 @@ const lastNameInput = document.getElementById('last-name');
 
 roleSelect.addEventListener('change', () => {
   const isCoordinator = roleSelect.value === 'staff';
-  shiftField.hidden = !isCoordinator;
-  if (shiftSelect) {
-    shiftSelect.required = isCoordinator;
-  }
+  
+  // Toggle the entire shift row visibility
+  if (shiftField) shiftField.hidden = !isCoordinator;
+  
+  // Toggle Required Status so the form can still submit when hidden
+  if (shiftSelect) shiftSelect.required = isCoordinator;
 });
 
 form.addEventListener('submit', async (e) => {

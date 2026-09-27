@@ -1521,3 +1521,11 @@ input[data-table-search]:focus {
   /* Allow the Chart.js canvas to render cleanly */
   canvas { max-width: 100% !important; }
 }
+
+/* Allows a form field to span the full width of a field-row */
+.field-row > .field[style*="grid-column"] {
+  grid-column: 1 / -1;
+}
+
+/* Forces elements with the hidden attribute to actually disappear, overriding grid/flex layouts */
+[hidden] { display: none !important; }

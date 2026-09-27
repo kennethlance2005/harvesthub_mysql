@@ -29,6 +29,23 @@ if ($user = currentUser()) {
 
     <form id="register-form" novalidate>
 
+      <!-- Row 1: The Trigger -->
+      <div class="field-row">
+        <div class="field">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="role">I am a...</label>
+          <select id="role" name="role" required>
+            <option value="" disabled selected style="background: #1e3a2b; color: #fff;">Select a role&hellip;</option>
+            <option value="customer" style="background: #1e3a2b; color: #fff;">Community Gardener</option>
+            <option value="staff" style="background: #1e3a2b; color: #fff;">Garden Coordinator</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 2: Identity -->
       <div class="field-row">
         <div class="field">
           <label for="first-name">First Name</label>
@@ -40,14 +57,7 @@ if ($user = currentUser()) {
         </div>
       </div>
 
-      <div class="field" id="shift-field" hidden>
-        <label for="shift">Coordinator Shift</label>
-        <select id="shift" name="shift">
-          <option value="Morning">Morning</option>
-          <option value="Afternoon">Afternoon</option>
-        </select>
-      </div>
-
+      <!-- Row 3: Age & Location (Standard) / Age & Shift (Coordinator) -->
       <div class="field-row">
         <div class="field">
           <label for="age">Age</label>
@@ -78,21 +88,18 @@ if ($user = currentUser()) {
         </div>
       </div>
 
-      <div class="field-row">
-        <div class="field">
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" autocomplete="email" required>
-        </div>
-        <div class="field">
-          <label for="role">I am a</label>
-          <select id="role" name="role" required>
-            <option value="" disabled selected style="background: #1e3a2b; color: #fff;">Select a role&hellip;</option>
-            <option value="customer" style="background: #1e3a2b; color: #fff;">Community Gardener</option>
-            <option value="staff" style="background: #1e3a2b; color: #fff;">Garden Coordinator</option>
+      <!-- Row 4: Dynamic Coordinator Shift (Appears below Location if selected) -->
+      <div class="field-row" id="shift-field" hidden>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label for="shift">Coordinator Shift</label>
+          <select id="shift" name="shift">
+            <option value="Morning" style="background: #1e3a2b; color: #fff;">Morning</option>
+            <option value="Afternoon" style="background: #1e3a2b; color: #fff;">Afternoon</option>
           </select>
         </div>
       </div>
 
+      <!-- Row 5: Security -->
       <div class="field-row">
         <div class="field">
           <label for="password">Password</label>
@@ -109,14 +116,13 @@ if ($user = currentUser()) {
         </div>
         <div class="field">
           <label for="confirm-password">Confirm Password</label>
-          <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password" 
-                 minlength="8" 
-                 required>
+          <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password" minlength="8" required>
         </div>
       </div>
 
       <button type="submit" class="btn btn-light btn-block" style="margin-top: 4px;">Request Account</button>
     </form>
+
     <p class="form-alert" id="register-alert" role="alert" hidden></p>
     <p class="form-success" id="register-success" role="status" hidden></p>
 
