@@ -80,7 +80,9 @@ Administrator approves them from the Admin dashboard.
 | `login.php` | Public | Role-tabbed login (Gardener / Coordinator / Admin) + link to registration |
 | `register.php` | Public | Sign-up form; creates a pending request, not an account directly |
 | `admin_dashboard.php` | Administrator | System stats, pending sign-up approvals, manage gardener/coordinator accounts, create coordinator accounts |
-| `staff_dashboard.php` | Garden Coordinator | Approve/reject plot applications & unassignment requests, approve/reject resource requests, create/delete plots, view all plots and resource borrowers |
+| `staff_dashboard.php` | Garden Coordinator | Overview of pending requests, available plots, and resources |
+| `staff_plots.php` | Garden Coordinator | Review plot applications and unassignment requests; create/delete plots and view their status on the plot map |
+| `staff_inventory.php` | Garden Coordinator | Approve/reject resource requests and view inventory and borrowers |
 | `customer_dashboard.php` | Community Gardener | View/apply for/unassign a plot, log crops, request resources, the Produce Exchange Board (search/filter/sort, post & claim listings) |
 
 ## What changed in this version

@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/auth.php';
 $user = requireRole('staff');
-$navTitle = 'Garden Coordinator Dashboard';
+$navTitle = 'Coordinator Dashboard';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -12,93 +12,45 @@ $navTitle = 'Garden Coordinator Dashboard';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/style.css?v=9">
 </head>
-<body class="staff-page">
-<?php include __DIR__ . '/nav_partial.php'; ?>
+<body>
+<div class="app-layout">
+  <?php include __DIR__ . '/coordinator_sidebar.php'; ?>
+  <div class="main-content coordinator-main">
+    <main class="coordinator-page" id="top">
+      <header class="coordinator-page-head">
+        <div>
+          <p class="eyebrow">Garden operations</p>
+          <h1>Dashboard</h1>
+          <p class="text-muted">A current snapshot of plots, requests, and shared resources.</p>
+        </div>
+        <span class="coordinator-greeting">Hi, <?= htmlspecialchars($user['name'] ?? '', ENT_QUOTES, 'UTF-8') ?></span>
+      </header>
 
-<main class="wrap page-wrap staff-page-wrap" id="top">
-  <div class="staff-dashboard-grid">
+      <section class="coordinator-stat-grid" id="coordinator-stats" aria-label="Garden overview">
+        <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Pending plot requests</div></div>
+        <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Pending resource requests</div></div>
+        <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Available plots</div></div>
+        <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Resource types</div></div>
+      </section>
 
-    <div class="pending-request-panels">
-      <div class="panel">
-        <p class="panel-title">Pending Plot Applications</p>
-        <form class="table-search" id="applications-search-form">
-          <label class="sr-only" for="applications-search">Search applications</label>
-          <input id="applications-search" type="search" placeholder="Search gardener or plot">
-          <button class="btn btn-accent btn-sm" type="submit">Search</button>
-        </form>
-        <div class="pending-request-list" id="applications-list"></div>
-        <p class="text-muted" id="applications-empty" hidden>No pending applications.</p>
-      </div>
-
-      <div class="panel">
-        <p class="panel-title">Pending Resource Requests</p>
-        <form class="table-search" id="resource-search-form">
-          <label class="sr-only" for="resource-search">Search resource requests</label>
-          <input id="resource-search" type="search" placeholder="Search gardener or resource">
-          <button class="btn btn-accent btn-sm" type="submit">Search</button>
-        </form>
-        <div class="pending-request-list" id="resource-txns-list"></div>
-        <p class="text-muted" id="resource-txns-empty" hidden>No pending resource requests.</p>
-      </div>
-    </div>
-
-    <div class="panel">
-      <p class="panel-title">All Plots</p>
-      <form class="plot-management-form" id="create-plot-form">
-        <label class="sr-only" for="new-plot-label">New plot name</label>
-        <input id="new-plot-label" type="text" maxlength="80" placeholder="New plot name" required>
-        <button class="btn btn-accent btn-sm" type="submit">Add Plot</button>
-      </form>
-      <div class="table-search">
-        <label class="sr-only" for="plot-status-filter">Filter plots by status</label>
-        <select id="plot-status-filter" aria-label="Filter plots by status">
-          <option value="all">See all plots</option>
-          <option value="available">Available</option>
-          <option value="unavailable">Unavailable</option>
-        </select>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Plot</th><th>Status</th><th>Gardener</th><th>Actions</th></tr></thead>
-          <tbody id="plots-table"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <p class="panel-title">All Resources</p>
-      <form class="table-search" id="all-resources-search-form">
-        <label class="sr-only" for="all-resources-search">Search resources or borrowers</label>
-        <input id="all-resources-search" type="search" placeholder="Search resource or borrower">
-        <button class="btn btn-accent btn-sm" type="submit">Search</button>
-      </form>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Resource</th><th>Total</th><th>Available</th><th>Borrowed By</th></tr></thead>
-          <tbody id="resources-table"></tbody>
-        </table>
-      </div>
-    </div>
-
+      <section class="coordinator-shortcuts" aria-label="Coordinator work areas">
+        <a class="coordinator-shortcut" href="staff_plots.php">
+          <span class="shortcut-index">01</span>
+          <span><strong>Plots</strong><small>Review applications and manage the plot map</small></span>
+          <span class="shortcut-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="coordinator-shortcut" href="staff_inventory.php">
+          <span class="shortcut-index">02</span>
+          <span><strong>Inventory</strong><small>Approve resource requests and check stock</small></span>
+          <span class="shortcut-arrow" aria-hidden="true">→</span>
+        </a>
+      </section>
+    </main>
   </div>
-</main>
-
-<footer class="site-footer">
-  <div class="wrap footer-row">
-    <div>
-      <p class="wordmark wordmark-light">HarvestHub</p>
-      <p class="footer-tagline">A produce exchange board for gardeners who'd rather share than waste it.</p>
-    </div>
-    <div class="footer-meta">
-      <p>Phase 3 prototype — Produce Exchange Board module</p>
-      <p>Built with PHP, MySQL, and vanilla JavaScript</p>
-    </div>
-  </div>
-</footer>
-
+</div>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=2"></script>
+<script src="assets/staff.js?v=3"></script>
 </body>
 </html>
