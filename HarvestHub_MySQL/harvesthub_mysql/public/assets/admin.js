@@ -552,7 +552,7 @@ async function renderActivityGraph() {
       labels: data.resources.labels,
       datasets: [
         {
-          label: 'Available in Shed',
+          label: 'Available',
           data: data.resources.available,
           backgroundColor: brownLight,
           borderRadius: 4
