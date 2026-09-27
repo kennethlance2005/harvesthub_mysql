@@ -651,7 +651,14 @@ try {
 
         case 'resources': {
             requireJsonRole('customer');
-            $rows = $pdo->query("SELECT ResourceID, Name, TotalQty, AvailableQty FROM RESOURCE ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
+            $rows = $pdo->query("
+                SELECT R.ResourceID, R.Name, R.TotalQty,
+                       GREATEST(0, R.TotalQty - COALESCE((
+                           SELECT SUM(T.Qty) FROM RESOURCE_TXN T
+                           WHERE T.ResourceID = R.ResourceID AND T.Status IN ('Approved', 'Return Requested')
+                       ), 0)) AS AvailableQty
+                FROM RESOURCE R ORDER BY R.Name
+            ")->fetchAll(PDO::FETCH_ASSOC);
             respond(['ok' => true, 'resources' => $rows]);
         }
 
@@ -663,7 +670,13 @@ try {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
             }
 
-            $res = $pdo->prepare("SELECT AvailableQty FROM RESOURCE WHERE ResourceID = ?");
+            $res = $pdo->prepare("
+                SELECT GREATEST(0, R.TotalQty - COALESCE((
+                    SELECT SUM(T.Qty) FROM RESOURCE_TXN T
+                    WHERE T.ResourceID = R.ResourceID AND T.Status IN ('Approved', 'Return Requested')
+                ), 0)) AS AvailableQty
+                FROM RESOURCE R WHERE R.ResourceID = ?
+            ");
             $res->execute([(int) $resourceId]);
             $available = $res->fetchColumn();
             if ($available === false || (int) $qty > (int) $available) {
@@ -703,10 +716,21 @@ try {
                 respond(['ok' => false, 'error' => 'Could not return this item.'], 400);
             }
 
+            $resource = $pdo->prepare('SELECT TotalQty FROM RESOURCE WHERE ResourceID = ? FOR UPDATE');
+            $resource->execute([(int) $row['ResourceID']]);
+            $totalQty = $resource->fetchColumn();
+            if ($totalQty === false) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'Resource not found.'], 404);
+            }
+
             $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Returned', ReturnedAt = NOW() WHERE TxnID = ?")
                 ->execute([(int) $txnId]);
-            $pdo->prepare('UPDATE RESOURCE SET AvailableQty = LEAST(TotalQty, AvailableQty + ?) WHERE ResourceID = ?')
-                ->execute([(int) $row['Qty'], (int) $row['ResourceID']]);
+            $active = $pdo->prepare("SELECT COALESCE(SUM(Qty), 0) FROM RESOURCE_TXN WHERE ResourceID = ? AND Status IN ('Approved', 'Return Requested')");
+            $active->execute([(int) $row['ResourceID']]);
+            $availableQty = max(0, (int) $totalQty - (int) $active->fetchColumn());
+            $pdo->prepare('UPDATE RESOURCE SET AvailableQty = ? WHERE ResourceID = ?')
+                ->execute([$availableQty, (int) $row['ResourceID']]);
             $pdo->commit();
             respond(['ok' => true]);
         }
@@ -895,28 +919,45 @@ try {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
             }
 
-            $txn = $pdo->prepare("SELECT GardenerID, ResourceID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ?");
+            $pdo->beginTransaction();
+            $txn = $pdo->prepare("SELECT GardenerID, ResourceID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ? FOR UPDATE");
             $txn->execute([(int) $txnId]);
             $row = $txn->fetch(PDO::FETCH_ASSOC);
-            if (!$row || $row['Status'] !== 'Requested') respond(['ok' => false, 'error' => 'Already processed.'], 409);
+            if (!$row || $row['Status'] !== 'Requested') {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'Already processed.'], 409);
+            }
 
             if ($decision === 'approve') {
-                $res = $pdo->prepare("SELECT AvailableQty FROM RESOURCE WHERE ResourceID = ?");
+                $res = $pdo->prepare('SELECT TotalQty FROM RESOURCE WHERE ResourceID = ? FOR UPDATE');
                 $res->execute([$row['ResourceID']]);
-                $avail = (int) $res->fetchColumn();
-                if ($row['Qty'] > $avail) respond(['ok' => false, 'error' => 'Not enough stock left to approve.'], 409);
+                $totalQty = $res->fetchColumn();
+                if ($totalQty === false) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Resource not found.'], 404);
+                }
+                $active = $pdo->prepare("SELECT COALESCE(SUM(Qty), 0) FROM RESOURCE_TXN WHERE ResourceID = ? AND Status IN ('Approved', 'Return Requested')");
+                $active->execute([(int) $row['ResourceID']]);
+                $availableQty = max(0, (int) $totalQty - (int) $active->fetchColumn());
+                if ((int) $row['Qty'] > $availableQty) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Not enough stock left to approve.'], 409);
+                }
 
-                $pdo->prepare("UPDATE RESOURCE SET AvailableQty = AvailableQty - ? WHERE ResourceID = ?")
-                    ->execute([$row['Qty'], $row['ResourceID']]);
                 $plot = $pdo->prepare("SELECT PltID FROM PLOT WHERE GardenerID = ? AND Status = 'Occupied' ORDER BY PltID LIMIT 1");
                 $plot->execute([(int) $row['GardenerID']]);
                 $plotId = $plot->fetchColumn();
                 $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Approved', CoordID = ?, PltID = ?, ApprovedAt = NOW() WHERE TxnID = ?")
                     ->execute([$user['id'], $plotId === false ? null : (int) $plotId, (int) $txnId]);
+                $active->execute([(int) $row['ResourceID']]);
+                $availableQty = max(0, (int) $totalQty - (int) $active->fetchColumn());
+                $pdo->prepare('UPDATE RESOURCE SET AvailableQty = ? WHERE ResourceID = ?')
+                    ->execute([$availableQty, (int) $row['ResourceID']]);
             } else {
                 $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Rejected', CoordID = ? WHERE TxnID = ?")
                     ->execute([$user['id'], (int) $txnId]);
             }
+            $pdo->commit();
             respond(['ok' => true]);
         }
 
@@ -1006,11 +1047,12 @@ try {
                         'ResourceID' => $resourceId,
                         'Name' => $row['Name'],
                         'TotalQty' => (int) $row['TotalQty'],
-                        'AvailableQty' => (int) $row['AvailableQty'],
+                        'AvailableQty' => (int) $row['TotalQty'],
                         'Borrowers' => [],
                     ];
                 }
                 if ($row['TxnID'] !== null) {
+                    $resources[$resourceId]['AvailableQty'] = max(0, $resources[$resourceId]['AvailableQty'] - (int) $row['BorrowedQty']);
                     $resources[$resourceId]['Borrowers'][] = [
                         'TxnID' => (int) $row['TxnID'],
                         'Name' => $row['BorrowerName'],
@@ -1421,7 +1463,17 @@ try {
             ];
 
             // 3. Resource Inventory (Per Item)
-            $resourcesRaw = $pdo->query("SELECT Name, TotalQty, AvailableQty FROM RESOURCE ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
+            $resourcesRaw = $pdo->query("
+                SELECT R.ResourceID, R.Name, R.TotalQty,
+                       GREATEST(0, R.TotalQty - COALESCE(SUM(CASE
+                           WHEN T.Status IN ('Approved', 'Return Requested') THEN T.Qty
+                           ELSE 0
+                       END), 0)) AS AvailableQty
+                FROM RESOURCE R
+                LEFT JOIN RESOURCE_TXN T ON T.ResourceID = R.ResourceID
+                GROUP BY R.ResourceID, R.Name, R.TotalQty
+                ORDER BY R.Name
+            ")->fetchAll(PDO::FETCH_ASSOC);
             $resources = [ 'labels' => [], 'available' => [], 'borrowed' => [] ];
             
             foreach ($resourcesRaw as $r) {

@@ -1410,13 +1410,27 @@ table.data-table {
 .inventory-add-form label { color: var(--ink-600); font-size: 0.82rem; font-weight: 600; }
 .inventory-add-form input { min-height: 38px; width: min(100%, 250px); padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink-900); font: inherit; }
 .inventory-add-form input[type="number"] { width: 100px; }
-.borrower-assignments { display: grid; gap: 8px; }
-.borrower-assignment { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-.borrower-assignment:last-child { border-bottom: 0; }
-.borrower-assignment > div { min-width: 0; }
-.borrower-assignment .text-muted { display: inline; overflow-wrap: anywhere; }
-.borrower-assignment .badge { margin-left: 6px; }
-.borrower-assignment .btn { flex: 0 0 auto; }
+.coordinator-section .resource-inventory-table { width: 100%; min-width: 960px; table-layout: fixed; }
+.resource-inventory-table th,
+.resource-inventory-table td { width: 25%; overflow: hidden; }
+.resource-inventory-table th { height: 42px; white-space: nowrap; text-overflow: ellipsis; }
+.resource-inventory-table td { height: 148px; padding: 10px 12px; }
+.resource-inventory-table .resource-inventory-row { height: 148px; }
+.resource-inventory-table .resource-inventory-row > td:nth-child(2),
+.resource-inventory-table .resource-inventory-row > td:nth-child(3) { text-align: center; font-variant-numeric: tabular-nums; }
+.resource-name-cell { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font-weight: 700; color: var(--green-900); }
+.borrower-assignments { display: grid; align-content: start; gap: 6px; max-height: 124px; overflow-y: auto; padding: 1px 5px 1px 1px; scrollbar-color: var(--sage-500) transparent; scrollbar-width: thin; }
+.borrower-assignment { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 52px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--white); }
+.borrower-assignment-info { display: grid; min-width: 0; gap: 2px; }
+.borrower-assignment-info strong,
+.borrower-assignment-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.borrower-assignment-info strong { color: var(--ink-900); font-size: 0.8rem; }
+.borrower-assignment-meta { color: var(--ink-600); font-size: 0.72rem; }
+.borrower-return-status { color: var(--brown-700); font-size: 0.68rem; font-weight: 700; }
+.borrower-empty-state { display: block; overflow: hidden; color: var(--ink-600); font-size: 0.82rem; text-overflow: ellipsis; white-space: nowrap; }
+.btn-return-request { min-width: 94px; padding: 7px 9px; border-color: var(--brown-700); background: var(--brown-600); box-shadow: 0 2px 5px rgba(78, 40, 22, 0.16); color: var(--white); font-size: 0.7rem; line-height: 1.2; white-space: nowrap; }
+.btn-return-request:hover { border-color: var(--brown-700); background: var(--brown-700); box-shadow: 0 3px 8px rgba(78, 40, 22, 0.22); }
+.btn-return-request:focus-visible { outline-color: var(--brown-700); }
 .records-section { max-width: 900px; }
 .records-timeline { position: relative; padding-left: 28px; }
 .records-timeline::before { position: absolute; top: 12px; bottom: 12px; left: 8px; width: 1px; background: var(--line); content: ""; }
@@ -1432,7 +1446,6 @@ table.data-table {
 
 @media (max-width: 900px) {
   .coordinator-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .borrower-assignment { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 768px) {
@@ -1445,6 +1458,7 @@ table.data-table {
   .inventory-add-form input[type="number"] { flex: 0 1 100px; }
   .coordinator-section .table-wrap { overflow-x: auto; }
   .coordinator-section .data-table { min-width: 760px; }
+  .coordinator-section .resource-inventory-table { min-width: 960px; }
 }
 
 @media (max-width: 480px) {

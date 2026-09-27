@@ -253,20 +253,22 @@ function renderResources() {
       matchesSearch(borrower.Name, query) || matchesSearch(borrower.PlotLabel, query)));
 
   const rows = filtered.map(resource => `
-    <tr>
-      <td>${escapeHtml(resource.Name)}</td>
+    <tr class="resource-inventory-row">
+      <td><span class="resource-name-cell" title="${escapeHtml(resource.Name)}">${escapeHtml(resource.Name)}</span></td>
       <td>${escapeHtml(String(resource.TotalQty))}</td>
       <td>${escapeHtml(String(resource.AvailableQty))}</td>
       <td><div class="borrower-assignments">${resource.Borrowers.length ? resource.Borrowers.map(borrower => `
         <div class="borrower-assignment">
-          <div><strong>${escapeHtml(borrower.Name)}</strong> <span class="text-muted">· ${escapeHtml(String(borrower.Qty))}x · ${escapeHtml(borrower.PlotLabel || 'No plot assigned')}</span>
-            ${borrower.Status === 'Return Requested' ? '<span class="badge badge-brown">Return requested</span>' : ''}
+          <div class="borrower-assignment-info">
+            <strong title="${escapeHtml(borrower.Name)}">${escapeHtml(borrower.Name)}</strong>
+            <span class="borrower-assignment-meta" title="${escapeHtml(`${borrower.Qty}x · ${borrower.PlotLabel || 'No plot assigned'}`)}">${escapeHtml(String(borrower.Qty))}x · ${escapeHtml(borrower.PlotLabel || 'No plot assigned')}</span>
+            ${borrower.Status === 'Return Requested' ? '<span class="borrower-return-status">Return requested</span>' : ''}
           </div>
           ${borrower.Status === 'Approved'
-            ? `<button class="btn btn-ghost btn-sm request-return-btn" type="button" data-id="${borrower.TxnID}">Request return</button>`
+            ? `<button class="btn btn-sm btn-return-request request-return-btn" type="button" data-id="${borrower.TxnID}">Request return</button>`
             : ''}
         </div>
-      `).join('') : '<span class="text-muted">No current borrowers</span>'}</div></td>
+      `).join('') : '<span class="borrower-empty-state">No current borrowers</span>'}</div></td>
     </tr>
   `).join('');
   tableEl.innerHTML = rows || '<tr><td colspan="4" class="text-muted">No resources match your search.</td></tr>';
