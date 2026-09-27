@@ -913,6 +913,7 @@ table.data-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.92rem;
+  table-layout: fixed;
 }
 
 .data-table th {
@@ -929,6 +930,7 @@ table.data-table {
   padding: 10px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
+  word-break: break-word;
 }
 
 .data-table tr:last-child td { border-bottom: none; }
@@ -1478,4 +1480,44 @@ input[data-table-search]:focus {
   outline: none;
   border-color: var(--brown-600);
   background-color: var(--white);
+}
+
+/* =========================================================
+   Print Styles (Clean Colored PDF Export)
+   ========================================================= */
+@media print {
+  @page { margin: 1cm; }
+  
+  /* Force browsers to print background colors and keep brand styling */
+  body { 
+    -webkit-print-color-adjust: exact !important; 
+    print-color-adjust: exact !important; 
+    margin: 0; 
+  }
+  
+  /* Hide navigation, interactive buttons, and overlays */
+  .sidebar, .app-header, .site-header, .toast-container, .modal-overlay, .btn {
+    display: none !important;
+  }
+  
+  /* Expand main content to fill the page cleanly */
+  .app-layout { display: block !important; min-height: auto; }
+  .main-content {
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .wrap { max-width: 100% !important; padding: 0 !important; }
+  
+  /* Keep the card shapes but remove heavy web shadows */
+  .panel, .stat-card {
+    border: 1px solid var(--line) !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+  
+  .stat-grid { gap: 16px; margin-bottom: 28px; }
+  
+  /* Allow the Chart.js canvas to render cleanly */
+  canvas { max-width: 100% !important; }
 }

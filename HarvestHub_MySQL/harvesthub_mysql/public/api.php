@@ -1238,6 +1238,54 @@ try {
             respond(['ok' => true]);
         }
 
+        case 'user_archive_details': {
+            requireJsonRole('admin');
+            $table = $_GET['table'] ?? '';
+            $id = (int)($_GET['id'] ?? 0);
+
+            if (!$id || !in_array($table, ['gardener', 'coordinator', 'admin'])) {
+                respond(['ok' => false, 'error' => 'Invalid request.']);
+            }
+
+            $details = ['profile' => [], 'plots' => [], 'listings' => [], 'borrowed' => []];
+
+            if ($table === 'gardener') {
+                $stmt = $pdo->prepare("SELECT Name, Email, Age, Location FROM COMMUNITY_GARDENER WHERE GardenerID = ?");
+                $stmt->execute([$id]);
+                $details['profile'] = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                $stmt = $pdo->prepare("SELECT Label FROM PLOT WHERE GardenerID = ? AND Status = 'Occupied'");
+                $stmt->execute([$id]);
+                $details['plots'] = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+                $stmt = $pdo->prepare("SELECT ProduceName FROM EXCHANGE_BOARD WHERE GardenerID = ? AND Status = 'Active'");
+                $stmt->execute([$id]);
+                $details['listings'] = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+                $stmt = $pdo->prepare("
+                    SELECT R.Name, T.Qty 
+                    FROM RESOURCE_TXN T 
+                    JOIN RESOURCE R ON T.ResourceID = R.ResourceID 
+                    WHERE T.GardenerID = ? AND T.Status = 'Approved'
+                ");
+                $stmt->execute([$id]);
+                $details['borrowed'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            } elseif ($table === 'coordinator') {
+                // Coordinators do not have an Age column in the schema!
+                $stmt = $pdo->prepare("SELECT Name, Email, Shift, Location FROM GARDEN_COORDINATOR WHERE CoordID = ?");
+                $stmt->execute([$id]);
+                $details['profile'] = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            } elseif ($table === 'admin') {
+                $stmt = $pdo->prepare("SELECT Name, Email, Age, Location FROM SYSTEM_ADMINISTRATOR WHERE AdminID = ?");
+                $stmt->execute([$id]);
+                $details['profile'] = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+
+            respond(['ok' => true, 'details' => $details]);
+        }
+
         case 'archived_accounts': {
             requireJsonRole('admin');
             $gardeners = $pdo->query("SELECT GardenerID AS id, Name, Email, 'Customer' as Role, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location, '—' as Shift FROM COMMUNITY_GARDENER WHERE Status = 'Archived'");

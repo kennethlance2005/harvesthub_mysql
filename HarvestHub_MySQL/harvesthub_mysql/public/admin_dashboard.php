@@ -21,12 +21,18 @@ $navTitle = 'System Dashboard';
   <div class="main-content">
     <main class="wrap" id="top" style="max-width: 1200px; padding-top: 32px;">
       
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <h2 style="margin:0; font-family: var(--font-display);">System Overview</h2>
-        <button id="export-report-btn" class="btn btn-accent btn-sm">Export System Report (CSV)</button>
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+          <div>
+              <h2 style="margin: 0; font-family: var(--font-display); color: var(--green-900); font-size: 1.8rem;">System Overview</h2>
+              
+          </div>
+          <div style="display: flex; gap: 12px;">
+              <button type="button" class="btn btn-accent" id="export-report-btn">Export CSV</button>
+              <button type="button" class="btn btn-accent" id="export-pdf-btn">Save as PDF</button>
+          </div>
       </div>
 
-      <div class="stat-grid" id="stats-row" style="margin-bottom: 24px;"></div>
+      <div class="stat-grid" id="stats-row" style="margin-bottom: 28px;"></div>
 
       <div class="panel">
         <p class="panel-title">Platform Activity Graph</p>

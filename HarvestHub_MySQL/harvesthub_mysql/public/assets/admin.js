@@ -253,20 +253,116 @@ async function processSignup(requestId, decision) {
 
 const deleteModal = document.getElementById('delete-modal');
 const deleteModalBody = document.getElementById('delete-modal-body');
+const deleteModalTitle = document.getElementById('delete-modal-title');
 const deleteCancelBtn = document.getElementById('delete-cancel');
 const deleteConfirmBtn = document.getElementById('delete-confirm');
 let pendingDelete = null;
 
-function openDeleteModal(table, id, name) {
-  if (!deleteModal) return; // Safety check
+async function openDeleteModal(table, id, name) {
+  if (!deleteModal) return; 
   pendingDelete = { table, id };
-  deleteModalBody.textContent = `Archive ${name}'s account? This cannot be undone.`;
+  
+  // Reset modal state to loading
+  if (deleteModalTitle) deleteModalTitle.textContent = `Archive ${name}?`;
+  if (deleteModalBody) deleteModalBody.innerHTML = `<p class="text-muted">Loading account details...</p>`;
+  
+  // Set button to faded brown while loading
+  if (deleteConfirmBtn) {
+      deleteConfirmBtn.disabled = true;
+      deleteConfirmBtn.style.opacity = '0.5';
+      deleteConfirmBtn.style.cursor = 'not-allowed';
+  }
+  
   deleteModal.hidden = false;
-  deleteConfirmBtn.focus();
+
+  // Fetch the user's active assets and profile from the backend
+  const res = await fetch(`api.php?action=user_archive_details&table=${table}&id=${id}`);
+  const data = await res.json();
+  
+  if (!data.ok) {
+     if (deleteModalBody) deleteModalBody.innerHTML = `<p class="text-danger">Failed to load account details.</p>`;
+     return;
+  }
+
+  const d = data.details;
+  let html = ``;
+  let canArchive = true;
+
+  // 1. Basic Information Block (Shown for everyone)
+  if (d.profile) {
+      html += `
+      <div style="background: var(--cream-100); padding: 14px; border-radius: var(--radius); border: 1px solid var(--line); margin-bottom: 18px; font-size: 0.9rem; color: var(--ink-900);">
+          <div style="margin-bottom: 6px;"><strong>Email:</strong> ${escapeHtml(d.profile.Email)}</div>
+          <div style="margin-bottom: 6px;"><strong>Location:</strong> ${escapeHtml(d.profile.Location || 'Not provided')}</div>`;
+      
+      if (d.profile.Age) {
+          html += `<div style="margin-bottom: 6px;"><strong>Age:</strong> ${escapeHtml(String(d.profile.Age))}</div>`;
+      }
+      if (d.profile.Shift) {
+          html += `<div style="margin-bottom: 0;"><strong>Shift:</strong> ${escapeHtml(d.profile.Shift)}</div>`;
+      }
+      html += `</div>`;
+  }
+
+  // 2. Gardener-Specific Checks
+  if (table === 'gardener') {
+     
+     // Hard Block: Unreturned Borrowed Items
+     if (d.borrowed && d.borrowed.length > 0) {
+         canArchive = false;
+         html += `
+         <div class="form-alert" style="margin-top: 0; margin-bottom: 18px; padding: 14px;">
+            <strong>Cannot Archive:</strong> This gardener currently possesses unreturned tools. They must return these items before archiving is permitted:
+            <ul style="margin: 8px 0 0; padding-left: 20px;">
+               ${d.borrowed.map(i => `<li>${escapeHtml(i.Name)} (Qty:${i.Qty})</li>`).join('')}
+            </ul>
+         </div>`;
+     }
+
+     // Warning: Active Plots
+     if (d.plots && d.plots.length > 0) {
+         html += `
+         <div style="margin-bottom: 14px;">
+            <strong style="color: var(--danger);">Active Plots (Will be unassigned):</strong>
+            <ul style="margin: 4px 0 0; padding-left: 20px; font-size: 0.92rem;">
+               ${d.plots.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+            </ul>
+         </div>`;
+     }
+
+     // Warning: Active Listings
+     if (d.listings && d.listings.length > 0) {
+         html += `
+         <div style="margin-bottom: 14px;">
+            <strong>Exchange Listings (Will be orphaned):</strong>
+            <ul style="margin: 4px 0 0; padding-left: 20px; font-size: 0.92rem;">
+               ${d.listings.map(l => `<li>${escapeHtml(l)}</li>`).join('')}
+            </ul>
+         </div>`;
+     }
+  }
+
+  // Final permissive text if they pass the guardrails
+  if (canArchive) {
+     html += `<p style="margin: 0; font-size: 0.95rem; color: var(--ink-600);">They will lose login access, but their past records will remain intact.</p>`;
+     
+     // Restore full brown button appearance
+     if (deleteConfirmBtn) {
+         deleteConfirmBtn.disabled = false;
+         deleteConfirmBtn.style.opacity = '1'; 
+         deleteConfirmBtn.style.cursor = 'pointer';
+     }
+  }
+
+  // Inject content and focus
+  if (deleteModalBody) deleteModalBody.innerHTML = html;
+  if (canArchive && deleteConfirmBtn) {
+      deleteConfirmBtn.focus();
+  }
 }
 
 function closeDeleteModal() {
-  if (!deleteModal) return; // Safety check
+  if (!deleteModal) return; 
   deleteModal.hidden = true;
   pendingDelete = null;
 }
@@ -298,7 +394,6 @@ if (deleteConfirmBtn) {
     });
 }
 
-// ---------- Archived Accounts Logic ----------
 // ---------- Archived Accounts Logic ----------
 async function loadArchivedAccounts() {
   const table = document.getElementById('archived-table');
@@ -552,6 +647,15 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+    });
+  }
+
+  // 5. Export PDF Button
+  const exportPdfBtn = document.getElementById('export-pdf-btn');
+  if (exportPdfBtn) {
+    exportPdfBtn.addEventListener('click', () => {
+      // Small timeout ensures any active tooltips close before capturing
+      setTimeout(() => window.print(), 100); 
     });
   }
 });
