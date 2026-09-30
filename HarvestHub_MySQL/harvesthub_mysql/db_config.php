@@ -12,9 +12,11 @@
  */
 
 return [
-    'host'    => 'localhost',
-    'dbname'  => 'harvesthub',
-    'user'    => 'root',
-    'password' => '',
-    'charset' => 'utf8mb4',
+    'host'     => getenv('DB_HOST') ?: 'localhost',
+    'port'     => getenv('DB_PORT') ?: '3306',
+    'dbname'   => getenv('DB_NAME') ?: 'harvesthub',
+    'user'     => getenv('DB_USER') ?: 'root',
+    'password' => getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : '',
+    'charset'  => 'utf8mb4',
+    'ssl_ca'   => getenv('DB_SSL_CA') ?: '',
 ];
