@@ -33,13 +33,14 @@ function renderApplications() {
 
   listEl.innerHTML = filtered.map(app => `
     <div class="action-row">
-      <div>
+      <div class="action-row-details">
         <div class="action-row-title">${escapeHtml(app.GardenerName)}</div>
         <div class="action-row-sub">${app.RequestType === 'Unassign'
           ? `Requesting for plot "${escapeHtml(app.Label)}" to be unassigned`
           : `Requesting ${escapeHtml(app.Label)}`}
           <span class="text-muted"> • ${escapeHtml(app.PlotStatus || 'Pending')}</span>
         </div>
+        <time class="action-row-time" datetime="${escapeHtml(String(app.AppliedAt || '').replace(' ', 'T'))}">Requested ${escapeHtml(formatRecordDate(app.AppliedAt))}</time>
       </div>
       <div class="action-row-actions">
         <button class="btn btn-accent btn-sm approve-app" data-id="${app.AppID}">Approve</button>
@@ -118,7 +119,10 @@ async function loadApplications() {
 async function processApplication(appId, decision) {
   const data = await postAction('process_application', { app_id: appId, decision });
   if (data.ok) {
-    showToast(`Application ${decision === 'approve' ? 'approved' : 'rejected'}.`, 'success');
+    const resultMessage = decision === 'approve' && data.auto_rejected
+      ? `Application approved. ${data.auto_rejected} other request${data.auto_rejected === 1 ? '' : 's'} automatically rejected.`
+      : `Application ${decision === 'approve' ? 'approved' : 'rejected'}.`;
+    showToast(resultMessage, 'success');
     loadApplications();
     loadPlots();
   } else {

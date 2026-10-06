@@ -110,12 +110,14 @@ CREATE TABLE PLOT_APPLICATION (
 CREATE TABLE CROP_LOG (
     LogID            INT AUTO_INCREMENT PRIMARY KEY,
     GardenerID       INT          NOT NULL,
-    PltID            INT          NOT NULL,
+    GardenPlotID     INT          NULL,
+    PltID            INT          NULL,
     CropName         VARCHAR(60)  NOT NULL,
     MaintenanceNotes TEXT         NULL,
     HarvestYield     VARCHAR(60)  NULL,
     LoggedAt         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (GardenerID) REFERENCES COMMUNITY_GARDENER(GardenerID),
+    FOREIGN KEY (GardenPlotID) REFERENCES GARDEN_PLOTS(PlotID),
     FOREIGN KEY (PltID) REFERENCES PLOT(PltID)
 ) ENGINE=InnoDB;
 

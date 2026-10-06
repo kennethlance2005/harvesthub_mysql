@@ -17,6 +17,24 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!data.ok) return;
 
+            const cropOptions = document.getElementById('maintenance-crop-options');
+            const maintenanceCropInput = document.getElementById('crop-name');
+            const maintenanceCropHint = document.getElementById('maintenance-crop-hint');
+            if (cropOptions) {
+                const cropChoices = data.plots.filter(plot => plot.CropName && !['Harvested', 'Failed'].includes(plot.Status)).map(plot => {
+                    const plantedDate = new Date(`${plot.PlantedDate}T00:00:00`).toLocaleDateString();
+                    return {
+                        plotId: plot.PlotID,
+                        label: `${plot.CropName} · planted ${plantedDate}`
+                    };
+                });
+                cropOptions.innerHTML = cropChoices.map(choice => `<option value="${escapeHtml(choice.label)}" data-plot-id="${Number(choice.plotId)}"></option>`).join('');
+                if (maintenanceCropInput) maintenanceCropInput.disabled = cropChoices.length === 0;
+                if (maintenanceCropHint && cropChoices.length === 0) {
+                    maintenanceCropHint.textContent = 'Add an active crop to your garden log before recording maintenance.';
+                }
+            }
+
             if (data.plots.length === 0) {
                 listEl.innerHTML = '<p class="empty-state">You have not logged any crops yet.</p>';
                 return;
@@ -79,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         if (result.ok) {
                             if (typeof showToast === 'function') showToast(`Status updated to ${newStatus}`, 'success');
+                            if (typeof loadCropLog === 'function') loadCropLog();
                             loadPlots(); 
                         } else {
                             if (typeof showToast === 'function') showToast(result.error || 'Failed to update status.', 'error');
@@ -188,6 +207,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------
     // COMMUNITY MAP LOGIC
     // -----------------------------------------
+
+    const seenPlotRejections = new Set();
+
+    function notifyRejectedApplications(applications) {
+        if (!Array.isArray(applications) || typeof showToast !== 'function') return;
+
+        applications.forEach(application => {
+            const appId = String(application.AppID);
+            const storageKey = `harvesthub:plot-rejection:${appId}`;
+            if (seenPlotRejections.has(appId)) return;
+
+            try {
+                if (localStorage.getItem(storageKey)) {
+                    seenPlotRejections.add(appId);
+                    return;
+                }
+                localStorage.setItem(storageKey, 'shown');
+            } catch (error) {
+                console.warn('Could not save plot rejection notification state:', error);
+            }
+
+            seenPlotRejections.add(appId);
+            showToast(`Your request for ${application.PlotName} was rejected. You can request another available plot.`, 'danger');
+        });
+    }
     
     async function loadMap() {
         const gridEl = document.getElementById('garden-map-grid');
@@ -203,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
 
             if (!data.ok) return;
+            notifyRejectedApplications(data.rejected_applications);
 
             gridEl.innerHTML = '';
 
@@ -233,19 +278,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
             gridEl.innerHTML = data.plots.map(plot => {
                 const isMine = Number(plot.IsMine) === 1;
-                const statusClass = isMine ? 'assigned' : plot.Status === 'Available' ? 'available' : plot.Status === 'Pending Approval' ? 'pending' : 'occupied';
-                const accessibleName = `${plot.PlotName ?? 'Plot'}, ${isMine ? 'assigned to you' : plot.Status}`;
-                const isAvailable = plot.Status === 'Available';
+                const hasRequested = Number(plot.ApplicationPending) === 1;
+                const statusClass = isMine ? 'assigned' : hasRequested ? 'pending' : ['Available', 'Pending Approval'].includes(plot.Status) ? 'available' : 'occupied';
+                const canRequest = !isMine && !Number(plot.ApplicationPending) && ['Available', 'Pending Approval'].includes(plot.Status);
+                const accessibleStatus = isMine
+                    ? 'assigned to you'
+                    : hasRequested
+                        ? 'your request is pending'
+                        : canRequest
+                            ? 'available to request'
+                            : plot.Status;
+                const accessibleName = `${plot.PlotName ?? 'Plot'}, ${accessibleStatus}`;
 
                 return `
-                    <button type="button" class="garden-map-plot ${statusClass}" aria-label="${escapeHtml(accessibleName)}" data-plot-id="${Number(plot.PlotID)}" data-plot-name="${escapeHtml(plot.PlotName ?? 'Plot')}" ${isAvailable ? '' : 'disabled'}>
+                    <button type="button" class="garden-map-plot ${statusClass}" aria-label="${escapeHtml(accessibleName)}" data-plot-id="${Number(plot.PlotID)}" data-plot-name="${escapeHtml(plot.PlotName ?? 'Plot')}" ${canRequest ? '' : 'disabled'}>
                         <span>${escapeHtml(plot.PlotName ?? 'Plot')}</span>
                         ${isMine ? '<small>Yours</small>' : ''}
+                        ${hasRequested ? '<small>Your request pending</small>' : ''}
                     </button>
                 `;
             }).join('');
 
-            gridEl.querySelectorAll('.garden-map-plot.available').forEach(button => {
+            gridEl.querySelectorAll('.garden-map-plot.available:not(:disabled), .garden-map-plot.pending:not(:disabled)').forEach(button => {
                 button.addEventListener('click', () => window.openPlotModal(button.dataset.plotId, button.dataset.plotName));
             });
 
@@ -337,5 +391,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize
     if (document.getElementById('plots-list')) loadPlots();
-    if (document.getElementById('garden-map-grid')) loadMap();
+    if (document.getElementById('garden-map-grid')) {
+        loadMap();
+        window.setInterval(() => {
+            if (!document.hidden) loadMap();
+        }, 15000);
+    }
 });

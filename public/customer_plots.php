@@ -50,7 +50,7 @@ $navTitle = 'My Plots';
         </div>
         <div class="garden-map-legend">
           <div><span class="garden-map-swatch available"></span>Available</div>
-          <div><span class="garden-map-swatch pending"></span>Pending</div>
+          <div><span class="garden-map-swatch pending"></span>My request pending</div>
           <div><span class="garden-map-swatch occupied"></span>Occupied</div>
           <div><span class="garden-map-swatch assigned"></span>Assigned to me</div>
         </div>
@@ -75,6 +75,6 @@ $navTitle = 'My Plots';
   </div>
 </div>
 <script src="assets/app.js"></script>
-<script src="assets/plots.js?v=3"></script>
+<script src="assets/plots.js?v=6"></script>
 </body>
 </html>

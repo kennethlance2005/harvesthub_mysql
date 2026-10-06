@@ -121,6 +121,7 @@ async function loadCropLog() {
         <strong>${escapeHtml(log.CropName)}</strong>
         <time class="text-muted">${escapeHtml(log.LoggedAt)}</time>
       </div>
+      ${log.GardenPlantedDate ? `<p class="maintenance-log-plot">Planted ${new Date(`${log.GardenPlantedDate}T00:00:00`).toLocaleDateString()}</p>` : ''}
       ${log.Label ? `<p class="maintenance-log-plot">${escapeHtml(log.Label)}</p>` : ''}
       ${log.MaintenanceNotes ? `<p class="maintenance-log-notes">${escapeHtml(log.MaintenanceNotes)}</p>` : ''}
       ${log.HarvestYield ? `<p class="maintenance-log-yield"><strong>Yield:</strong> ${escapeHtml(log.HarvestYield)}</p>` : ''}
@@ -135,15 +136,23 @@ if (croplogForm) {
     const alertEl = document.getElementById('croplog-alert');
     alertEl.hidden = true;
 
-    const cropName = document.getElementById('crop-name').value.trim();
-    if (cropName === '') {
-      alertEl.textContent = 'Crop name is required.';
+    const cropSelection = document.getElementById('crop-name').value.trim();
+    if (cropSelection === '') {
+      alertEl.textContent = 'Select a crop from your garden log.';
+      alertEl.hidden = false;
+      return;
+    }
+
+    const cropOptions = document.getElementById('maintenance-crop-options');
+    const selectedCrop = cropOptions && Array.from(cropOptions.options).find(option => option.value.toLowerCase() === cropSelection.toLowerCase());
+    if (cropOptions && !selectedCrop) {
+      alertEl.textContent = 'Choose a crop and planted date from your garden log.';
       alertEl.hidden = false;
       return;
     }
 
     const result = await postAction('croplog_create', {
-      crop_name: cropName,
+      garden_plot_id: selectedCrop.dataset.plotId,
       notes: document.getElementById('crop-notes').value.trim(),
       yield: document.getElementById('crop-yield').value.trim(),
     });
@@ -268,6 +277,7 @@ async function loadCustomerDashboard() {
               <strong>${escapeHtml(log.CropName)}</strong>
               <span class="text-muted" style="font-size: 0.75rem;">${escapeHtml(log.LoggedAt.split(' ')[0])}</span>
             </div>
+            ${log.GardenPlantedDate ? `<div class="text-muted" style="font-size: 0.75rem;">Planted ${new Date(`${log.GardenPlantedDate}T00:00:00`).toLocaleDateString()}</div>` : ''}
             ${log.MaintenanceNotes ? `<div class="text-muted" style="font-size: 0.8rem;">${escapeHtml(log.MaintenanceNotes)}</div>` : ''}
           </div>
         `).join('');

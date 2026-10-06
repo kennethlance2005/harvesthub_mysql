@@ -51,6 +51,6 @@ $navTitle = 'Coordinator Dashboard';
   </div>
 </div>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=3"></script>
+<script src="assets/staff.js?v=4"></script>
 </body>
 </html>

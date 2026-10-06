@@ -89,6 +89,6 @@ $navTitle = 'Gardener Dashboard';
 
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
-<script src="assets/customer.js?v=4"></script>
+<script src="assets/customer.js?v=5"></script>
 </body>
 </html>

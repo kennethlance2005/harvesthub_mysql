@@ -79,8 +79,10 @@ $navTitle = 'My Crops';
 					<h2 class="panel-title" id="maintenance-form-title">Log Maintenance</h2>
 					<form id="croplog-form" class="maintenance-form" novalidate>
 						<div class="field">
-							<label for="crop-name">Crop name</label>
-							<input type="text" id="crop-name" maxlength="60" placeholder="e.g., Tomatoes" required>
+							<label for="crop-name">Select crop from your garden log</label>
+							<input type="search" id="crop-name" list="maintenance-crop-options" maxlength="60" placeholder="Search your crops..." autocomplete="off" required>
+							<datalist id="maintenance-crop-options"></datalist>
+							<small id="maintenance-crop-hint" class="text-muted">Choose one of your crops to log its care.</small>
 						</div>
 						<div class="field">
 							<label for="crop-notes">Maintenance notes</label>
@@ -90,7 +92,7 @@ $navTitle = 'My Crops';
 							<label for="crop-yield">Harvest yield <span class="text-muted">(optional)</span></label>
 							<input type="text" id="crop-yield" maxlength="60" placeholder="e.g., 2 kg">
 						</div>
-						<p class="maintenance-form-hint text-muted">An assigned garden plot is required to create a maintenance record.</p>
+						<p class="maintenance-form-hint text-muted">Only crops that are still planted or growing can receive maintenance entries.</p>
 						<p id="croplog-alert" class="form-error" role="alert" hidden></p>
 						<button type="submit" class="btn btn-accent">Save maintenance entry</button>
 					</form>
@@ -113,7 +115,7 @@ $navTitle = 'My Crops';
 </div>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
-<script src="assets/customer.js?v=5"></script>
-<script src="assets/plots.js?v=2"></script>
+<script src="assets/customer.js?v=8"></script>
+<script src="assets/plots.js?v=6"></script>
 </body>
 </html>
