@@ -760,6 +760,42 @@ a { color: inherit; }
 
 .page-wrap { padding: 32px 0 64px; }
 
+.maintenance-page { max-width: 1120px; padding-top: 32px; padding-bottom: 56px; }
+.maintenance-page-head { align-items: start; }
+.maintenance-page-head h1 { margin: 0; font-family: var(--font-display); font-size: 2.1rem; color: var(--green-900); }
+.maintenance-page-head .text-muted { margin: 8px 0 0; }
+.maintenance-layout { display: grid; grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr); align-items: start; gap: 24px; }
+.maintenance-form-panel,
+.maintenance-history-panel { min-width: 0; }
+.maintenance-form { display: grid; gap: 16px; }
+.maintenance-form .field { margin: 0; }
+.maintenance-form label { display: block; margin-bottom: 6px; color: var(--ink-600); font-size: 0.86rem; font-weight: 600; }
+.maintenance-form input,
+.maintenance-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink-900); font: inherit; }
+.maintenance-form textarea { resize: vertical; }
+.maintenance-form-hint { margin: 0; font-size: 0.82rem; }
+.maintenance-log-list { max-height: 680px; overflow-y: auto; }
+.maintenance-log-entry { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.maintenance-log-entry:first-child { padding-top: 0; }
+.maintenance-log-entry:last-child { border-bottom: 0; }
+.maintenance-log-entry-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.maintenance-log-entry-head strong { color: var(--green-900); font-family: var(--font-display); font-size: 1.05rem; }
+.maintenance-log-entry-head time { font-size: 0.78rem; }
+.maintenance-log-plot,
+.maintenance-log-notes,
+.maintenance-log-yield { margin: 6px 0 0; overflow-wrap: anywhere; }
+.maintenance-log-plot { color: var(--ink-600); font-size: 0.8rem; }
+.maintenance-log-notes { color: var(--ink-600); font-size: 0.9rem; white-space: pre-wrap; }
+.maintenance-log-yield { font-size: 0.86rem; }
+.form-error { margin: 0; color: var(--danger); font-size: 0.88rem; }
+
+@media (max-width: 768px) {
+  .maintenance-layout { grid-template-columns: minmax(0, 1fr); }
+  .maintenance-page { padding: 24px 16px 40px; }
+  .maintenance-page-head h1 { font-size: 1.75rem; }
+  .maintenance-log-entry-head { align-items: flex-start; flex-direction: column; gap: 4px; }
+}
+
 .staff-page {
   min-height: 100vh;
   display: flex;

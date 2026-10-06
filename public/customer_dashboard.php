@@ -65,7 +65,7 @@ $navTitle = 'Gardener Dashboard';
         <div class="panel">
           <div class="panel-header">
             <p class="panel-title" style="margin: 0;">Recent Maintenance</p>
-            <a href="customer_plots.php" class="kpi-link" style="font-weight: 400;">Log new entry</a>
+            <a href="customer_maintenance.php" class="kpi-link" style="font-weight: 400;">Log new entry</a>
           </div>
           <div id="recent-logs-list" class="scroll-y" style="max-height: 220px;" aria-live="polite">
             <p class="empty-state">Loading recent logs...</p>

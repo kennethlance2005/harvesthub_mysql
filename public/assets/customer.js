@@ -116,14 +116,15 @@ async function loadCropLog() {
   }
 
   el.innerHTML = data.logs.map(log => `
-    <div style="border-bottom: 1px solid var(--line); padding: 10px 0;">
-      <div style="display:flex; justify-content: space-between;">
-        <strong style="font-size: 0.9rem;">${escapeHtml(log.CropName)}</strong>
-        <span class="text-muted" style="font-size: 0.72rem;">${escapeHtml(log.LoggedAt)}</span>
+    <article class="maintenance-log-entry">
+      <div class="maintenance-log-entry-head">
+        <strong>${escapeHtml(log.CropName)}</strong>
+        <time class="text-muted">${escapeHtml(log.LoggedAt)}</time>
       </div>
-      ${log.MaintenanceNotes ? `<div class="text-muted" style="font-size: 0.85rem;">${escapeHtml(log.MaintenanceNotes)}</div>` : ''}
-      ${log.HarvestYield ? `<div style="font-size: 0.85rem;">Yield: ${escapeHtml(log.HarvestYield)}</div>` : ''}
-    </div>
+      ${log.Label ? `<p class="maintenance-log-plot">${escapeHtml(log.Label)}</p>` : ''}
+      ${log.MaintenanceNotes ? `<p class="maintenance-log-notes">${escapeHtml(log.MaintenanceNotes)}</p>` : ''}
+      ${log.HarvestYield ? `<p class="maintenance-log-yield"><strong>Yield:</strong> ${escapeHtml(log.HarvestYield)}</p>` : ''}
+    </article>
   `).join('');
 }
 
