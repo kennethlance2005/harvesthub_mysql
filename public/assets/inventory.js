@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input type="number" name="qty" min="1" max="${r.AvailableQty}" value="1" style="width: 55px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
                             <span style="font-weight: 600; color: #64748b; font-size: 0.9rem;">x</span>
                         </div>
-                        <button type="submit" class="btn btn-accent btn-sm">Request</button>
+                        <button type="submit" class="btn btn-accent btn-sm inventory-action-btn">Request</button>
                     </form>
                     ` : `
                     <span class="badge badge-neutral">Out of stock</span>
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="badge ${r.Status === 'Return Requested' ? 'badge-brown' : 'badge-green'}" style="margin-left: 8px; font-size: 0.7rem;">${r.Status === 'Return Requested' ? 'Return requested' : 'Borrowed'}</span><br>
                             <span class="text-muted" style="font-size: 0.8em;">${r.Status === 'Return Requested' ? 'The coordinator has requested this item back.' : `Approved ${new Date(r.ApprovedAt || r.RequestedAt).toLocaleDateString()}`}</span>
                         </div>
-                        <button class="btn btn-accent btn-sm return-btn" data-txn="${r.TxnID}" style="width: 100px;">Return item</button>
+                        <button class="btn btn-accent btn-sm inventory-action-btn return-btn" data-txn="${r.TxnID}">Return item</button>
                     </div>
                 `).join('');
             }
@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="badge badge-neutral" style="margin-left: 8px; font-size: 0.7rem;">Personal</span><br>
                             <span class="text-muted" style="font-size: 0.8em;">Added ${new Date(p.AddedAt).toLocaleDateString()}</span>
                         </div>
-                        <button class="btn btn-accent btn-sm remove-personal-btn" data-id="${p.ItemID}" style="width: 85px;">Remove</button>
+                        <button class="btn btn-accent btn-sm inventory-action-btn remove-personal-btn" data-id="${p.ItemID}">Remove</button>
                     </div>
                 `).join('');
             }

@@ -12,7 +12,7 @@ $navTitle = 'Resource Inventory';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=19">
+<link rel="stylesheet" href="assets/style.css?v=23">
 </head>
 <body class="account-page">
 
@@ -32,8 +32,8 @@ $navTitle = 'Resource Inventory';
           
           <!-- Top Left: Resource Catalog -->
           <div class="board-panel">
-            <!-- Added padding: 0 24px to match the list panel below -->
-            <div class="board-head" style="margin-bottom: 24px; padding: 0 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
+            <!-- Padding comes from .inventory-head-aligned so the header controls line up with the list buttons -->
+            <div class="board-head inventory-head-aligned" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
               <div>
                 <h2 style="margin-bottom: 8px;">Resource Catalog</h2>
                 <p class="text-muted" style="margin: 0;">Request community tools or garden materials directly from this list.</p>
@@ -52,26 +52,24 @@ $navTitle = 'Resource Inventory';
 
           <!-- Bottom Left: My Inventory -->
           <div class="board-panel">
-            <!-- Added padding: 0 24px to match the list panel below -->
-            <div class="board-head" style="margin-bottom: 24px; padding: 0 24px;">
+            <!-- Padding comes from .inventory-head-aligned so the header controls line up with the list buttons -->
+            <div class="board-head inventory-head-aligned" style="margin-bottom: 24px;">
               <h2 style="margin-bottom: 16px;">My Inventory</h2>
               
               <!-- Toolbar Row: Search & Add Item -->
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+              <div class="inventory-toolbar" style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
                 
                 <!-- Search Bar: Inventory -->
                 <input type="search" id="search-inventory" placeholder="Search my items..." style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; width: 220px;">
                 
                 <!-- Add Personal Item Form -->
-                <form id="add-personal-form" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;" novalidate>
+                <form id="add-personal-form" style="display: flex; gap: 8px; align-items: center;" novalidate>
                   <input type="text" id="personal-item-name" placeholder="E.g., Pruning Shears" style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; width: 200px;" required>
                   <div style="display: flex; align-items: center; gap: 6px;">
                       <input type="number" id="personal-item-qty" min="1" value="1" style="width: 55px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
                       <span style="font-weight: 600; color: #64748b; font-size: 0.9rem;">x</span>
                   </div>
-                  <!-- Set fixed 85px width to match the other buttons -->
-                  <!-- Shortened to "Add" to fit the 85px uniform width and added nowrap -->
-                  <button type="submit" class="btn btn-accent btn-sm" style="width: 85px; white-space: nowrap;">Add Item</button>
+                  <button type="submit" class="btn btn-accent btn-sm inventory-action-btn">Add Item</button>
                 </form>
 
               </div>
@@ -107,6 +105,6 @@ $navTitle = 'Resource Inventory';
 
 <script src="assets/app.js"></script>
 <!-- Bumped version number to guarantee the new layout scripts load -->
-<script src="assets/inventory.js?v=6"></script>
+<script src="assets/inventory.js?v=7"></script>
 </body>
 </html>

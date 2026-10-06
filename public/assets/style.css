@@ -1583,6 +1583,68 @@ table.data-table {
 .inventory-primary { min-width: 0; display: flex; flex-direction: column; gap: 32px; }
 .inventory-requests { min-width: 0; padding: 24px; }
 
+/* Gardener Resource Inventory: every action button (Request, Add Item,
+   Return item, Remove) shares one size and never wraps. */
+.customer-inventory-page .inventory-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 104px;
+  height: 32px;
+  padding: 0 12px;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Both lists always reserve the same scrollbar space, so buttons in a list
+   that scrolls (catalog) line up with buttons in one that doesn't. */
+.customer-inventory-page #inventory-list,
+.customer-inventory-page #my-inventory-list {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+/* The headers sit outside the bordered list panels. Match the panel's
+   1px border + 24px padding + the list's 8px padding, and reserve the same
+   scrollbar gutter, so the search bars and "Add Item" end exactly where the
+   list buttons end. */
+.customer-inventory-page .inventory-head-aligned {
+  padding: 0 33px 0 25px;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+/* Keep "My Inventory" on one line beside its toolbar (the old layout).
+   The item-name and search boxes give up a little width instead of the
+   heading wrapping, so "Add Item" stays lined up with the list buttons. */
+.customer-inventory-page .inventory-head-aligned {
+  flex-wrap: wrap;
+  column-gap: 24px;
+}
+.customer-inventory-page .inventory-head-aligned > h2 {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* If the toolbar can't fit beside the heading, it moves under it as a whole. */
+.customer-inventory-page .inventory-toolbar {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+.customer-inventory-page .inventory-toolbar #add-personal-form {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.customer-inventory-page .inventory-toolbar #search-inventory {
+  flex: 0 1 220px;
+  min-width: 140px;
+}
+.customer-inventory-page .inventory-toolbar #personal-item-name {
+  flex: 0 1 200px;
+  min-width: 120px;
+}
+
 @media (max-width: 900px) {
   .inventory-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
 }
@@ -1601,6 +1663,8 @@ table.data-table {
   .customer-inventory-page .inventory-item > div,
   .customer-inventory-page #my-requests-list > div > div { min-width: 0; flex: 1 1 120px; }
   .customer-inventory-page .inline-request-form { gap: 6px !important; }
+  .customer-inventory-page .inventory-toolbar { flex-basis: 100%; flex-wrap: wrap; }
+  .customer-inventory-page #add-personal-form { flex-wrap: wrap; }
 }
 
 .plots-layout {
