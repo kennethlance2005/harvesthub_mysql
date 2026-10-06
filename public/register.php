@@ -33,7 +33,10 @@ if ($user = currentUser()) {
       <div class="field-row">
         <div class="field">
           <label for="email">Email Address</label>
-          <input type="email" id="email" name="email" autocomplete="email" required>
+          <input type="email" id="email" name="email" autocomplete="email" aria-describedby="email-reqs" required>
+          <ul id="email-reqs" class="password-reqs" aria-live="polite">
+            <li id="email-req" class="invalid">Enter a valid email address</li>
+          </ul>
         </div>
         <div class="field">
           <label for="role">I am a...</label>

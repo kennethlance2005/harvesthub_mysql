@@ -9,6 +9,9 @@ const shiftSelect = document.getElementById('shift');
 
 const firstNameInput = document.getElementById('first-name');
 const lastNameInput = document.getElementById('last-name');
+const emailInput = document.getElementById('email');
+const emailReqs = document.getElementById('email-reqs');
+const emailReq = document.getElementById('email-req');
 const ageInput = document.getElementById('age');
 const ageReqs = document.getElementById('age-reqs');
 const ageReq = document.getElementById('age-req');
@@ -24,6 +27,16 @@ const updateAgeRequirement = () => {
 ageInput.addEventListener('input', updateAgeRequirement);
 ageInput.addEventListener('focus', () => ageReqs.classList.add('active'));
 ageInput.addEventListener('blur', () => ageReqs.classList.remove('active'));
+
+const updateEmailRequirement = () => {
+  const isValidEmail = emailInput.value.trim() !== '' && emailInput.validity.valid;
+  emailReq.classList.toggle('valid', isValidEmail);
+  emailReq.classList.toggle('invalid', !isValidEmail);
+};
+
+emailInput.addEventListener('input', updateEmailRequirement);
+emailInput.addEventListener('focus', () => emailReqs.classList.add('active'));
+emailInput.addEventListener('blur', () => emailReqs.classList.remove('active'));
 
 // Prevent typing numbers or special symbols into name fields
 [firstNameInput, lastNameInput].forEach((input) => {
@@ -52,7 +65,7 @@ form.addEventListener('submit', async (e) => {
   const ageVal = ageInput.value.trim();
   const age = parseInt(ageVal, 10);
   const location = document.getElementById('location').value;
-  const email = document.getElementById('email').value.trim();
+  const email = emailInput.value.trim();
   const password = document.getElementById('password').value;
   const confirmPassword = document.getElementById('confirm-password').value;
   const role = roleSelect.value;
@@ -87,10 +100,10 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
-  if (!email || !email.includes('@') || !email.includes('.')) {
+  if (!email || !emailInput.validity.valid) {
     alertEl.textContent = 'Please enter a valid email address.';
     alertEl.hidden = false;
-    document.getElementById('email').focus();
+    emailInput.focus();
     return;
   }
 
