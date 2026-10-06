@@ -12,7 +12,7 @@ $navTitle = 'Coordinator Dashboard';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=14">
+<link rel="stylesheet" href="assets/style.css?v=18">
 </head>
 <body>
 <div class="app-layout">
@@ -35,6 +35,19 @@ $navTitle = 'Coordinator Dashboard';
         <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Resource types</div></div>
       </section>
 
+      <section class="coordinator-section" aria-labelledby="dashboard-plot-requests-heading">
+        <div class="section-heading">
+          <div><p class="eyebrow">Needs review</p><h2 id="dashboard-plot-requests-heading">Pending Requests</h2></div>
+          <form class="table-search" id="applications-search-form">
+            <label class="sr-only" for="applications-search">Search plot requests</label>
+            <input id="applications-search" type="search" placeholder="Search gardener or plot">
+            <button class="btn btn-accent btn-sm" type="submit">Search</button>
+          </form>
+        </div>
+        <div class="pending-request-list coordinator-request-list" id="applications-list"></div>
+        <p class="text-muted" id="applications-empty" hidden>No pending plot requests.</p>
+      </section>
+
       <section class="coordinator-shortcuts" aria-label="Coordinator work areas">
         <a class="coordinator-shortcut" href="staff_plots.php">
           <span class="shortcut-index">01</span>
@@ -51,6 +64,6 @@ $navTitle = 'Coordinator Dashboard';
   </div>
 </div>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=4"></script>
+<script src="assets/staff.js?v=9"></script>
 </body>
 </html>

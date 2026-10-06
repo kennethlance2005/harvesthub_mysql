@@ -18,6 +18,7 @@ let applications = [];
 let resourceTransactions = [];
 let plots = [];
 let resources = [];
+let activeRecordsTimeline = 'inventory';
 
 function matchesSearch(value, query) {
   return String(value || '').toLowerCase().includes(query);
@@ -43,14 +44,14 @@ function renderApplications() {
         <time class="action-row-time" datetime="${escapeHtml(String(app.AppliedAt || '').replace(' ', 'T'))}">Requested ${escapeHtml(formatRecordDate(app.AppliedAt))}</time>
       </div>
       <div class="action-row-actions">
-        <button class="btn btn-accent btn-sm approve-app" data-id="${app.AppID}">Approve</button>
+        <button class="btn btn-accent btn-sm approve-app" data-id="${app.AppID}">Accept</button>
         <button class="btn btn-ghost btn-sm reject-app" data-id="${app.AppID}">Reject</button>
       </div>
     </div>
   `).join('');
   emptyEl.textContent = applications.length && !filtered.length
     ? 'No applications match your search.'
-    : 'No pending applications.';
+    : 'No pending plot requests.';
   emptyEl.hidden = filtered.length > 0;
 
   listEl.querySelectorAll('.approve-app').forEach(btn =>
@@ -120,8 +121,8 @@ async function processApplication(appId, decision) {
   const data = await postAction('process_application', { app_id: appId, decision });
   if (data.ok) {
     const resultMessage = decision === 'approve' && data.auto_rejected
-      ? `Application approved. ${data.auto_rejected} other request${data.auto_rejected === 1 ? '' : 's'} automatically rejected.`
-      : `Application ${decision === 'approve' ? 'approved' : 'rejected'}.`;
+      ? `Request accepted. ${data.auto_rejected} competing request${data.auto_rejected === 1 ? '' : 's'} rejected.`
+      : `Request ${decision === 'approve' ? 'accepted' : 'rejected'}.`;
     showToast(resultMessage, 'success');
     loadApplications();
     loadPlots();
@@ -243,7 +244,52 @@ async function loadResourceRecords(dateValue) {
     listEl.innerHTML = '<p class="text-muted">Could not load inventory records.</p>';
     return;
   }
-  renderResourceRecords(data.records);
+  renderTimelineRecords('resource-records-list', data.records, renderResourceRecord, 'No inventory events have been recorded for this date.');
+}
+
+async function loadPlotRecords(dateValue) {
+  const listEl = document.getElementById('plot-records-list');
+  const dateFilter = document.getElementById('records-date-filter-input');
+  const selectedDate = dateValue || dateFilter?.value;
+  if (!listEl || !selectedDate) return;
+  const params = new URLSearchParams({ action: 'plot_records', date: selectedDate });
+  const res = await fetch(`api.php?${params.toString()}`);
+  const data = await res.json();
+  if (!data.ok) {
+    listEl.innerHTML = '<p class="text-muted">Could not load plot records.</p>';
+    return;
+  }
+  renderTimelineRecords('plot-records-list', data.records, renderPlotRecord, 'No plot events have been recorded for this date.');
+}
+
+function loadActiveRecords(dateValue) {
+  if (activeRecordsTimeline === 'plots') {
+    loadPlotRecords(dateValue);
+  } else {
+    loadResourceRecords(dateValue);
+  }
+}
+
+function switchRecordsTimeline(type) {
+  const inventoryTab = document.getElementById('records-inventory-tab');
+  const plotsTab = document.getElementById('records-plots-tab');
+  const inventoryPanel = document.getElementById('resource-records-panel');
+  const plotsPanel = document.getElementById('plot-records-panel');
+  const heading = document.getElementById('records-heading');
+  const dateFilter = document.querySelector('.records-date-filter');
+  if (!inventoryTab || !plotsTab || !inventoryPanel || !plotsPanel) return;
+
+  activeRecordsTimeline = type;
+  const showInventory = type === 'inventory';
+  inventoryTab.classList.toggle('is-active', showInventory);
+  inventoryTab.setAttribute('aria-selected', String(showInventory));
+  plotsTab.classList.toggle('is-active', !showInventory);
+  plotsTab.setAttribute('aria-selected', String(!showInventory));
+  inventoryPanel.hidden = !showInventory;
+  plotsPanel.hidden = showInventory;
+  if (heading) heading.textContent = showInventory ? 'Inventory Timeline' : 'Plots Timeline';
+  dateFilter?.setAttribute('aria-label', `Filter ${showInventory ? 'inventory' : 'plot'} records by date`);
+  loadActiveRecords();
 }
 
 function shiftResourceRecordDate(dayOffset) {
@@ -253,7 +299,7 @@ function shiftResourceRecordDate(dayOffset) {
   const selectedDate = new Date(selectedDateParts[0], selectedDateParts[1] - 1, selectedDateParts[2], 12);
   selectedDate.setDate(selectedDate.getDate() + dayOffset);
   dateFilter.value = formatRecordInputDate(selectedDate);
-  loadResourceRecords(dateFilter.value);
+  loadActiveRecords(dateFilter.value);
 }
 
 function formatRecordInputDate(date) {
@@ -329,8 +375,8 @@ function renderResources() {
   });
 }
 
-function renderResourceRecords(records) {
-  const listEl = document.getElementById('resource-records-list');
+function renderTimelineRecords(listId, records, renderRecord, emptyMessage) {
+  const listEl = document.getElementById(listId);
   if (!listEl) return;
   const groups = new Map();
   records.forEach(record => {
@@ -350,9 +396,9 @@ function renderResourceRecords(records) {
   listEl.innerHTML = groups.size ? Array.from(groups.values()).map(group => `
     <section class="record-day-group">
       <h3 class="record-day-heading">${escapeHtml(group.label)}</h3>
-      <div class="record-day-events">${group.records.map(renderResourceRecord).join('')}</div>
+      <div class="record-day-events">${group.records.map(renderRecord).join('')}</div>
     </section>
-  `).join('') : '<p class="text-muted">No inventory events have been recorded.</p>';
+  `).join('') : `<p class="text-muted">${escapeHtml(emptyMessage)}</p>`;
 }
 
 function renderResourceRecord(record) {
@@ -384,6 +430,68 @@ function renderResourceRecord(record) {
         <div class="record-entry-head">
           <strong>${escapeHtml(record.ResourceName)}</strong>
           <span class="badge ${badgeClass}">${escapeHtml(record.Action)}</span>
+        </div>
+        <p>${details}</p>
+      </div>
+    </article>
+  `;
+}
+
+function renderPlotRecord(record) {
+  const plotLabel = escapeHtml(record.PlotLabel);
+  const gardenerName = escapeHtml(record.GardenerName || 'A gardener');
+  const actorName = escapeHtml(record.ActorName || 'A coordinator');
+  let details;
+  let badgeLabel;
+  let badgeClass;
+  let entryClass;
+
+  switch (record.Action) {
+    case 'Plot Added':
+      details = `Added by ${actorName}`;
+      badgeLabel = 'Added';
+      badgeClass = 'badge-green';
+      entryClass = 'record-plot-added';
+      break;
+    case 'Request Assignment':
+      details = `${gardenerName} requested assignment to ${plotLabel}`;
+      badgeLabel = 'Pending';
+      badgeClass = 'badge-brown';
+      entryClass = 'record-plot-pending';
+      break;
+    case 'Request Unassign':
+      details = `${gardenerName} requested unassignment of ${plotLabel}`;
+      badgeLabel = 'Pending';
+      badgeClass = 'badge-brown';
+      entryClass = 'record-plot-pending';
+      break;
+    case 'Request Accepted':
+      details = `${actorName} accepted ${gardenerName}'s request for ${plotLabel}`;
+      badgeLabel = 'Accepted';
+      badgeClass = 'badge-green';
+      entryClass = 'record-plot-accepted';
+      break;
+    case 'Plot Unassigned':
+      details = `${actorName} unassigned ${gardenerName} from ${plotLabel}`;
+      badgeLabel = 'Unassigned';
+      badgeClass = 'badge-neutral';
+      entryClass = 'record-plot-unassigned';
+      break;
+    default:
+      details = `${actorName} rejected ${gardenerName}'s request for ${plotLabel}`;
+      badgeLabel = 'Rejected';
+      badgeClass = 'badge-neutral';
+      entryClass = 'record-plot-rejected';
+  }
+
+  return `
+    <article class="record-entry ${entryClass}">
+      <time class="record-entry-time" datetime="${escapeHtml(String(record.OccurredAt).replace(' ', 'T'))}">${escapeHtml(formatRecordTime(record.OccurredAt))}</time>
+      <div class="record-entry-marker" aria-hidden="true"></div>
+      <div class="record-entry-content">
+        <div class="record-entry-head">
+          <strong>${plotLabel}</strong>
+          <span class="badge ${badgeClass}">${badgeLabel}</span>
         </div>
         <p>${details}</p>
       </div>
@@ -455,11 +563,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (recordsDateFilter) {
     recordsDateFilter.value = formatRecordInputDate(new Date());
     recordsDateFilter.addEventListener('change', event => {
-    if (event.target.value) loadResourceRecords(event.target.value);
+      if (event.target.value) loadActiveRecords(event.target.value);
     });
   }
   document.getElementById('records-previous-day')?.addEventListener('click', () => shiftResourceRecordDate(-1));
   document.getElementById('records-next-day')?.addEventListener('click', () => shiftResourceRecordDate(1));
+  document.getElementById('records-inventory-tab')?.addEventListener('click', () => switchRecordsTimeline('inventory'));
+  document.getElementById('records-plots-tab')?.addEventListener('click', () => switchRecordsTimeline('plots'));
   const isDashboard = Boolean(document.getElementById('coordinator-stats'));
   if (isDashboard || document.getElementById('applications-list')) loadApplications();
   if (isDashboard || document.getElementById('resource-txns-list')) loadResourceTxns();

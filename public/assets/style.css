@@ -1804,6 +1804,10 @@ table.data-table {
 .btn-return-request:hover { border-color: var(--brown-700); background: var(--brown-700); box-shadow: 0 3px 8px rgba(78, 40, 22, 0.22); }
 .btn-return-request:focus-visible { outline-color: var(--brown-700); }
 .records-section { max-width: 900px; }
+.records-tabs { display: flex; gap: 8px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+.records-tab { min-height: 42px; padding: 8px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-600); cursor: pointer; font: inherit; font-size: 0.86rem; font-weight: 700; }
+.records-tab.is-active { border-bottom-color: var(--green-700); color: var(--green-900); }
+.records-tab:focus-visible { outline-offset: -2px; }
 .records-date-filter { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
 .records-date-filter label { display: grid; gap: 5px; color: var(--ink-600); font-size: 0.78rem; font-weight: 700; }
 .records-date-filter input { min-height: 40px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink-900); font: inherit; }
