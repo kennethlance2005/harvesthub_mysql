@@ -27,7 +27,6 @@ $user = requireRole('staff');
           <form class="table-search" id="applications-search-form">
             <label class="sr-only" for="applications-search">Search applications</label>
             <input id="applications-search" type="search" placeholder="Search gardener or plot">
-            <button class="btn btn-accent btn-sm" type="submit">Search</button>
           </form>
         </div>
         <div class="pending-request-list coordinator-request-list" id="applications-list"></div>
@@ -55,6 +54,6 @@ $user = requireRole('staff');
 </div>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=9"></script>
+<script src="assets/staff.js?v=10"></script>
 </body>
 </html>

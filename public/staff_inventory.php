@@ -27,7 +27,6 @@ $user = requireRole('staff');
           <form class="table-search" id="resource-search-form">
             <label class="sr-only" for="resource-search">Search resource requests</label>
             <input id="resource-search" type="search" placeholder="Search gardener or resource">
-            <button class="btn btn-accent btn-sm" type="submit">Search</button>
           </form>
         </div>
         <div class="pending-request-list coordinator-request-list" id="resource-txns-list"></div>
@@ -39,7 +38,6 @@ $user = requireRole('staff');
           <form class="table-search" id="all-resources-search-form">
             <label class="sr-only" for="all-resources-search">Search resources or borrowers</label>
             <input id="all-resources-search" type="search" placeholder="Search resource or borrower">
-            <button class="btn btn-accent btn-sm" type="submit">Search</button>
           </form>
         </div>
         <form class="inventory-add-form" id="add-resource-form">
@@ -61,6 +59,6 @@ $user = requireRole('staff');
 </div>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=9"></script>
+<script src="assets/staff.js?v=11"></script>
 </body>
 </html>

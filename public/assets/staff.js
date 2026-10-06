@@ -21,14 +21,30 @@ let resources = [];
 let activeRecordsTimeline = 'inventory';
 
 function matchesSearch(value, query) {
-  return String(value || '').toLowerCase().includes(query);
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  return String(value || '').toLowerCase().includes(normalizedQuery);
+}
+
+function bindLiveSearch(inputId, render) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  const filter = () => render();
+  input.addEventListener('input', filter);
+  input.addEventListener('search', filter);
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      input.value = '';
+      filter();
+    }
+  });
 }
 
 function renderApplications() {
   const listEl = document.getElementById('applications-list');
   const emptyEl = document.getElementById('applications-empty');
   if (!listEl || !emptyEl) return;
-  const query = document.getElementById('applications-search').value.trim().toLowerCase();
+  const query = document.getElementById('applications-search').value.trim();
   const filtered = applications.filter(app =>
     matchesSearch(app.GardenerName, query) || matchesSearch(app.Label, query));
 
@@ -64,7 +80,7 @@ function renderResourceTransactions() {
   const listEl = document.getElementById('resource-txns-list');
   const emptyEl = document.getElementById('resource-txns-empty');
   if (!listEl || !emptyEl) return;
-  const query = document.getElementById('resource-search').value.trim().toLowerCase();
+  const query = document.getElementById('resource-search').value.trim();
   const filtered = resourceTransactions.filter(txn =>
     matchesSearch(txn.GardenerName, query) || matchesSearch(txn.ResourceName, query));
 
@@ -338,17 +354,23 @@ async function requestResourceReturn(txnId, qty) {
 function renderResources() {
   const tableEl = document.getElementById('resources-table');
   if (!tableEl) return;
-  const query = document.getElementById('all-resources-search').value.trim().toLowerCase();
-  const filtered = resources.filter(resource =>
-    matchesSearch(resource.Name, query) || resource.Borrowers.some(borrower =>
-      matchesSearch(borrower.Name, query) || matchesSearch(borrower.PlotLabel, query)));
+  const query = document.getElementById('all-resources-search').value.trim();
+  const filtered = resources.map(resource => {
+    const matchingBorrowers = resource.Borrowers.filter(borrower =>
+      matchesSearch(borrower.Name, query) || matchesSearch(borrower.PlotLabel, query));
+    return {
+      ...resource,
+      matchingBorrowers,
+      matchesQuery: matchesSearch(resource.Name, query) || matchingBorrowers.length > 0,
+    };
+  }).filter(resource => resource.matchesQuery);
 
   const rows = filtered.map(resource => `
     <tr class="resource-inventory-row">
       <td data-label="Resource"><span class="resource-name-cell" title="${escapeHtml(resource.Name)}">${escapeHtml(resource.Name)}</span></td>
       <td data-label="Total">${escapeHtml(String(resource.TotalQty))}</td>
       <td data-label="Available">${escapeHtml(String(resource.AvailableQty))}</td>
-      <td data-label="Borrower assignments"><div class="borrower-assignments">${resource.Borrowers.length ? resource.Borrowers.map(borrower => `
+      <td data-label="Borrower assignments"><div class="borrower-assignments">${resource.matchingBorrowers.length ? resource.matchingBorrowers.map(borrower => `
         <div class="borrower-assignment">
           <div class="borrower-assignment-info">
             <strong title="${escapeHtml(borrower.Name)}">${escapeHtml(borrower.Name)}</strong>
@@ -363,7 +385,7 @@ function renderResources() {
               </div>`
             : ''}
         </div>
-      `).join('') : '<span class="borrower-empty-state">No current borrowers</span>'}</div></td>
+      `).join('') : resource.Borrowers.length ? '<span class="borrower-empty-state">No borrower assignments match this search.</span>' : '<span class="borrower-empty-state">No current borrowers</span>'}</div></td>
     </tr>
   `).join('');
   tableEl.innerHTML = rows || '<tr class="resource-empty-row"><td colspan="4" class="text-muted">No resources match your search.</td></tr>';
@@ -522,7 +544,6 @@ function renderCoordinatorOverview() {
   if (!statsEl) return;
   const availablePlots = plots.filter(plot => String(plot.Status || '').trim().toLowerCase() === 'available').length;
   const stats = [
-    [applications.length, 'Pending plot requests'],
     [resourceTransactions.length, 'Pending resource requests'],
     [availablePlots, 'Available plots'],
     [resources.length, 'Resource types'],
@@ -537,17 +558,17 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     createPlot(document.getElementById('new-plot-label').value.trim());
   });
-  document.getElementById('applications-search-form')?.addEventListener('submit', event => {
-    event.preventDefault();
-    renderApplications();
-  });
-  document.getElementById('resource-search-form')?.addEventListener('submit', event => {
-    event.preventDefault();
-    renderResourceTransactions();
-  });
-  document.getElementById('all-resources-search-form')?.addEventListener('submit', event => {
-    event.preventDefault();
-    renderResources();
+  [
+    ['applications-search-form', 'applications-search', renderApplications],
+    ['resource-search-form', 'resource-search', renderResourceTransactions],
+    ['all-resources-search-form', 'all-resources-search', renderResources],
+  ].forEach(([formId, inputId, render]) => {
+    const form = document.getElementById(formId);
+    form?.addEventListener('submit', event => {
+      event.preventDefault();
+      render();
+    });
+    bindLiveSearch(inputId, render);
   });
   document.getElementById('add-resource-form')?.addEventListener('submit', event => {
     event.preventDefault();
@@ -571,7 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('records-inventory-tab')?.addEventListener('click', () => switchRecordsTimeline('inventory'));
   document.getElementById('records-plots-tab')?.addEventListener('click', () => switchRecordsTimeline('plots'));
   const isDashboard = Boolean(document.getElementById('coordinator-stats'));
-  if (isDashboard || document.getElementById('applications-list')) loadApplications();
+  if (document.getElementById('applications-list')) loadApplications();
   if (isDashboard || document.getElementById('resource-txns-list')) loadResourceTxns();
   if (isDashboard || document.getElementById('plot-map')) loadPlots();
   if (isDashboard || document.getElementById('resources-table')) loadResources();

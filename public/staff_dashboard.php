@@ -29,23 +29,9 @@ $navTitle = 'Coordinator Dashboard';
       </header>
 
       <section class="coordinator-stat-grid" id="coordinator-stats" aria-label="Garden overview">
-        <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Pending plot requests</div></div>
         <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Pending resource requests</div></div>
         <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Available plots</div></div>
         <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Resource types</div></div>
-      </section>
-
-      <section class="coordinator-section" aria-labelledby="dashboard-plot-requests-heading">
-        <div class="section-heading">
-          <div><p class="eyebrow">Needs review</p><h2 id="dashboard-plot-requests-heading">Pending Requests</h2></div>
-          <form class="table-search" id="applications-search-form">
-            <label class="sr-only" for="applications-search">Search plot requests</label>
-            <input id="applications-search" type="search" placeholder="Search gardener or plot">
-            <button class="btn btn-accent btn-sm" type="submit">Search</button>
-          </form>
-        </div>
-        <div class="pending-request-list coordinator-request-list" id="applications-list"></div>
-        <p class="text-muted" id="applications-empty" hidden>No pending plot requests.</p>
       </section>
 
       <section class="coordinator-shortcuts" aria-label="Coordinator work areas">
@@ -65,6 +51,6 @@ $navTitle = 'Coordinator Dashboard';
 </div>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=9"></script>
+<script src="assets/staff.js?v=12"></script>
 </body>
 </html>
