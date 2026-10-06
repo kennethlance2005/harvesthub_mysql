@@ -10,9 +10,9 @@ $navTitle = 'Archived Accounts';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Archived Accounts</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=15">
+<link rel="stylesheet" href="assets/style.css?v=19">
 </head>
-<body>
+<body class="account-page">
 
 <div class="app-layout">
   <?php include __DIR__ . '/admin_sidebar.php'; ?>
@@ -49,6 +49,7 @@ $navTitle = 'Archived Accounts';
   </div>
 </div>
 
+<?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/admin.js?v=3"></script>
 </body>

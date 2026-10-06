@@ -204,16 +204,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function loadHarvestedCrops() {
+        const cropSelect = document.getElementById('exchange-item');
+        const cropHint = document.getElementById('exchange-crop-hint');
+        const postButton = document.querySelector('#add-exchange-form button[type="submit"]');
+        if (!cropSelect) return;
+
+        try {
+            const res = await fetch('api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ action: 'get_my_plots' })
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Could not load harvested crops.');
+
+            const harvestedCrops = data.plots.filter(plot => plot.Status === 'Harvested');
+            cropSelect.innerHTML = '<option value="" selected disabled>Select a harvested crop</option>' + harvestedCrops.map(plot => {
+                const plantedDate = new Date(`${plot.PlantedDate}T00:00:00`).toLocaleDateString();
+                return `<option value="${Number(plot.PlotID)}">${escapeHtml(plot.CropName)} · planted ${escapeHtml(plantedDate)}</option>`;
+            }).join('');
+            cropSelect.disabled = harvestedCrops.length === 0;
+            if (postButton) postButton.disabled = harvestedCrops.length === 0;
+            if (cropHint && harvestedCrops.length === 0) {
+                cropHint.textContent = 'No harvested crops yet. Mark a crop as Harvested in My Crops first.';
+            }
+        } catch (error) {
+            cropSelect.innerHTML = '<option value="" selected disabled>Could not load harvested crops</option>';
+            cropSelect.disabled = true;
+            if (postButton) postButton.disabled = true;
+            if (cropHint) cropHint.textContent = 'Could not load your crops. Refresh the page to try again.';
+            console.error('Error loading harvested crops:', error);
+        }
+    }
+
+    loadHarvestedCrops();
+
     // 3. Handle Add Post Form Submission
     const addForm = document.getElementById('add-exchange-form');
-    const itemInput = document.getElementById('exchange-item');
-
-    // Force real-time character-only input for the Item name
-    if (itemInput) {
-        itemInput.addEventListener('input', function() {
-            this.value = this.value.replace(/[^A-Za-z\s]/g, '');
-        });
-    }
 
     if (addForm) {
         addForm.addEventListener('submit', async (e) => {
@@ -221,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const btn = addForm.querySelector('button[type="submit"]');
             btn.disabled = true;
 
-            const item = document.getElementById('exchange-item').value;
+            const gardenPlotId = document.getElementById('exchange-item').value;
             const qtyNum = document.getElementById('exchange-qty-num').value;
             const qtyUnit = document.getElementById('exchange-qty-unit').value;
             const desc = document.getElementById('exchange-desc').value;
@@ -233,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch('api.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({ action: 'add_exchange_post', item: item, qty: combinedQty, desc: desc })
+                    body: new URLSearchParams({ action: 'add_exchange_post', garden_plot_id: gardenPlotId, qty: combinedQty, desc: desc })
                 });
                 const result = await res.json();
                 

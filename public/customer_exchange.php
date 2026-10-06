@@ -12,9 +12,9 @@ $navTitle = 'Exchange Board';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=14">
+<link rel="stylesheet" href="assets/style.css?v=19">
 </head>
-<body>
+<body class="account-page">
 
 <div class="app-layout">
   
@@ -57,8 +57,10 @@ $navTitle = 'Exchange Board';
             
             <form id="add-exchange-form" style="display: flex; flex-direction: column; gap: 12px;" novalidate>
               
-              <!-- Item input restricted to letters and spaces via pattern -->
-              <input type="text" id="exchange-item" placeholder="Item (e.g., Tomatoes)" pattern="[A-Za-z\s]+" title="Letters and spaces only." style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
+              <label class="sr-only" for="exchange-item">Select a harvested crop</label>
+              <select id="exchange-item" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;" required>
+                <option value="" selected disabled>Loading harvested crops...</option>
+              </select>
               
               <!-- Split Quantity: Full width container with flex spacing -->
               <div style="display: flex; gap: 8px; width: 100%;">
@@ -102,6 +104,7 @@ $navTitle = 'Exchange Board';
   </div>
 </div>
 
+<?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <!-- Claim Request Modal Overlay -->
 <div id="claim-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; padding: 16px;">
@@ -130,6 +133,6 @@ $navTitle = 'Exchange Board';
   </div>
 </div>
 <script src="assets/app.js"></script>
-<script src="assets/exchange.js?v=1"></script> 
+<script src="assets/exchange.js?v=2"></script>
 </body>
 </html>

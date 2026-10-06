@@ -12,9 +12,9 @@ $navTitle = 'My Crops';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=17">
+<link rel="stylesheet" href="assets/style.css?v=19">
 </head>
-<body>
+<body class="account-page">
 <div class="app-layout">
 	<?php include __DIR__ . '/customer_sidebar.php'; ?>
 	<div class="main-content">
@@ -113,6 +113,7 @@ $navTitle = 'My Crops';
 		</main>
 	</div>
 </div>
+<?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
 <script src="assets/customer.js?v=8"></script>

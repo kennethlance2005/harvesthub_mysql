@@ -639,21 +639,31 @@ try {
 
         case 'add_exchange_post': {
             $user = requireJsonRole('customer');
-            $item = trim($_POST['item'] ?? '');
+            $gardenPlotId = $_POST['garden_plot_id'] ?? '';
             $qty = trim($_POST['qty'] ?? '');
             $desc = trim($_POST['desc'] ?? '');
 
-            if (empty($item) || empty($qty)) {
-                respond(['ok' => false, 'error' => 'Item and Quantity are required.'], 422);
-            }
+            if (!ctype_digit((string) $gardenPlotId)) respond(['ok' => false, 'error' => 'Select a harvested crop.'], 422);
+            if ($qty === '') respond(['ok' => false, 'error' => 'Quantity is required.'], 422);
 
-            $stmt = $pdo->prepare("INSERT INTO EXCHANGE_BOARD (GardenerID, ProduceName, Qty, Description) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$user['id'], $item, $qty, $desc]);
-            
-            if ($stmt->rowCount() > 0) {
-                respond(['ok' => true]);
-            } else {
-                respond(['ok' => false, 'error' => 'Failed to create post.'], 400);
+            $pdo->beginTransaction();
+            try {
+                $cropStmt = $pdo->prepare("SELECT CropName, Status FROM GARDEN_PLOTS WHERE PlotID = ? AND GardenerID = ? FOR UPDATE");
+                $cropStmt->execute([(int) $gardenPlotId, $user['id']]);
+                $crop = $cropStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$crop || $crop['Status'] !== 'Harvested') {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Only crops marked Harvested can be posted.'], 422);
+                }
+
+                $stmt = $pdo->prepare("INSERT INTO EXCHANGE_BOARD (GardenerID, ProduceName, Qty, Description) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$user['id'], $crop['CropName'], $qty, $desc]);
+                $postId = (int) $pdo->lastInsertId();
+                $pdo->commit();
+                respond(['ok' => true, 'post_id' => $postId]);
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
             }
         }
 
@@ -930,13 +940,14 @@ try {
             $recentLogs = $logsStmt->fetchAll(PDO::FETCH_ASSOC);
 
             // 3. New on Exchange (last 4 active listings)
-            $exchangeStmt = $pdo->query("
+            $exchangeStmt = $pdo->prepare("
                 SELECT ProduceName, Qty, Description, CreatedAt 
                 FROM EXCHANGE_BOARD 
-                WHERE Status = 'Active' 
+                WHERE Status = 'Active' AND GardenerID <> ?
                 ORDER BY CreatedAt DESC 
                 LIMIT 4
             ");
+            $exchangeStmt->execute([$user['id']]);
             $recentExchange = $exchangeStmt->fetchAll(PDO::FETCH_ASSOC);
 
             respond([

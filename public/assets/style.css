@@ -550,6 +550,20 @@ a { color: inherit; }
 .footer-meta { text-align: right; font-size: 0.82rem; }
 .footer-meta p { margin: 0 0 4px; }
 
+.account-footer { padding: 24px 0; }
+.account-footer .footer-row { align-items: center; }
+.account-footer-brand .wordmark-light { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 6px; font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; text-decoration: none; }
+.account-footer .footer-meta { max-width: 280px; }
+
+.account-page { display: flex; min-height: 100vh; flex-direction: column; }
+.account-page > .app-layout { flex: 1; min-height: 0; }
+
+@media (max-width: 767px) {
+  .account-footer { padding: 24px 0; }
+  .account-footer .footer-row { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .account-footer .footer-meta { text-align: left; }
+}
+
 /* =========================================================
    Responsive breakpoints — tablet and mobile
    ========================================================= */
