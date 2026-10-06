@@ -49,11 +49,11 @@ if ($user = currentUser()) {
       <div class="field-row">
         <div class="field">
           <label for="first-name">First Name</label>
-          <input type="text" id="first-name" name="first_name" autocomplete="given-name" pattern="[A-Za-z\s\-']+" title="Letters only" required>
+          <input type="text" id="first-name" name="first_name" autocomplete="given-name" pattern="[A-Za-z\s\-']+" title="Letters only" required maxle>
         </div>
         <div class="field">
           <label for="last-name">Last Name</label>
-          <input type="text" id="last-name" name="last_name" autocomplete="family-name" pattern="[A-Za-z\s\-']+" title="Letters only" required>
+          <input type="text" id="last-name" name="last_name" autocomplete="family-name" pattern="[A-Za-z\s\-']+" title="Letters only" required maxlength="25">
         </div>
       </div>
 
@@ -61,7 +61,10 @@ if ($user = currentUser()) {
       <div class="field-row">
         <div class="field">
           <label for="age">Age</label>
-          <input type="number" id="age" name="age" min="18" max="120" autocomplete="off" required>
+          <input type="text" id="age" name="age" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" autocomplete="off" aria-describedby="age-reqs" required>
+          <ul id="age-reqs" class="password-reqs" aria-live="polite">
+            <li id="age-req" class="invalid">At least 18 years old</li>
+          </ul>
         </div>
         <div class="field">
           <label for="location">Location</label>
@@ -132,6 +135,6 @@ if ($user = currentUser()) {
   </div>
 </div>
 
-<script src="assets/register.js?v=4"></script>
+<script src="assets/register.js?v=5"></script>
 </body>
 </html>

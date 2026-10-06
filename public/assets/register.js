@@ -9,6 +9,21 @@ const shiftSelect = document.getElementById('shift');
 
 const firstNameInput = document.getElementById('first-name');
 const lastNameInput = document.getElementById('last-name');
+const ageInput = document.getElementById('age');
+const ageReqs = document.getElementById('age-reqs');
+const ageReq = document.getElementById('age-req');
+
+const updateAgeRequirement = () => {
+  const digits = ageInput.value.replace(/\D/g, '');
+  ageInput.value = digits.slice(0, 2);
+  const isValidAge = Number(ageInput.value) >= 18;
+  ageReq.classList.toggle('valid', isValidAge);
+  ageReq.classList.toggle('invalid', !isValidAge);
+};
+
+ageInput.addEventListener('input', updateAgeRequirement);
+ageInput.addEventListener('focus', () => ageReqs.classList.add('active'));
+ageInput.addEventListener('blur', () => ageReqs.classList.remove('active'));
 
 // Prevent typing numbers or special symbols into name fields
 [firstNameInput, lastNameInput].forEach((input) => {
@@ -34,7 +49,7 @@ form.addEventListener('submit', async (e) => {
 
   const firstName = firstNameInput.value.trim();
   const lastName = lastNameInput.value.trim();
-  const ageVal = document.getElementById('age').value.trim();
+  const ageVal = ageInput.value.trim();
   const age = parseInt(ageVal, 10);
   const location = document.getElementById('location').value;
   const email = document.getElementById('email').value.trim();
@@ -61,7 +76,7 @@ form.addEventListener('submit', async (e) => {
   if (!ageVal || isNaN(age) || age < 18 || age > 120) {
     alertEl.textContent = 'You must be at least 18 years old to create an account.';
     alertEl.hidden = false;
-    document.getElementById('age').focus();
+    ageInput.focus();
     return;
   }
 
