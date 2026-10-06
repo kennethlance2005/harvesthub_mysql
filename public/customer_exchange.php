@@ -12,7 +12,7 @@ $navTitle = 'Exchange Board';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=6">
+<link rel="stylesheet" href="assets/style.css?v=14">
 </head>
 <body>
 
@@ -21,12 +21,12 @@ $navTitle = 'Exchange Board';
   <?php include __DIR__ . '/customer_sidebar.php'; ?>
 
   <div class="main-content">
-    <main class="wrap" id="top" style="max-width: 1200px; padding-top: 32px;">
+    <main class="wrap exchange-page" id="top" style="max-width: 1200px; padding-top: 32px;">
 
-      <div style="display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap;">
+      <div class="exchange-layout">
         
         <!-- WIDE LEFT COLUMN: Community Exchange Feed (flex: 3) -->
-        <div style="flex: 3; min-width: 600px; display: flex; flex-direction: column; gap: 32px;">
+        <div class="exchange-feed-column">
           
           <div class="board-panel">
             <div class="board-head" style="margin-bottom: 24px; padding: 0 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
@@ -48,7 +48,7 @@ $navTitle = 'Exchange Board';
         </div>
 
         <!-- NARROW RIGHT COLUMN: My Listings & Post Form (flex: 1) -->
-        <div style="flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 24px;">
+        <div class="exchange-sidebar">
           
           <!-- Create Listing Form -->
           <div class="board-panel" style="padding: 24px;">
@@ -97,6 +97,7 @@ $navTitle = 'Exchange Board';
 
         </div>
 
+      </div>
     </main>
   </div>
 </div>
@@ -121,7 +122,7 @@ $navTitle = 'Exchange Board';
         <textarea id="claim-pickup" placeholder="e.g., Tomorrow at 10 AM by the main gate" rows="3" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 4px; resize: none;" required></textarea>
       </div>
       
-      <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+      <div class="claim-modal-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
         <button type="button" class="btn btn-ghost" id="cancel-claim-btn" style="border: 1px solid #cbd5e1;">Cancel</button>
         <button type="submit" class="btn btn-accent">Send Request</button>
       </div>

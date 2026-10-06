@@ -10,7 +10,7 @@ $navTitle = 'System Dashboard';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Admin Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=8">
+<link rel="stylesheet" href="assets/style.css?v=14">
 <!-- Load Chart.js for the graph -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -35,7 +35,7 @@ $navTitle = 'System Dashboard';
       <div class="stat-grid" id="stats-row" style="margin-bottom: 28px;"></div>
 
       <!-- Analytics Grid -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; margin-bottom: 24px;">
+    <div class="admin-analytics-grid" style="gap: 24px; margin-bottom: 24px;">
           
           <!-- Plots Doughnut -->
           <div class="panel">

@@ -11,8 +11,12 @@ $isManageActive = in_array($currentPage, $managePages);
   <div class="sidebar-brand">
     <span class="sprout">🌱</span> HarvestHub
   </div>
+
+  <button class="sidebar-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="adminSidebarNav adminSidebarLogout">
+    <span></span><span></span><span></span>
+  </button>
   
-  <nav class="sidebar-nav">
+  <nav class="sidebar-nav" id="adminSidebarNav" aria-label="Administrator navigation">
     <a href="admin_dashboard.php" class="sidebar-link <?= $currentPage === 'admin_dashboard.php' ? 'active' : '' ?>">
       Dashboard
     </a>
@@ -49,7 +53,7 @@ $isManageActive = in_array($currentPage, $managePages);
     </a>
   </nav>
 
-  <div class="sidebar-footer">
+  <div class="sidebar-footer" id="adminSidebarLogout">
     <a href="logout.php" class="sidebar-link" style="color: #fca5a5;">Log Out</a>
   </div>
   </div>
@@ -76,6 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
 (function () {
   var nav = document.querySelector('.sidebar');
   if (!nav) return;
+  var toggle = nav.querySelector('.sidebar-toggle');
+  toggle.addEventListener('click', function () {
+    var isOpen = nav.classList.toggle('is-open');
+    toggle.setAttribute('aria-expanded', String(isOpen));
+    toggle.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
+  });
   function onScroll() {
     nav.classList.toggle('is-scrolled', window.scrollY > 8);
   }

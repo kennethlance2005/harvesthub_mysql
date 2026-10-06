@@ -8,11 +8,15 @@ $currentPage = basename($_SERVER['PHP_SELF']);
       <span class="sprout">🌱</span> HarvestHub
     </div>
 
-    <div class="sidebar-user">
+    <button class="sidebar-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="customerSidebarUser customerSidebarNav customerSidebarLogout">
+      <span></span><span></span><span></span>
+    </button>
+
+    <div class="sidebar-user" id="customerSidebarUser">
       <?= htmlspecialchars($user['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>
     </div>
 
-    <nav class="sidebar-nav">
+    <nav class="sidebar-nav" id="customerSidebarNav" aria-label="Customer navigation">
       <a href="customer_dashboard.php" class="sidebar-link <?= $currentPage === 'customer_dashboard.php' ? 'active' : '' ?>">
         Dashboard
       </a>
@@ -27,7 +31,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
       </a>
     </nav>
 
-    <div class="sidebar-footer">
+    <div class="sidebar-footer" id="customerSidebarLogout">
       <a href="logout.php" class="sidebar-link" style="color: #fca5a5;">Log Out</a>
     </div>
   </div>
@@ -36,6 +40,12 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 (function () {
   var nav = document.querySelector('.sidebar');
   if (!nav) return;
+  var toggle = nav.querySelector('.sidebar-toggle');
+  toggle.addEventListener('click', function () {
+    var isOpen = nav.classList.toggle('is-open');
+    toggle.setAttribute('aria-expanded', String(isOpen));
+    toggle.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
+  });
   function onScroll() {
     nav.classList.toggle('is-scrolled', window.scrollY > 8);
   }

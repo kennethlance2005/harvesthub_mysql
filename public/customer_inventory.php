@@ -12,7 +12,7 @@ $navTitle = 'Resource Inventory';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=5">
+<link rel="stylesheet" href="assets/style.css?v=14">
 </head>
 <body>
 
@@ -23,12 +23,12 @@ $navTitle = 'Resource Inventory';
 
   <!-- Main Workspace -->
   <div class="main-content">
-    <main class="wrap" id="top" style="max-width: 1200px; padding-top: 32px;">
+    <main class="wrap customer-inventory-page" id="top" style="max-width: 1200px; padding-top: 32px;">
 
-      <div style="display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap;">
+      <div class="inventory-layout">
         
         <!-- WIDE LEFT COLUMN: Catalog & Inventory (flex: 3) -->
-        <div style="flex: 3; min-width: 600px; display: flex; flex-direction: column; gap: 32px;">
+        <div class="inventory-primary">
           
           <!-- Top Left: Resource Catalog -->
           <div class="board-panel">
@@ -87,7 +87,7 @@ $navTitle = 'Resource Inventory';
         </div>
 
         <!-- NARROW RIGHT COLUMN: My Requests (flex: 1) -->
-        <div class="post-panel" style="flex: 1; min-width: 280px; padding: 24px;">
+        <div class="post-panel inventory-requests">
           <h2 style="font-size: 1.25rem; margin-bottom: 8px;">My Requests</h2>
           <p class="panel-hint" style="margin-bottom: 16px;">Track your ongoing approvals.</p>
           

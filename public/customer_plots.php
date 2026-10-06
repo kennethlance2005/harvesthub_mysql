@@ -12,7 +12,7 @@ $navTitle = 'My Plots & Crops';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=5">
+<link rel="stylesheet" href="assets/style.css?v=14">
 </head>
 <body>
 
@@ -21,12 +21,12 @@ $navTitle = 'My Plots & Crops';
   <?php include __DIR__ . '/customer_sidebar.php'; ?>
 
   <div class="main-content">
-    <main class="wrap" id="top" style="max-width: 1200px; padding-top: 32px;">
+    <main class="wrap customer-plots-page" id="top" style="max-width: 1200px; padding-top: 32px;">
 
-      <div style="display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap;">
+      <div class="plots-layout">
         
         <!-- WIDE LEFT COLUMN: Active Plots (flex: 3) -->
-        <div style="flex: 3; min-width: 600px; display: flex; flex-direction: column; gap: 32px;">
+        <div class="plots-primary">
           
           <div class="board-panel">
             <div class="board-head" style="margin-bottom: 24px; padding: 0 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
@@ -54,7 +54,7 @@ $navTitle = 'My Plots & Crops';
           </div>
 
           <!-- Interactive Garden Map -->
-          <div class="board-panel" style="margin-top: 32px; padding: 24px;">
+          <div class="board-panel garden-map-panel">
             <div style="margin-bottom: 24px;">
               <h2 style="font-size: 1.25rem; margin-bottom: 8px;">Community Garden Map</h2>
               <p class="text-muted" style="margin: 0;">Click on any green available plot to request space from the coordinator.</p>
@@ -76,7 +76,7 @@ $navTitle = 'My Plots & Crops';
         </div>
 
         <!-- NARROW RIGHT COLUMN: Log New Crop Form (flex: 1) -->
-        <div style="flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 24px;">
+        <div class="plots-secondary">
           
           <div class="board-panel" style="padding: 24px;">
             <h2 style="font-size: 1.25rem; margin-bottom: 8px;">Log a Crop</h2>

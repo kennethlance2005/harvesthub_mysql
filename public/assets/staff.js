@@ -277,10 +277,10 @@ function renderResources() {
 
   const rows = filtered.map(resource => `
     <tr class="resource-inventory-row">
-      <td><span class="resource-name-cell" title="${escapeHtml(resource.Name)}">${escapeHtml(resource.Name)}</span></td>
-      <td>${escapeHtml(String(resource.TotalQty))}</td>
-      <td>${escapeHtml(String(resource.AvailableQty))}</td>
-      <td><div class="borrower-assignments">${resource.Borrowers.length ? resource.Borrowers.map(borrower => `
+      <td data-label="Resource"><span class="resource-name-cell" title="${escapeHtml(resource.Name)}">${escapeHtml(resource.Name)}</span></td>
+      <td data-label="Total">${escapeHtml(String(resource.TotalQty))}</td>
+      <td data-label="Available">${escapeHtml(String(resource.AvailableQty))}</td>
+      <td data-label="Borrower assignments"><div class="borrower-assignments">${resource.Borrowers.length ? resource.Borrowers.map(borrower => `
         <div class="borrower-assignment">
           <div class="borrower-assignment-info">
             <strong title="${escapeHtml(borrower.Name)}">${escapeHtml(borrower.Name)}</strong>
@@ -298,7 +298,7 @@ function renderResources() {
       `).join('') : '<span class="borrower-empty-state">No current borrowers</span>'}</div></td>
     </tr>
   `).join('');
-  tableEl.innerHTML = rows || '<tr><td colspan="4" class="text-muted">No resources match your search.</td></tr>';
+  tableEl.innerHTML = rows || '<tr class="resource-empty-row"><td colspan="4" class="text-muted">No resources match your search.</td></tr>';
   tableEl.querySelectorAll('.request-return-btn').forEach(button => {
     button.addEventListener('click', () => {
       const input = document.getElementById(`return-qty-${button.dataset.id}`);

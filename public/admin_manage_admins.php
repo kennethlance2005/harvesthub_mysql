@@ -10,7 +10,7 @@ $navTitle = 'Manage Administrators';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Admins</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=8">
+<link rel="stylesheet" href="assets/style.css?v=14">
 </head>
 <body>
 <div class="app-layout">
@@ -25,7 +25,7 @@ $navTitle = 'Manage Administrators';
             <h2 style="margin-bottom: 4px;">Register New Administrator</h2>
             
             <form id="create-admin-form" novalidate>
-              <div style="display: grid; grid-template-columns: 2fr 1.5fr 100px; gap: 16px; align-items: start;">
+              <div class="admin-form-grid" style="display: grid; grid-template-columns: 2fr 1.5fr 100px; gap: 16px; align-items: start;">
                 
                 <!-- Row 1: Full Name | Location | Age -->
                 <div class="field" style="margin: 0;">
@@ -88,7 +88,7 @@ $navTitle = 'Manage Administrators';
 
           <!-- Active Admins Table -->
           <div class="panel">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div class="admin-table-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
               <p class="panel-title" style="margin: 0;">Active Administrators</p>
               <input type="search" id="search-admins" data-table-search="admins-table" placeholder="Search administrators...">
             </div>
