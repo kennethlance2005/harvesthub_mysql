@@ -935,6 +935,51 @@ table.data-table {
 
 .data-table tr:last-child td { border-bottom: none; }
 
+@media (max-width: 600px) {
+  .admin-table-heading { flex-wrap: wrap; }
+  .admin-table-heading > .panel-title,
+  .admin-table-heading > p { flex: 1 1 100%; }
+  .admin-table-heading input[type="search"] { flex: 1 1 100%; width: 100%; max-width: none; }
+  table.admin-responsive-table,
+  table.admin-responsive-table tbody { display: block; width: 100%; min-width: 0; table-layout: auto; }
+  table.admin-responsive-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  table.admin-responsive-table tbody { display: grid; gap: 12px; }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding: 8px 0; border: 0; overflow-wrap: anywhere; word-break: normal; }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td::before { content: attr(data-label); color: var(--ink-600); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td:first-child,
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td:nth-child(2),
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td:last-child { grid-column: 1 / -1; }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td:last-child { flex-direction: row; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--line); margin-top: 4px; }
+  table.admin-responsive-table .admin-empty-row { display: block; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+  table.admin-responsive-table .admin-empty-row > td { display: block; padding: 0; border: 0; }
+  table.admin-responsive-table .approve-signup,
+  table.admin-responsive-table .reject-signup,
+  table.admin-responsive-table .delete-btn { white-space: nowrap; }
+}
+
+@media (max-width: 600px) {
+  .archived-accounts-page { width: 100%; padding: 24px 14px 40px !important; }
+  .archived-accounts-panel { padding: 16px; }
+  .archived-accounts-panel > div:first-child { align-items: stretch !important; margin-bottom: 16px !important; }
+  .archived-accounts-panel #search-archived { width: 100%; max-width: none; }
+  .archived-accounts-panel .table-wrap { overflow: visible; }
+  #archived-data-table,
+  #archived-data-table tbody { display: block; width: 100%; min-width: 0; table-layout: auto; }
+  #archived-data-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #archived-data-table tbody { display: grid; gap: 12px; }
+  #archived-table > tr:not(.archived-empty-row) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+  #archived-table > tr:not(.archived-empty-row) > td { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding: 8px 0; border: 0; overflow-wrap: anywhere; word-break: normal; }
+  #archived-table > tr:not(.archived-empty-row) > td::before { content: attr(data-label); color: var(--ink-600); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
+  #archived-table > tr:not(.archived-empty-row) > td:first-child,
+  #archived-table > tr:not(.archived-empty-row) > td:nth-child(2),
+  #archived-table > tr:not(.archived-empty-row) > td:last-child { grid-column: 1 / -1; }
+  #archived-table > tr:not(.archived-empty-row) > td:last-child { border-top: 1px solid var(--line); margin-top: 4px; }
+  #archived-table .unarchive-btn { align-self: flex-start; white-space: nowrap; }
+  #archived-table > .archived-empty-row { display: block; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+  #archived-table > .archived-empty-row > td { display: block; padding: 0; border: 0; }
+}
+
 .text-muted { color: var(--ink-600); }
 .text-right { text-align: right; }
 

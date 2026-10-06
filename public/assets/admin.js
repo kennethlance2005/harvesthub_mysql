@@ -71,14 +71,14 @@ async function loadAccounts() {
   if (gardenersTable) {
     gardenersTable.innerHTML = data.gardeners.map(g => `
       <tr data-name="${escapeHtml(g.Name)}" data-location="${escapeHtml(g.Location || '')}">
-        <td>${escapeHtml(g.Name)}</td>
-        <td>${escapeHtml(g.Email)}</td>
-        <td>${escapeHtml(g.Location || 'Not provided')}</td>
-        <td>
+        <td data-label="Name">${escapeHtml(g.Name)}</td>
+        <td data-label="Email">${escapeHtml(g.Email)}</td>
+        <td data-label="Location">${escapeHtml(g.Location || 'Not provided')}</td>
+        <td data-label="Actions">
           <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}">Archive</button>
         </td>
       </tr>
-    `).join('') || '<tr><td colspan="4" class="text-muted">No gardeners yet.</td></tr>';
+    `).join('') || '<tr class="admin-empty-row"><td colspan="4" class="text-muted">No gardeners yet.</td></tr>';
   }
 
   // Render Coordinators if table exists
@@ -86,15 +86,15 @@ async function loadAccounts() {
   if (coordsTable) {
     coordsTable.innerHTML = data.coordinators.map(c => `
       <tr data-name="${escapeHtml(c.Name)}" data-location="${escapeHtml(c.Location || '')}">
-        <td>${escapeHtml(c.Name)}</td>
-        <td>${escapeHtml(c.Email)}</td>
-        <td>${escapeHtml(c.Shift)}</td>
-        <td>${escapeHtml(c.Location || 'Not provided')}</td>
-        <td>
+        <td data-label="Name">${escapeHtml(c.Name)}</td>
+        <td data-label="Email">${escapeHtml(c.Email)}</td>
+        <td data-label="Shift">${escapeHtml(c.Shift)}</td>
+        <td data-label="Location">${escapeHtml(c.Location || 'Not provided')}</td>
+        <td data-label="Actions">
           <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Archive</button>
         </td>
       </tr>
-    `).join('') || '<tr><td colspan="5" class="text-muted">No coordinators yet.</td></tr>';
+    `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No coordinators yet.</td></tr>';
   }
 
   // Render Admins if table exists
@@ -102,14 +102,14 @@ async function loadAccounts() {
   if (adminsTable) {
     adminsTable.innerHTML = data.admins.map(a => `
       <tr data-name="${escapeHtml(a.Name)}" data-location="${escapeHtml(a.Location || '')}">
-        <td>${escapeHtml(a.Name)}</td>
-        <td>${escapeHtml(a.Email)}</td>
-        <td>${escapeHtml(a.Location || 'Not provided')}</td>
-        <td>
+        <td data-label="Name">${escapeHtml(a.Name)}</td>
+        <td data-label="Email">${escapeHtml(a.Email)}</td>
+        <td data-label="Location">${escapeHtml(a.Location || 'Not provided')}</td>
+        <td data-label="Actions">
           <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.id === data.current_user_id ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>Archive</button>
         </td>
       </tr>
-    `).join('') || '<tr><td colspan="4" class="text-muted">No administrators yet.</td></tr>';
+    `).join('') || '<tr class="admin-empty-row"><td colspan="4" class="text-muted">No administrators yet.</td></tr>';
   }
 
   document.querySelectorAll('.delete-btn').forEach(btn => {
@@ -127,7 +127,7 @@ async function loadArchivedAccounts() {
   const data = await res.json();
   
   if (!data.ok || data.accounts.length === 0) {
-    table.innerHTML = '<tr><td colspan="6" class="text-muted">No archived accounts found.</td></tr>';
+    table.innerHTML = '<tr class="archived-empty-row"><td colspan="6" class="text-muted">No archived accounts found.</td></tr>';
     return;
   }
 
@@ -135,12 +135,12 @@ async function loadArchivedAccounts() {
     const displayRole = a.Role === 'Customer' ? 'Gardener' : a.Role;
     return `
       <tr data-name="${escapeHtml(a.Name)}">
-        <td>${escapeHtml(a.Name)}</td>
-        <td>${escapeHtml(a.Email)}</td>
-        <td>${escapeHtml(displayRole)}</td>
-        <td>${escapeHtml(a.Location)}</td>
-        <td>${escapeHtml(a.Shift)}</td>
-        <td>
+        <td data-label="Name">${escapeHtml(a.Name)}</td>
+        <td data-label="Email">${escapeHtml(a.Email)}</td>
+        <td data-label="Role">${escapeHtml(displayRole)}</td>
+        <td data-label="Location">${escapeHtml(a.Location)}</td>
+        <td data-label="Shift">${escapeHtml(a.Shift)}</td>
+        <td data-label="Actions">
           <button type="button" class="btn btn-accent btn-sm unarchive-btn" data-role="${a.Role}" data-id="${a.id}">Unarchive</button>
         </td>
       </tr>
@@ -188,12 +188,12 @@ async function loadSignupRequests() {
 
   const renderRow = (r) => `
     <tr data-name="${escapeHtml(r.FirstName + ' ' + r.LastName)}" data-location="${escapeHtml(r.Location || '')}">
-      <td>${escapeHtml(r.FirstName + ' ' + r.LastName)}</td>
-      <td>${escapeHtml(r.Email)}</td>
-      <td>${escapeHtml(String(r.Age))}</td>
-      <td>${escapeHtml(r.Location)}</td>
-      ${r.Role === 'staff' ? `<td>${escapeHtml(r.Shift || 'Morning')}</td>` : ''}
-      <td class="text-right" style="white-space: nowrap;">
+      <td data-label="Name">${escapeHtml(r.FirstName + ' ' + r.LastName)}</td>
+      <td data-label="Email">${escapeHtml(r.Email)}</td>
+      <td data-label="Age">${escapeHtml(String(r.Age))}</td>
+      <td data-label="Location">${escapeHtml(r.Location)}</td>
+      ${r.Role === 'staff' ? `<td data-label="Shift">${escapeHtml(r.Shift || 'Morning')}</td>` : ''}
+      <td data-label="Actions" class="text-right" style="white-space: nowrap;">
         <button class="btn btn-sm approve-signup" style="background: var(--green-700); color: var(--white);" data-id="${r.RequestID}">Approve</button>
         <button class="btn btn-sm reject-signup" style="background: var(--danger); color: var(--white);" data-id="${r.RequestID}">Reject</button>
       </td>
@@ -403,7 +403,7 @@ async function loadArchivedAccounts() {
   const data = await res.json();
   
   if (!data.ok || data.accounts.length === 0) {
-    table.innerHTML = '<tr><td colspan="6" class="text-muted">No archived accounts found.</td></tr>';
+    table.innerHTML = '<tr class="archived-empty-row"><td colspan="6" class="text-muted">No archived accounts found.</td></tr>';
     return;
   }
 
@@ -411,12 +411,12 @@ async function loadArchivedAccounts() {
     const displayRole = a.Role === 'Customer' ? 'Gardener' : a.Role;
     return `
       <tr data-name="${escapeHtml(a.Name)}">
-        <td>${escapeHtml(a.Name)}</td>
-        <td>${escapeHtml(a.Email)}</td>
-        <td>${escapeHtml(displayRole)}</td>
-        <td>${escapeHtml(a.Location)}</td>
-        <td>${escapeHtml(a.Shift)}</td>
-        <td>
+        <td data-label="Name">${escapeHtml(a.Name)}</td>
+        <td data-label="Email">${escapeHtml(a.Email)}</td>
+        <td data-label="Role">${escapeHtml(displayRole)}</td>
+        <td data-label="Location">${escapeHtml(a.Location)}</td>
+        <td data-label="Shift">${escapeHtml(a.Shift)}</td>
+        <td data-label="Actions">
           <button type="button" class="btn btn-accent btn-sm unarchive-btn" data-role="${a.Role}" data-id="${a.id}">Unarchive</button>
         </td>
       </tr>

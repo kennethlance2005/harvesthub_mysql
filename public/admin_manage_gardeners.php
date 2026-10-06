@@ -10,7 +10,7 @@ $navTitle = 'Manage Gardeners';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Gardeners</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=14">
+<link rel="stylesheet" href="assets/style.css?v=15">
 </head>
 <body>
 <div class="app-layout">
@@ -22,7 +22,7 @@ $navTitle = 'Manage Gardeners';
       <div class="panel" style="margin-bottom: 24px;">
         <p class="panel-title">Pending Gardener Requests</p>
         <div class="table-wrap">
-          <table class="data-table">
+          <table class="data-table admin-responsive-table">
             <thead><tr><th>Name</th><th>Email</th><th>Age</th><th>Location</th><th>Actions</th></tr></thead>
             <tbody id="pending-gardeners-table"></tbody>
           </table>
@@ -32,12 +32,12 @@ $navTitle = 'Manage Gardeners';
 
       <!-- Active Gardeners -->
       <div class="panel">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div class="admin-table-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <p class="panel-title" style="margin: 0;">Active Community Gardeners</p>
           <input type="search" id="search-gardeners" data-table-search="gardeners-table" placeholder="Search gardeners...">
         </div>
         <div class="table-wrap">
-          <table class="data-table">
+          <table class="data-table admin-responsive-table">
             <thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Actions</th></tr></thead>
             <tbody id="gardeners-table"></tbody>
           </table>
@@ -49,6 +49,6 @@ $navTitle = 'Manage Gardeners';
 </div>
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js"></script>
+<script src="assets/admin.js?v=3"></script>
 </body>
 </html>

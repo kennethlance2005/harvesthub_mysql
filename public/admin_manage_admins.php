@@ -10,7 +10,7 @@ $navTitle = 'Manage Administrators';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Admins</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=14">
+<link rel="stylesheet" href="assets/style.css?v=15">
 </head>
 <body>
 <div class="app-layout">
@@ -93,7 +93,7 @@ $navTitle = 'Manage Administrators';
               <input type="search" id="search-admins" data-table-search="admins-table" placeholder="Search administrators...">
             </div>
             <div class="table-wrap">
-              <table class="data-table">
+              <table class="data-table admin-responsive-table">
                 <thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Actions</th></tr></thead>
                 <tbody id="admins-table"></tbody>
               </table>
@@ -107,6 +107,6 @@ $navTitle = 'Manage Administrators';
 </div>
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js"></script>
+<script src="assets/admin.js?v=3"></script>
 </body>
 </html>
