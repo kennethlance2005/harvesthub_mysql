@@ -44,19 +44,16 @@ $navTitle = 'Gardener Dashboard';
         <div class="panel">
           <p class="panel-title">Active Plots</p>
           <p class="kpi-value" id="kpi-plots">-</p>
-          <a href="customer_plots.php" class="kpi-link">Manage your plots &rarr;</a>
         </div>
         
         <div class="panel">
           <p class="panel-title">Pending Resources</p>
           <p class="kpi-value" id="kpi-resources">-</p>
-          <a href="customer_inventory.php" class="kpi-link">View inventory tracker &rarr;</a>
         </div>
 
         <div class="panel">
           <p class="panel-title">My Exchange Listings</p>
           <p class="kpi-value" id="kpi-listings">-</p>
-          <a href="customer_exchange.php" class="kpi-link">Go to the board &rarr;</a>
         </div>
       </div>
 
@@ -65,7 +62,6 @@ $navTitle = 'Gardener Dashboard';
         <div class="panel">
           <div class="panel-header">
             <p class="panel-title" style="margin: 0;">Recent Maintenance</p>
-            <a href="customer_crops.php" class="kpi-link" style="font-weight: 400;">View maintenance history</a>
           </div>
           <div id="recent-logs-list" class="scroll-y" style="max-height: 220px;" aria-live="polite">
             <p class="empty-state">Loading recent logs...</p>
@@ -75,7 +71,6 @@ $navTitle = 'Gardener Dashboard';
         <div class="panel">
           <div class="panel-header">
             <p class="panel-title" style="margin: 0;">New on the Exchange</p>
-            <a href="customer_exchange.php" class="kpi-link" style="font-weight: 400;">Browse all</a>
           </div>
           <div id="recent-exchange-list" class="scroll-y" style="max-height: 220px;" aria-live="polite">
             <p class="empty-state">Loading latest produce...</p>
