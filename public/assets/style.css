@@ -1801,20 +1801,34 @@ table.data-table {
 .btn-return-request:hover { border-color: var(--brown-700); background: var(--brown-700); box-shadow: 0 3px 8px rgba(78, 40, 22, 0.22); }
 .btn-return-request:focus-visible { outline-color: var(--brown-700); }
 .records-section { max-width: 900px; }
-.records-timeline { position: relative; padding-left: 28px; }
-.records-timeline::before { position: absolute; top: 12px; bottom: 12px; left: 8px; width: 1px; background: var(--line); content: ""; }
-.record-entry { position: relative; padding: 0 0 26px; }
-.record-entry:last-child { padding-bottom: 0; }
-.record-entry-marker { position: absolute; top: 6px; left: -25px; width: 11px; height: 11px; border: 2px solid var(--cream-100); border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.records-date-filter { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.records-date-filter label { display: grid; gap: 5px; color: var(--ink-600); font-size: 0.78rem; font-weight: 700; }
+.records-date-filter input { min-height: 40px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink-900); font: inherit; }
+.records-date-filter .records-day-button { min-height: 40px; padding: 8px 12px; font-size: 0.82rem; }
+.records-timeline { display: flex; flex-direction: column; gap: 24px; }
+.record-day-group + .record-day-group { padding-top: 18px; border-top: 1px solid var(--line); }
+.record-day-heading { margin: 0 0 4px; color: var(--ink-600); font-size: 0.78rem; font-weight: 700; }
+.record-day-events { --record-rail-left: 78px; }
+.record-entry { position: relative; display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 28px; padding: 0; }
+.record-entry::before { position: absolute; top: 24px; bottom: -24px; left: var(--record-rail-left); width: 1px; background: var(--line); content: ""; }
+.record-entry:last-child::before { display: none; }
+.record-entry-marker { position: absolute; z-index: 1; top: 18px; left: calc(var(--record-rail-left) - 6px); width: 12px; height: 12px; border: 2px solid var(--cream-100); border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .record-returned .record-entry-marker { background: var(--green-700); box-shadow: 0 0 0 1px var(--green-700); }
-.record-entry-content { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.record-entry-time { padding-top: 16px; color: var(--ink-600); font-size: 0.78rem; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.record-entry-content { min-width: 0; padding: 14px 16px 16px; border-bottom: 1px solid var(--line); }
 .record-entry-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .record-entry-head strong { color: var(--green-900); font-family: var(--font-display); font-size: 1.05rem; }
 .record-entry-content p { margin: 8px 0 5px; }
-.record-entry-content time { color: var(--ink-600); font-size: 0.82rem; }
 
 @media (max-width: 900px) {
   .coordinator-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .record-day-events { --record-rail-left: 66px; }
+  .record-entry { grid-template-columns: 54px minmax(0, 1fr); column-gap: 24px; }
+  .record-entry-content { padding-right: 4px; padding-left: 12px; }
+  .record-entry-head { align-items: flex-start; }
 }
 
 @media (max-width: 768px) {

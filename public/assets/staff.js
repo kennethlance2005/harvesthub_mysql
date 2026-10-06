@@ -226,16 +226,34 @@ async function loadResources() {
   }
 }
 
-async function loadResourceRecords() {
+async function loadResourceRecords(dateValue) {
   const listEl = document.getElementById('resource-records-list');
   if (!listEl) return;
-  const res = await fetch('api.php?action=resource_records');
+  const dateFilter = document.getElementById('records-date-filter-input');
+  const selectedDate = dateValue || dateFilter?.value;
+  if (!selectedDate) return;
+  const params = new URLSearchParams({ action: 'resource_records', date: selectedDate });
+  const res = await fetch(`api.php?${params.toString()}`);
   const data = await res.json();
   if (!data.ok) {
     listEl.innerHTML = '<p class="text-muted">Could not load inventory records.</p>';
     return;
   }
   renderResourceRecords(data.records);
+}
+
+function shiftResourceRecordDate(dayOffset) {
+  const dateFilter = document.getElementById('records-date-filter-input');
+  if (!dateFilter?.value) return;
+  const selectedDateParts = dateFilter.value.split('-').map(Number);
+  const selectedDate = new Date(selectedDateParts[0], selectedDateParts[1] - 1, selectedDateParts[2], 12);
+  selectedDate.setDate(selectedDate.getDate() + dayOffset);
+  dateFilter.value = formatRecordInputDate(selectedDate);
+  loadResourceRecords(dateFilter.value);
+}
+
+function formatRecordInputDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 async function addResource(name, qty) {
@@ -310,19 +328,76 @@ function renderResources() {
 function renderResourceRecords(records) {
   const listEl = document.getElementById('resource-records-list');
   if (!listEl) return;
-  listEl.innerHTML = records.length ? records.map(record => `
-    <article class="record-entry ${record.Action === 'Returned' ? 'record-returned' : 'record-borrowed'}">
+  const groups = new Map();
+  records.forEach(record => {
+    const date = parseRecordDate(record.OccurredAt);
+    const key = Number.isNaN(date.getTime())
+      ? 'unknown-date'
+      : `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        label: Number.isNaN(date.getTime()) ? 'Date unavailable' : formatRecordGroupDate(date),
+        records: [],
+      });
+    }
+    groups.get(key).records.push(record);
+  });
+
+  listEl.innerHTML = groups.size ? Array.from(groups.values()).map(group => `
+    <section class="record-day-group">
+      <h3 class="record-day-heading">${escapeHtml(group.label)}</h3>
+      <div class="record-day-events">${group.records.map(renderResourceRecord).join('')}</div>
+    </section>
+  `).join('') : '<p class="text-muted">No inventory events have been recorded.</p>';
+}
+
+function renderResourceRecord(record) {
+  const quantity = `${escapeHtml(String(record.Qty))}x`;
+  const plot = escapeHtml(record.PlotLabel || 'No plot assigned');
+  let details;
+  let entryClass = 'record-borrowed';
+  let badgeClass = 'badge-brown';
+
+  if (record.Action === 'Added') {
+    details = `${quantity} added by ${escapeHtml(record.ActorName)}`;
+    entryClass = 'record-added';
+  } else if (record.Action === 'Borrowed') {
+    details = `${quantity} borrowed by ${escapeHtml(record.GardenerName)} · ${plot}`;
+  } else if (record.Action === 'Returned') {
+    details = `${quantity} returned by ${escapeHtml(record.ActorName)} · ${plot}`;
+    entryClass = 'record-returned';
+    badgeClass = 'badge-green';
+  } else {
+    details = `${quantity} return requested by ${escapeHtml(record.ActorName)} for ${escapeHtml(record.GardenerName)} · ${plot}`;
+    entryClass = 'record-return-requested';
+  }
+
+  return `
+    <article class="record-entry ${entryClass}">
+      <time class="record-entry-time" datetime="${escapeHtml(String(record.OccurredAt).replace(' ', 'T'))}">${escapeHtml(formatRecordTime(record.OccurredAt))}</time>
       <div class="record-entry-marker" aria-hidden="true"></div>
       <div class="record-entry-content">
         <div class="record-entry-head">
           <strong>${escapeHtml(record.ResourceName)}</strong>
-          <span class="badge ${record.Action === 'Returned' ? 'badge-green' : 'badge-brown'}">${escapeHtml(record.Action)}</span>
+          <span class="badge ${badgeClass}">${escapeHtml(record.Action)}</span>
         </div>
-        <p>${escapeHtml(record.GardenerName)} <span class="text-muted">· ${escapeHtml(record.PlotLabel || 'No plot assigned')}</span></p>
-        <time datetime="${escapeHtml(String(record.OccurredAt).replace(' ', 'T'))}">${escapeHtml(formatRecordDate(record.OccurredAt))}</time>
+        <p>${details}</p>
       </div>
     </article>
-  `).join('') : '<p class="text-muted">No inventory transactions have been recorded.</p>';
+  `;
+}
+
+function parseRecordDate(value) {
+  return new Date(String(value).replace(' ', 'T'));
+}
+
+function formatRecordGroupDate(date) {
+  return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function formatRecordTime(value) {
+  const date = parseRecordDate(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
 function formatRecordDate(value) {
@@ -372,6 +447,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('plot-status-filter')?.addEventListener('change', event => {
     renderPlots(event.target.value);
   });
+  const recordsDateFilter = document.getElementById('records-date-filter-input');
+  if (recordsDateFilter) {
+    recordsDateFilter.value = formatRecordInputDate(new Date());
+    recordsDateFilter.addEventListener('change', event => {
+    if (event.target.value) loadResourceRecords(event.target.value);
+    });
+  }
+  document.getElementById('records-previous-day')?.addEventListener('click', () => shiftResourceRecordDate(-1));
+  document.getElementById('records-next-day')?.addEventListener('click', () => shiftResourceRecordDate(1));
   const isDashboard = Boolean(document.getElementById('coordinator-stats'));
   if (isDashboard || document.getElementById('applications-list')) loadApplications();
   if (isDashboard || document.getElementById('resource-txns-list')) loadResourceTxns();

@@ -156,6 +156,11 @@ function mergeOrCreateReturnRequestRow(PDO $pdo, int $gardenerId, int $resourceI
     }
 }
 
+function recordResourceEvent(PDO $pdo, int $resourceId, string $eventType, int $qty, string $actorType, string $actorName, ?int $gardenerId = null, ?string $gardenerName = null, ?int $coordId = null, ?int $pltId = null, ?string $plotLabel = null): void {
+    $stmt = $pdo->prepare("INSERT INTO RESOURCE_EVENT (ResourceID, EventType, Qty, ActorType, ActorName, GardenerID, GardenerName, CoordID, PltID, PlotLabel, OccurredAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+    $stmt->execute([$resourceId, $eventType, $qty, $actorType, $actorName, $gardenerId, $gardenerName, $coordId, $pltId, $plotLabel]);
+}
+
 // Whitelisted sort options for the Exchange Board
 const SORT_OPTIONS = [
     'newest'   => 'L.CreatedAt DESC',
@@ -770,7 +775,7 @@ try {
             }
 
             $pdo->beginTransaction();
-            $stmt = $pdo->prepare("SELECT ResourceID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ? AND GardenerID = ? FOR UPDATE");
+            $stmt = $pdo->prepare("SELECT ResourceID, PltID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ? AND GardenerID = ? FOR UPDATE");
             $stmt->execute([(int) $txnId, $user['id']]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$row || !in_array($row['Status'], ['Approved', 'Return Requested'], true)) {
@@ -785,6 +790,14 @@ try {
                 $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'Resource not found.'], 404);
             }
+
+            $plotLabel = null;
+            if ($row['PltID'] !== null) {
+                $plot = $pdo->prepare('SELECT Label FROM PLOT WHERE PltID = ?');
+                $plot->execute([(int) $row['PltID']]);
+                $plotLabel = $plot->fetchColumn() ?: null;
+            }
+            recordResourceEvent($pdo, (int) $row['ResourceID'], 'Returned', (int) $row['Qty'], 'customer', $user['name'], (int) $user['id'], $user['name'], null, $row['PltID'] === null ? null : (int) $row['PltID'], $plotLabel);
 
             $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Returned', ReturnedAt = NOW() WHERE TxnID = ?")
                 ->execute([(int) $txnId]);
@@ -964,7 +977,7 @@ try {
         }
 
         case 'add_resource': {
-            requireJsonRole('staff');
+            $user = requireJsonRole('staff');
             $name = trim($_POST['name'] ?? '');
             $qty = $_POST['qty'] ?? '';
             if ($name === '' || mb_strlen($name) > 80 || !ctype_digit((string) $qty) || (int) $qty < 1 || (int) $qty > 100000) {
@@ -979,12 +992,15 @@ try {
             $existingId = $existing->fetchColumn();
 
             if ($existingId) {
+                $resourceId = (int) $existingId;
                 $pdo->prepare('UPDATE RESOURCE SET TotalQty = TotalQty + ?, AvailableQty = AvailableQty + ? WHERE ResourceID = ?')
-                    ->execute([(int) $qty, (int) $qty, (int) $existingId]);
+                    ->execute([(int) $qty, (int) $qty, $resourceId]);
             } else {
                 $pdo->prepare('INSERT INTO RESOURCE (Name, TotalQty, AvailableQty) VALUES (?, ?, ?)')
                     ->execute([$name, (int) $qty, (int) $qty]);
+                $resourceId = (int) $pdo->lastInsertId();
             }
+            recordResourceEvent($pdo, $resourceId, 'Added', (int) $qty, 'staff', $user['name'], null, null, (int) $user['id']);
             $pdo->commit();
             respond(['ok' => true]);
         }
@@ -998,7 +1014,7 @@ try {
             }
 
             $pdo->beginTransaction();
-            $txn = $pdo->prepare("SELECT GardenerID, ResourceID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ? FOR UPDATE");
+            $txn = $pdo->prepare("SELECT T.GardenerID, G.Name AS GardenerName, T.ResourceID, T.Qty, T.Status FROM RESOURCE_TXN T JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID WHERE T.TxnID = ? FOR UPDATE");
             $txn->execute([(int) $txnId]);
             $row = $txn->fetch(PDO::FETCH_ASSOC);
             if (!$row || $row['Status'] !== 'Requested') {
@@ -1040,14 +1056,16 @@ try {
                     respond(['ok' => false, 'error' => 'Not enough stock left to approve that many.'], 409);
                 }
 
-                $plot = $pdo->prepare("SELECT PltID FROM PLOT WHERE GardenerID = ? AND Status = 'Occupied' ORDER BY PltID LIMIT 1");
+                $plot = $pdo->prepare("SELECT PltID, Label FROM PLOT WHERE GardenerID = ? AND Status = 'Occupied' ORDER BY PltID LIMIT 1");
                 $plot->execute([(int) $row['GardenerID']]);
-                $plotId = $plot->fetchColumn();
-                $plotId = $plotId === false ? null : (int) $plotId;
+                $plotRow = $plot->fetch(PDO::FETCH_ASSOC);
+                $plotId = $plotRow ? (int) $plotRow['PltID'] : null;
+                $plotLabel = $plotRow['Label'] ?? null;
 
                 // Fold the approved amount into the gardener's existing borrower
                 // assignment for this resource rather than adding a new row.
                 mergeOrCreateApprovalRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $chosenQty, (int) $user['id'], $plotId);
+                recordResourceEvent($pdo, (int) $row['ResourceID'], 'Borrowed', $chosenQty, 'customer', $row['GardenerName'], (int) $row['GardenerID'], $row['GardenerName'], null, $plotId, $plotLabel);
 
                 if ($remainder > 0) {
                     // Leave the rest of the request pending — don't reject it.
@@ -1192,35 +1210,26 @@ try {
 
         case 'resource_records': {
             requireJsonRole('staff');
-            $rows = $pdo->query("
-                SELECT T.TxnID, R.Name AS ResourceName, G.Name AS GardenerName,
-                       COALESCE(AssignedPlot.Label, CurrentPlot.Label) AS PlotLabel,
-                       'Borrowed' AS Action, COALESCE(T.ApprovedAt, T.RequestedAt) AS OccurredAt
-                FROM RESOURCE_TXN T
-                JOIN RESOURCE R ON R.ResourceID = T.ResourceID
-                JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID
-                LEFT JOIN PLOT AssignedPlot ON AssignedPlot.PltID = T.PltID
-                LEFT JOIN PLOT CurrentPlot ON CurrentPlot.PltID = (
-                    SELECT MIN(P2.PltID) FROM PLOT P2
-                    WHERE P2.GardenerID = T.GardenerID AND P2.Status = 'Occupied'
-                )
-                WHERE T.Status IN ('Approved', 'Return Requested', 'Returned')
-                UNION ALL
-                SELECT T.TxnID, R.Name AS ResourceName, G.Name AS GardenerName,
-                       COALESCE(AssignedPlot.Label, CurrentPlot.Label) AS PlotLabel,
-                       'Returned' AS Action, COALESCE(T.ReturnedAt, T.RequestedAt) AS OccurredAt
-                FROM RESOURCE_TXN T
-                JOIN RESOURCE R ON R.ResourceID = T.ResourceID
-                JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID
-                LEFT JOIN PLOT AssignedPlot ON AssignedPlot.PltID = T.PltID
-                LEFT JOIN PLOT CurrentPlot ON CurrentPlot.PltID = (
-                    SELECT MIN(P2.PltID) FROM PLOT P2
-                    WHERE P2.GardenerID = T.GardenerID AND P2.Status = 'Occupied'
-                )
-                WHERE T.Status = 'Returned'
-                ORDER BY OccurredAt DESC, TxnID DESC
-            ")->fetchAll(PDO::FETCH_ASSOC);
-            respond(['ok' => true, 'records' => $rows]);
+            $selectedDate = $_GET['date'] ?? date('Y-m-d');
+            if (!is_string($selectedDate)) {
+                respond(['ok' => false, 'error' => 'Choose a valid date.'], 422);
+            }
+            $date = DateTimeImmutable::createFromFormat('!Y-m-d', $selectedDate);
+            if (!$date || $date->format('Y-m-d') !== $selectedDate) {
+                respond(['ok' => false, 'error' => 'Choose a valid date.'], 422);
+            }
+            $startAt = $date->format('Y-m-d') . ' 00:00:00';
+            $endAt = $date->modify('+1 day')->format('Y-m-d') . ' 00:00:00';
+            $stmt = $pdo->prepare("
+                SELECT E.EventID, R.Name AS ResourceName, E.EventType AS Action, E.Qty,
+                       E.ActorType, E.ActorName, E.GardenerName, E.PlotLabel, E.OccurredAt
+                FROM RESOURCE_EVENT E
+                JOIN RESOURCE R ON R.ResourceID = E.ResourceID
+                WHERE E.OccurredAt >= ? AND E.OccurredAt < ?
+                ORDER BY E.OccurredAt DESC, E.EventID DESC
+            ");
+            $stmt->execute([$startAt, $endAt]);
+            respond(['ok' => true, 'date' => $selectedDate, 'records' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         }
 
         case 'request_resource_return': {
@@ -1231,7 +1240,7 @@ try {
             }
 
             $pdo->beginTransaction();
-            $stmt = $pdo->prepare("SELECT GardenerID, ResourceID, PltID, Qty, Status FROM RESOURCE_TXN WHERE TxnID = ? FOR UPDATE");
+            $stmt = $pdo->prepare("SELECT T.GardenerID, G.Name AS GardenerName, T.ResourceID, T.PltID, P.Label AS PlotLabel, T.Qty, T.Status FROM RESOURCE_TXN T JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID LEFT JOIN PLOT P ON P.PltID = T.PltID WHERE T.TxnID = ? FOR UPDATE");
             $stmt->execute([(int) $txnId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$row || $row['Status'] !== 'Approved') {
@@ -1255,6 +1264,7 @@ try {
 
             $pltId = $row['PltID'] === null ? null : (int) $row['PltID'];
             mergeOrCreateReturnRequestRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $returnQty, (int) $user['id'], $pltId);
+            recordResourceEvent($pdo, (int) $row['ResourceID'], 'Return Requested', $returnQty, 'staff', $user['name'], (int) $row['GardenerID'], $row['GardenerName'], (int) $user['id'], $pltId, $row['PlotLabel']);
 
             $remaining = $borrowedQty - $returnQty;
             if ($remaining > 0) {
