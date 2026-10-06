@@ -190,6 +190,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------
     
     async function loadMap() {
+        const gridEl = document.getElementById('garden-map-grid');
+        if (!gridEl) return;
+        const assignedListEl = document.getElementById('my-assigned-plots');
+
         try {
             const res = await fetch('api.php', {
                 method: 'POST',
@@ -200,48 +204,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!data.ok) return;
 
-            const gridEl = document.getElementById('garden-map-grid');
-            if (!gridEl) return;
-
             gridEl.innerHTML = '';
 
             if (!Array.isArray(data.plots) || data.plots.length === 0) {
                 gridEl.innerHTML = '<p class="text-muted" style="grid-column: span 4; text-align: center;">No community plots available right now.</p>';
+                if (assignedListEl) assignedListEl.innerHTML = '<p class="text-muted">You do not have any assigned plots.</p>';
                 return;
             }
 
-            data.plots.forEach(plot => {
-                let bg, border, textColor, cursor, onClick;
+            const assignedPlots = data.plots.filter(plot => Number(plot.IsMine) === 1);
+            if (assignedListEl) {
+                assignedListEl.innerHTML = assignedPlots.length ? assignedPlots.map(plot => `
+                    <article class="assigned-plot-item">
+                        <div class="assigned-plot-info">
+                            <strong>${escapeHtml(plot.PlotName ?? 'Plot')}</strong>
+                            <span>${plot.UnassignmentPending ? 'Unassignment request pending' : 'Assigned to you'}</span>
+                        </div>
+                        <button type="button" class="btn btn-sm request-unassignment-btn" data-plot-id="${Number(plot.PlotID)}" ${plot.UnassignmentPending ? 'disabled' : ''}>
+                            ${plot.UnassignmentPending ? 'Request pending' : 'Request unassignment'}
+                        </button>
+                    </article>
+                `).join('') : '<p class="text-muted">You do not have any assigned plots.</p>';
 
-                if (plot.Status === 'Available') {
-                    bg = '#dcfce7'; border = '#22c55e'; textColor = '#166534'; cursor = 'pointer';
-                    const safePlotName = escapeHtml(plot.PlotName ?? 'Plot');
-                    onClick = `onclick="openPlotModal(${plot.PlotID}, '${safePlotName.replace(/'/g, "\\'") }')"`;
-                } else if (plot.Status === 'Pending Approval') {
-                    bg = '#fef08a'; border = '#eab308'; textColor = '#854d0e'; cursor = 'not-allowed';
-                    onClick = '';
-                } else {
-                    bg = '#e2e8f0'; border = '#94a3b8'; textColor = '#475569'; cursor = 'not-allowed';
-                    onClick = '';
-                }
+                assignedListEl.querySelectorAll('.request-unassignment-btn:not(:disabled)').forEach(button => {
+                    button.addEventListener('click', () => requestPlotUnassignment(button.dataset.plotId, button));
+                });
+            }
 
-                gridEl.innerHTML += `
-                    <button type="button" ${onClick} style="
-                        height: 100px; 
-                        border-radius: 8px; 
-                        background: ${bg}; 
-                        border: 2px solid ${border}; 
-                        color: ${textColor}; 
-                        font-weight: bold; 
-                        font-size: 1.1rem; 
-                        cursor: ${cursor}; 
-                        display: flex; 
-                        align-items: center; 
-                        justify-content: center; 
-                        transition: opacity 0.2s;">
-                        ${escapeHtml(plot.PlotName ?? 'Plot')}
+            gridEl.innerHTML = data.plots.map(plot => {
+                const isMine = Number(plot.IsMine) === 1;
+                const statusClass = isMine ? 'assigned' : plot.Status === 'Available' ? 'available' : plot.Status === 'Pending Approval' ? 'pending' : 'occupied';
+                const accessibleName = `${plot.PlotName ?? 'Plot'}, ${isMine ? 'assigned to you' : plot.Status}`;
+                const isAvailable = plot.Status === 'Available';
+
+                return `
+                    <button type="button" class="garden-map-plot ${statusClass}" aria-label="${escapeHtml(accessibleName)}" data-plot-id="${Number(plot.PlotID)}" data-plot-name="${escapeHtml(plot.PlotName ?? 'Plot')}" ${isAvailable ? '' : 'disabled'}>
+                        <span>${escapeHtml(plot.PlotName ?? 'Plot')}</span>
+                        ${isMine ? '<small>Yours</small>' : ''}
                     </button>
                 `;
+            }).join('');
+
+            gridEl.querySelectorAll('.garden-map-plot.available').forEach(button => {
+                button.addEventListener('click', () => window.openPlotModal(button.dataset.plotId, button.dataset.plotName));
             });
 
         } catch (err) {
@@ -250,6 +255,34 @@ document.addEventListener('DOMContentLoaded', () => {
             if (gridEl) {
                 gridEl.innerHTML = '<p class="text-muted" style="grid-column: span 4; text-align: center;">Failed to load community map.</p>';
             }
+        }
+    }
+
+    async function requestPlotUnassignment(plotId, button) {
+        if (!window.confirm('Send an unassignment request to the coordinator? The plot stays assigned to you until it is approved.')) return;
+        button.disabled = true;
+        button.textContent = 'Sending...';
+
+        try {
+            const res = await fetch('api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ action: 'request_plot_unassignment', plt_id: plotId })
+            });
+            const result = await res.json();
+            if (result.ok) {
+                if (typeof showToast === 'function') showToast('Unassignment request sent to the coordinator.', 'success');
+                await loadMap();
+            } else {
+                if (typeof showToast === 'function') showToast(result.error || 'Could not request unassignment.', 'danger');
+                button.disabled = false;
+                button.textContent = 'Request unassignment';
+            }
+        } catch (err) {
+            console.error('Error requesting plot unassignment:', err);
+            if (typeof showToast === 'function') showToast('Could not send the unassignment request.', 'danger');
+            button.disabled = false;
+            button.textContent = 'Request unassignment';
         }
     }
 
@@ -303,6 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initialize
-    loadPlots();
-    loadMap();
+    if (document.getElementById('plots-list')) loadPlots();
+    if (document.getElementById('garden-map-grid')) loadMap();
 });

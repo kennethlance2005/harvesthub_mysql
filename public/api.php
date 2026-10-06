@@ -109,6 +109,20 @@ function requireJsonRole(string $role): array {
     return $user;
 }
 
+function syncLegacyCommunityPlots(PDO $pdo): void {
+    $pdo->exec("
+        INSERT INTO PLOT (Label, GardenerID, Status)
+        SELECT CP.PlotName,
+               CASE WHEN CP.Status = 'Occupied' AND G.GardenerID IS NOT NULL THEN G.GardenerID ELSE NULL END,
+               CASE WHEN CP.Status = 'Occupied' AND G.GardenerID IS NOT NULL THEN 'Occupied' ELSE 'Available' END
+        FROM COMMUNITY_PLOTS CP
+        LEFT JOIN COMMUNITY_GARDENER G ON G.GardenerID = CP.OccupantID
+        WHERE NOT EXISTS (
+            SELECT 1 FROM PLOT P WHERE LOWER(P.Label) = LOWER(CP.PlotName)
+        )
+    ");
+}
+
 // Adds an approved quantity onto the gardener's existing borrower assignment for
 // this resource (if one already exists) instead of creating a second row, so a
 // gardener only ever has one "Approved" line per resource with the totals summed.
@@ -875,14 +889,17 @@ try {
             $rows = $pdo->query("
                 SELECT PA.AppID,
                        G.Name AS GardenerName,
-                       COALESCE(CP.PlotName, P.Label) AS Label,
-                       COALESCE(CP.Status, P.Status) AS PlotStatus,
+                      P.Label,
+                      CASE
+                        WHEN PA.RequestType = 'Apply' THEN 'Pending Approval'
+                        WHEN P.Status = 'Occupied' OR P.GardenerID IS NOT NULL THEN 'Occupied'
+                        ELSE 'Available'
+                      END AS PlotStatus,
                        PA.AppliedAt,
                        PA.RequestType
                 FROM PLOT_APPLICATION PA
                 JOIN COMMUNITY_GARDENER G ON G.GardenerID = PA.GardenerID
                 JOIN PLOT P ON P.PltID = PA.PltID
-                LEFT JOIN COMMUNITY_PLOTS CP ON LOWER(CP.PlotName) = LOWER(P.Label)
                 WHERE PA.Status = 'Pending' ORDER BY PA.AppliedAt ASC
             ")->fetchAll(PDO::FETCH_ASSOC);
             respond(['ok' => true, 'applications' => $rows]);
@@ -1110,15 +1127,22 @@ try {
 
         case 'all_plots': {
             requireJsonRole('staff');
+            syncLegacyCommunityPlots($pdo);
             $rows = $pdo->query("
                 SELECT P.PltID,
-                       COALESCE(CP.PlotName, P.Label) AS Label,
-                       COALESCE(CP.Status, P.Status) AS Status,
+                       P.Label,
+                       CASE
+                         WHEN P.Status = 'Occupied' OR P.GardenerID IS NOT NULL THEN 'Occupied'
+                         WHEN P.Status = 'Pending Approval' OR EXISTS (
+                           SELECT 1 FROM PLOT_APPLICATION PA
+                           WHERE PA.PltID = P.PltID AND PA.Status = 'Pending' AND PA.RequestType = 'Apply'
+                         ) THEN 'Pending Approval'
+                         ELSE 'Available'
+                       END AS Status,
                        G.Name AS GardenerName
                 FROM PLOT P
                 LEFT JOIN COMMUNITY_GARDENER G ON G.GardenerID = P.GardenerID
-                LEFT JOIN COMMUNITY_PLOTS CP ON LOWER(CP.PlotName) = LOWER(P.Label)
-                ORDER BY COALESCE(CP.PlotName, P.Label)
+                ORDER BY P.Label
             ")->fetchAll(PDO::FETCH_ASSOC);
             respond(['ok' => true, 'plots' => $rows]);
         }
@@ -1288,52 +1312,71 @@ try {
         // Community Map Endpoints
         // ---------------------------------------------------------
 
-        case 'get_community_map': {
-            // Added the missing role validation to prevent access crashes
-            $user = requireJsonRole('customer'); 
-            
-            // Switched to lowercase table name to perfectly match your phpMyAdmin
-            $stmt = $pdo->query("SELECT PlotID, PlotName, Status, OccupantID FROM community_plots ORDER BY PlotName ASC");
-            $plots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                case 'get_community_map': {
+                        $user = requireJsonRole('customer');
+                        syncLegacyCommunityPlots($pdo);
+                        $stmt = $pdo->prepare("
+                                SELECT P.PltID AS PlotID,
+                                             P.Label AS PlotName,
+                                             CASE
+                                                 WHEN P.Status = 'Occupied' OR P.GardenerID IS NOT NULL THEN 'Occupied'
+                                                 WHEN P.Status = 'Pending Approval' OR EXISTS (
+                                                     SELECT 1 FROM PLOT_APPLICATION PA
+                                                     WHERE PA.PltID = P.PltID AND PA.Status = 'Pending' AND PA.RequestType = 'Apply'
+                                                 ) THEN 'Pending Approval'
+                                                 ELSE 'Available'
+                                             END AS Status,
+                                             P.GardenerID AS OccupantID,
+                                             G.Name AS OccupantName,
+                                             CASE WHEN P.GardenerID = ? THEN 1 ELSE 0 END AS IsMine,
+                                             EXISTS (
+                                                 SELECT 1 FROM PLOT_APPLICATION PA
+                                                 WHERE PA.PltID = P.PltID AND PA.GardenerID = ?
+                                                     AND PA.Status = 'Pending' AND PA.RequestType = 'Unassign'
+                                             ) AS UnassignmentPending
+                                FROM PLOT P
+                                LEFT JOIN COMMUNITY_GARDENER G ON G.GardenerID = P.GardenerID
+                                ORDER BY P.Label ASC
+                        ");
+                        $stmt->execute([$user['id'], $user['id']]);
+                        $plots = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             respond(['ok' => true, 'plots' => $plots]);
-            break;
         }
 
         case 'request_garden_plot': {
             $user = requireJsonRole('customer');
             $plotId = (int)($_POST['plot_id'] ?? 0);
 
-            $check = $pdo->prepare("SELECT PlotID, PlotName, Status FROM community_plots WHERE PlotID = ?");
+            $check = $pdo->prepare("
+                SELECT P.PltID, P.Label,
+                       CASE
+                         WHEN P.Status = 'Occupied' OR P.GardenerID IS NOT NULL THEN 'Occupied'
+                         WHEN P.Status = 'Pending Approval' OR EXISTS (
+                           SELECT 1 FROM PLOT_APPLICATION PA
+                           WHERE PA.PltID = P.PltID AND PA.Status = 'Pending' AND PA.RequestType = 'Apply'
+                         ) THEN 'Pending Approval'
+                         ELSE 'Available'
+                       END AS MapStatus
+                FROM PLOT P WHERE P.PltID = ?
+            ");
             $check->execute([$plotId]);
             $plot = $check->fetch(PDO::FETCH_ASSOC);
 
-            if (!$plot || $plot['Status'] !== 'Available') {
+            if (!$plot || $plot['MapStatus'] !== 'Available') {
                 respond(['ok' => false, 'error' => 'This plot is no longer available.']);
             }
 
-            $linkedPlot = $pdo->prepare("SELECT PltID, Label FROM PLOT WHERE LOWER(Label) = LOWER(?) LIMIT 1");
-            $linkedPlot->execute([$plot['PlotName']]);
-            $linked = $linkedPlot->fetch(PDO::FETCH_ASSOC);
-
-            if (!$linked) {
-                respond(['ok' => false, 'error' => 'No matching plot record was found for coordinator approval.'], 409);
-            }
-
-            $existing = $pdo->prepare("SELECT 1 FROM PLOT_APPLICATION WHERE GardenerID = ? AND PltID = ? AND Status = 'Pending' LIMIT 1");
-            $existing->execute([$user['id'], $linked['PltID']]);
+            $existing = $pdo->prepare("SELECT 1 FROM PLOT_APPLICATION WHERE PltID = ? AND Status = 'Pending' AND RequestType = 'Apply' LIMIT 1");
+            $existing->execute([$plot['PltID']]);
             if ($existing->fetchColumn()) {
-                respond(['ok' => false, 'error' => 'You already have a pending request for this plot.'], 409);
+                respond(['ok' => false, 'error' => 'This plot already has a pending request.'], 409);
             }
 
             $pdo->prepare("INSERT INTO PLOT_APPLICATION (GardenerID, PltID, Status, RequestType) VALUES (?, ?, 'Pending', 'Apply')")
-                ->execute([$user['id'], $linked['PltID']]);
-
-            $pdo->prepare("UPDATE community_plots SET Status = 'Pending Approval', OccupantID = ? WHERE PlotID = ?")
-                ->execute([$user['id'], $plotId]);
+                ->execute([$user['id'], $plot['PltID']]);
 
             respond(['ok' => true]);
-            break;
         }
 
         // ---------------- ADMIN ----------------

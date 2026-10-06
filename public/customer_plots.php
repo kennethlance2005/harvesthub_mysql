@@ -1,18 +1,18 @@
 <?php
 require_once __DIR__ . '/auth.php';
 $user = requireRole('customer');
-$navTitle = 'My Plots & Crops';
+$navTitle = 'My Plots';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HarvestHub — My Plots & Crops</title>
+<title>HarvestHub — My Plots</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=14">
+<link rel="stylesheet" href="assets/style.css?v=18">
 </head>
 <body>
 
@@ -21,92 +21,40 @@ $navTitle = 'My Plots & Crops';
   <?php include __DIR__ . '/customer_sidebar.php'; ?>
 
   <div class="main-content">
-    <main class="wrap customer-plots-page" id="top" style="max-width: 1200px; padding-top: 32px;">
-
-      <div class="plots-layout">
-        
-        <!-- WIDE LEFT COLUMN: Active Plots (flex: 3) -->
-        <div class="plots-primary">
-          
-          <div class="board-panel">
-            <div class="board-head" style="margin-bottom: 24px; padding: 0 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
-              <div>
-                <h2 style="margin-bottom: 8px;">My Garden Log</h2>
-                <p class="text-muted" style="margin: 0;">Track your planted crops and estimate harvest timelines.</p>
-              </div>
-              
-              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                <select id="plots-category-filter" style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; min-width: 150px;">
-                  <option value="All">All Categories</option>
-                  <option value="Planted">Planted</option>
-                  <option value="Harvested">Harvested</option>
-                  <option value="Failed">Failed</option>
-                </select>
-                <input type="search" id="search-plots" placeholder="Search crops..." style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; width: 220px;">
-              </div>
-            </div>
-
-            <div class="panel" style="padding: 0 24px;">
-              <div id="plots-list" class="scroll-y" aria-live="polite" style="max-height: 420px; min-height: 180px;">
-                  <p class="empty-state">Loading your garden plots...</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Interactive Garden Map -->
-          <div class="board-panel garden-map-panel">
-            <div style="margin-bottom: 24px;">
-              <h2 style="font-size: 1.25rem; margin-bottom: 8px;">Community Garden Map</h2>
-              <p class="text-muted" style="margin: 0;">Click on any green available plot to request space from the coordinator.</p>
-            </div>
-            
-            <!-- Map Grid -->
-            <div id="garden-map-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; background: #f8fafc; padding: 32px; border-radius: 8px; border: 2px dashed #cbd5e1; min-height: 250px; max-height: 420px;">
-                <p class="text-muted" style="grid-column: span 4; text-align: center;">Loading map...</p>
-            </div>
-            
-            <!-- Map Legend -->
-            <div style="display: flex; gap: 24px; margin-top: 24px; justify-content: center; font-size: 0.85rem; color: #475569;">
-                <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 16px; height: 16px; background: #dcfce7; border: 1px solid #22c55e; border-radius: 4px;"></div> Available</div>
-                <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 16px; height: 16px; background: #fef08a; border: 1px solid #eab308; border-radius: 4px;"></div> Pending</div>
-                <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 16px; height: 16px; background: #e2e8f0; border: 1px solid #94a3b8; border-radius: 4px;"></div> Occupied</div>
-            </div>
-          </div>
-
+    <main class="wrap customer-plots-page" id="top" style="max-width: 1000px; padding-top: 32px;">
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Space & community</p>
+          <h1>My Plots</h1>
+          <p class="text-muted">Explore available garden plots and request a space.</p>
         </div>
-
-        <!-- NARROW RIGHT COLUMN: Log New Crop Form (flex: 1) -->
-        <div class="plots-secondary">
-          
-          <div class="board-panel" style="padding: 24px;">
-            <h2 style="font-size: 1.25rem; margin-bottom: 8px;">Log a Crop</h2>
-            <p class="text-muted" style="margin-bottom: 16px; font-size: 0.9rem;">Planted something new? Record it here.</p>
-            
-            <form id="add-plot-form" style="display: flex; flex-direction: column; gap: 12px;" novalidate>
-              
-              <div>
-                <label style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #475569; font-weight: 500;">Crop Name</label>
-                <input type="text" id="plot-crop-name" placeholder="e.g., Cherry Tomatoes" pattern="[A-Za-z\s]+" title="Letters and spaces only." style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
-              </div>
-              
-              <div>
-                <label style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #475569; font-weight: 500;">Planted Date</label>
-                <input type="date" id="plot-planted-date" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
-              </div>
-              
-              <div>
-                <label style="display: block; margin-bottom: 4px; font-size: 0.85rem; color: #475569; font-weight: 500;">Notes (Optional)</label>
-                <textarea id="plot-notes" placeholder="e.g., Used organic compost" rows="2" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; resize: none;"></textarea>
-              </div>
-
-              <button type="submit" class="btn btn-accent" style="width: 100%; padding: 10px; margin-top: 4px;">Log Crop</button>
-            </form>
+      </header>
+      <section class="assigned-plots-section" aria-labelledby="assigned-plots-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Your garden space</p>
+            <h2 id="assigned-plots-title">Plots assigned to me</h2>
           </div>
-
         </div>
-
-      </div>
-
+        <div id="my-assigned-plots" class="assigned-plots-list" aria-live="polite">
+          <p class="text-muted">Loading your assigned plots...</p>
+        </div>
+      </section>
+      <section class="board-panel garden-map-panel" aria-labelledby="garden-map-title">
+        <div style="margin-bottom: 24px;">
+          <h2 id="garden-map-title" style="font-size: 1.25rem; margin-bottom: 8px;">Community Garden Map</h2>
+          <p class="text-muted" style="margin: 0;">Select an available plot to request it from the coordinator.</p>
+        </div>
+        <div id="garden-map-grid" class="customer-garden-map" aria-live="polite">
+          <p class="text-muted" style="grid-column: span 4; text-align: center;">Loading map...</p>
+        </div>
+        <div class="garden-map-legend">
+          <div><span class="garden-map-swatch available"></span>Available</div>
+          <div><span class="garden-map-swatch pending"></span>Pending</div>
+          <div><span class="garden-map-swatch occupied"></span>Occupied</div>
+          <div><span class="garden-map-swatch assigned"></span>Assigned to me</div>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -127,6 +75,6 @@ $navTitle = 'My Plots & Crops';
   </div>
 </div>
 <script src="assets/app.js"></script>
-<script src="assets/plots.js"></script> 
+<script src="assets/plots.js?v=3"></script>
 </body>
 </html>

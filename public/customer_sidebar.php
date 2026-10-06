@@ -20,11 +20,11 @@ $currentPage = basename($_SERVER['PHP_SELF']);
       <a href="customer_dashboard.php" class="sidebar-link <?= $currentPage === 'customer_dashboard.php' ? 'active' : '' ?>">
         Dashboard
       </a>
-      <a href="customer_plots.php" class="sidebar-link <?= $currentPage === 'customer_plots.php' ? 'active' : '' ?>">
-        My Plots & Crops
+      <a href="customer_crops.php" class="sidebar-link <?= $currentPage === 'customer_crops.php' ? 'active' : '' ?>">
+        My Crops
       </a>
-      <a href="customer_maintenance.php" class="sidebar-link <?= $currentPage === 'customer_maintenance.php' ? 'active' : '' ?>">
-        Maintenance Log
+      <a href="customer_plots.php" class="sidebar-link <?= $currentPage === 'customer_plots.php' ? 'active' : '' ?>">
+        My Plots
       </a>
       <a href="customer_inventory.php" class="sidebar-link <?= $currentPage === 'customer_inventory.php' ? 'active' : '' ?>">
         Resource Inventory

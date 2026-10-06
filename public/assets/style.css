@@ -789,11 +789,69 @@ a { color: inherit; }
 .maintenance-log-yield { font-size: 0.86rem; }
 .form-error { margin: 0; color: var(--danger); font-size: 0.88rem; }
 
+.customer-crops-page { max-width: 1200px; padding: 32px 24px 56px; }
+.crops-overview-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.8fr); align-items: start; gap: 24px; margin-bottom: 24px; }
+.crops-garden-log,
+.crops-add-panel { min-width: 0; }
+.crops-section-heading { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; }
+.crops-section-heading .panel-title { margin: 0; }
+.crops-log-controls { display: flex; min-width: 0; flex: 1 1 320px; justify-content: flex-end; gap: 8px; }
+.crops-log-controls select,
+.crops-log-controls input { min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink-900); font: inherit; }
+.crops-log-controls select { flex: 0 1 180px; }
+.crops-log-controls input { flex: 1 1 180px; }
+.crops-list { max-height: 480px; min-height: 180px; }
+.crops-add-panel .panel-title { margin-bottom: 8px; }
+.crops-form-intro { margin: 0 0 18px; font-size: 0.9rem; }
+.crops-maintenance-layout { margin-top: 24px; }
+.customer-garden-map { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; min-width: 0; padding: 24px; border: 1px dashed #cbd5e1; border-radius: var(--radius); background: #f8fafc; }
+.customer-garden-map > p { grid-column: 1 / -1; text-align: center; }
+.garden-map-plot { display: flex; min-width: 0; min-height: 100px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px; border: 2px solid; border-radius: var(--radius); font: inherit; font-weight: 700; overflow-wrap: anywhere; }
+.garden-map-plot small { font-size: 0.72rem; font-weight: 600; }
+.garden-map-plot.available { border-color: #22c55e; background: #dcfce7; color: #166534; cursor: pointer; }
+.garden-map-plot.pending { border-color: #eab308; background: #fef08a; color: #854d0e; cursor: not-allowed; }
+.garden-map-plot.occupied { border-color: #94a3b8; background: #e2e8f0; color: #475569; cursor: not-allowed; }
+.garden-map-plot.assigned { border-color: #3b82f6; background: #dbeafe; color: #1e40af; cursor: not-allowed; }
+.garden-map-plot:disabled { opacity: 1; }
+.garden-map-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px 24px; margin-top: 20px; color: var(--ink-600); font-size: 0.85rem; }
+.garden-map-legend > div { display: flex; align-items: center; gap: 8px; }
+.garden-map-swatch { width: 14px; height: 14px; border: 1px solid; border-radius: 4px; }
+.garden-map-swatch.available { border-color: #22c55e; background: #dcfce7; }
+.garden-map-swatch.pending { border-color: #eab308; background: #fef08a; }
+.garden-map-swatch.occupied { border-color: #94a3b8; background: #e2e8f0; }
+.garden-map-swatch.assigned { border-color: #3b82f6; background: #dbeafe; }
+.assigned-plots-section { margin-bottom: 24px; }
+.assigned-plots-section .section-heading { margin-bottom: 12px; }
+.assigned-plots-section h2 { margin: 0; font-family: var(--font-display); font-size: 1.35rem; color: var(--green-900); }
+.assigned-plots-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
+.assigned-plot-item { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border: 1px solid #93c5fd; border-radius: var(--radius); background: #eff6ff; }
+.assigned-plot-info { display: grid; min-width: 0; gap: 4px; }
+.assigned-plot-info strong { color: #1e40af; }
+.assigned-plot-info span { color: var(--ink-600); font-size: 0.82rem; }
+.request-unassignment-btn { flex: 0 0 auto; border: 1px solid #3b82f6; background: #fff; color: #1e40af; }
+.request-unassignment-btn:hover:not(:disabled) { background: #dbeafe; }
+.request-unassignment-btn:disabled { cursor: default; opacity: 0.75; }
+
 @media (max-width: 768px) {
   .maintenance-layout { grid-template-columns: minmax(0, 1fr); }
   .maintenance-page { padding: 24px 16px 40px; }
+  .customer-crops-page { padding: 24px 16px 40px; }
+  .customer-garden-map { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px; }
+  .garden-map-plot { min-height: 76px; font-size: 0.95rem; }
+  .assigned-plot-item { align-items: stretch; flex-direction: column; }
+  .request-unassignment-btn { width: 100%; }
+  .crops-overview-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .crops-log-controls { flex: 1 1 100%; justify-content: stretch; }
+  .crops-log-controls select,
+  .crops-log-controls input { flex: 1 1 0; }
   .maintenance-page-head h1 { font-size: 1.75rem; }
   .maintenance-log-entry-head { align-items: flex-start; flex-direction: column; gap: 4px; }
+}
+
+@media (max-width: 480px) {
+  .crops-log-controls { flex-direction: column; }
+  .crops-log-controls select,
+  .crops-log-controls input { width: 100%; flex-basis: auto; }
 }
 
 .staff-page {

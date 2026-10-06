@@ -241,8 +241,11 @@ INSERT INTO PLOT (Label, GardenerID, Status) VALUES
 ('Plot A1', 1, 'Occupied'),
 ('Plot A2', 2, 'Occupied'),
 ('Plot A3', NULL, 'Available'),
+('Plot A4', NULL, 'Available'),
 ('Plot B1', NULL, 'Available'),
-('Plot B2', NULL, 'Available');
+('Plot B2', NULL, 'Available'),
+('Plot B3', NULL, 'Available'),
+('Plot B4', NULL, 'Available');
 
 -- A pending application, so the Staff dashboard has something to act on
 INSERT INTO PLOT_APPLICATION (GardenerID, PltID, Status, RequestType) VALUES
