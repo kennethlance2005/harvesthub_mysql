@@ -12,7 +12,7 @@ $navTitle = 'Gardener Dashboard';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=19">
+<link rel="stylesheet" href="assets/style.css?v=24">
 <style>
   .kpi-value { font-size: 2.5rem; font-weight: 700; color: var(--accent); margin: 8px 0; font-family: 'Fraunces', serif; }
   .kpi-link { font-size: 0.85rem; font-weight: 600; text-decoration: none; color: var(--text); transition: color 0.2s ease; }

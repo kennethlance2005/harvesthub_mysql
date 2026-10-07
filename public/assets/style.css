@@ -2164,5 +2164,18 @@ input[data-table-search]:focus {
   grid-column: 1 / -1;
 }
 
+button:disabled,
+input[type="button"]:disabled,
+input[type="submit"]:disabled,
+input[type="reset"]:disabled,
+input[type="image"]:disabled,
+.btn:disabled {
+  background-color: #b8b8b8 !important;
+  border-color: #b8b8b8 !important;
+  color: #fff !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+}
+
 /* Forces elements with the hidden attribute to actually disappear, overriding grid/flex layouts */
 [hidden] { display: none !important; }
