@@ -1351,7 +1351,8 @@ table.data-table {
   border-bottom: 1px solid rgba(255, 255, 255, 0.5);
 }
 .terms-link:hover { border-bottom-color: var(--white); }
-.required-mark { color: #ff9c8a; font-weight: 700; margin-left: 2px; }
+.required,
+.required-mark { color: #dc2626; font-weight: 700; margin-left: 2px; }
 
 /* Request Account stays dim until the form is complete */
 .btn-light:disabled,
