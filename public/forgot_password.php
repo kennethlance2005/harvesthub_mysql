@@ -35,6 +35,7 @@
   </div>
 </div>
 
+<script src="assets/required-form-buttons.js?v=1"></script>
 <script>
 document.getElementById('forgot-form').addEventListener('submit', async (e) => {
     e.preventDefault();

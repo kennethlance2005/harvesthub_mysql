@@ -49,6 +49,7 @@ if (!$email || !$token) {
   </div>
 </div>
 
+<script src="assets/required-form-buttons.js?v=1"></script>
 <script>
 const resetForm = document.getElementById('reset-form');
 const passwordInput = document.getElementById('password');
