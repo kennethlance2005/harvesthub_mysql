@@ -1054,7 +1054,7 @@ try {
                     if ($row['RequestType'] === 'Unassign') {
                         $pdo->prepare("UPDATE PLOT SET GardenerID = NULL, Status = 'Available' WHERE PltID = ? AND GardenerID = ?")
                             ->execute([$row['PltID'], $row['GardenerID']]);
-                        $pdo->prepare("UPDATE community_plots SET Status = 'Available', OccupantID = NULL WHERE PlotName = ?")
+                        $pdo->prepare("UPDATE COMMUNITY_PLOTS SET Status = 'Available', OccupantID = NULL WHERE PlotName = ?")
                             ->execute([$plot['Label']]);
                     } else {
                         if ($plot['Status'] !== 'Available' || $plot['GardenerID'] !== null) {
@@ -1064,7 +1064,7 @@ try {
 
                         $pdo->prepare("UPDATE PLOT SET GardenerID = ?, Status = 'Occupied' WHERE PltID = ?")
                             ->execute([$row['GardenerID'], $row['PltID']]);
-                        $pdo->prepare("UPDATE community_plots SET Status = 'Occupied', OccupantID = ? WHERE PlotName = ?")
+                        $pdo->prepare("UPDATE COMMUNITY_PLOTS SET Status = 'Occupied', OccupantID = ? WHERE PlotName = ?")
                             ->execute([$row['GardenerID'], $plot['Label']]);
                         $otherRequests = $pdo->prepare("SELECT PA.AppID, PA.GardenerID, G.Name AS GardenerName FROM PLOT_APPLICATION PA JOIN COMMUNITY_GARDENER G ON G.GardenerID = PA.GardenerID WHERE PA.PltID = ? AND PA.AppID <> ? AND PA.Status = 'Pending' AND PA.RequestType = 'Apply' FOR UPDATE");
                         $otherRequests->execute([$row['PltID'], (int) $appId]);
