@@ -45,6 +45,40 @@ emailInput.addEventListener('blur', () => emailReqs.classList.remove('active'));
   });
 });
 
+// ---------- Request Account button: disabled until every field is filled ----------
+const submitBtn = document.getElementById('register-submit');
+const registerHint = document.getElementById('register-hint');
+const termsCheckbox = document.getElementById('accept-terms');
+let isSubmitting = false;
+
+const allFieldsFilled = () => {
+  const requiredValues = [
+    emailInput.value.trim(),
+    roleSelect.value,
+    firstNameInput.value.trim(),
+    lastNameInput.value.trim(),
+    ageInput.value.trim(),
+    document.getElementById('location').value,
+    document.getElementById('password').value,
+    document.getElementById('confirm-password').value,
+  ];
+  if (roleSelect.value === 'staff' && shiftSelect) requiredValues.push(shiftSelect.value);
+  return requiredValues.every(Boolean) && termsCheckbox.checked;
+};
+
+const updateSubmitState = () => {
+  if (isSubmitting) return;
+  const ready = allFieldsFilled();
+  submitBtn.disabled = !ready;
+  if (registerHint) registerHint.hidden = ready;
+};
+
+form.addEventListener('input', updateSubmitState);
+form.addEventListener('change', updateSubmitState);
+// Browsers can autofill fields without firing input events, so check again once the page settles.
+window.addEventListener('load', () => setTimeout(updateSubmitState, 300));
+updateSubmitState();
+
 roleSelect.addEventListener('change', () => {
   const isCoordinator = roleSelect.value === 'staff';
   
@@ -126,6 +160,13 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
+  if (!termsCheckbox.checked) {
+    alertEl.textContent = 'Please agree to the Terms of Service to request an account.';
+    alertEl.hidden = false;
+    termsCheckbox.focus();
+    return;
+  }
+
   const formData = new URLSearchParams({
     action: 'signup_request',
     first_name: firstName,
@@ -137,9 +178,10 @@ form.addEventListener('submit', async (e) => {
     confirm_password: confirmPassword,
     role: role,
     shift: role === 'staff' ? shift : 'Morning',
+    accept_terms: '1',
   });
 
-  const submitBtn = form.querySelector('button[type="submit"]');
+  isSubmitting = true;
   submitBtn.disabled = true;
 
   try {
@@ -158,12 +200,14 @@ form.addEventListener('submit', async (e) => {
     } else {
       alertEl.textContent = (data.errors || [data.error]).filter(Boolean).join(' ') || 'Could not submit request.';
       alertEl.hidden = false;
-      submitBtn.disabled = false;
+      isSubmitting = false;
+      updateSubmitState();
     }
   } catch (err) {
     alertEl.textContent = 'Network error. Please try again.';
     alertEl.hidden = false;
-    submitBtn.disabled = false;
+    isSubmitting = false;
+    updateSubmitState();
   }
 });
 

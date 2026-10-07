@@ -126,7 +126,14 @@ if ($user = currentUser()) {
         </div>
       </div>
 
-      <button type="submit" class="btn btn-light btn-block" style="margin-top: 4px;">Request Account</button>
+      <!-- Terms of Service: required before the request can be sent -->
+      <label class="terms-check" for="accept-terms">
+        <input type="checkbox" id="accept-terms" name="accept_terms" value="1" required aria-required="true">
+        <span>I have read and agree to the <a href="terms.php" target="_blank" rel="noopener" class="terms-link">Terms of Service</a> <span class="required-mark" aria-hidden="true">*</span></span>
+      </label>
+
+      <button type="submit" id="register-submit" class="btn btn-light btn-block" style="margin-top: 4px;" disabled>Request Account</button>
+      <p class="register-hint" id="register-hint">Fill in all fields and agree to the Terms of Service to request an account.</p>
     </form>
 
     <p class="form-alert" id="register-alert" role="alert" hidden></p>
@@ -138,6 +145,6 @@ if ($user = currentUser()) {
   </div>
 </div>
 
-<script src="assets/register.js?v=5"></script>
+<script src="assets/register.js?v=6"></script>
 </body>
 </html>
