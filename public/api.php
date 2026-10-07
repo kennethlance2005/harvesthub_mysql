@@ -1702,6 +1702,10 @@ try {
             $location = trim($_POST['location'] ?? '');
             $password = $_POST['password'] ?? '';
 
+            if (trim($name) === '' || $email === '' || trim((string)$age) === '' || $location === '' || $password === '') {
+                respond(['ok' => false, 'error' => 'Please fill in all required fields.'], 422);
+            }
+
             $errors = [];
             if (empty($name)) $errors[] = 'Name is required.';
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Valid email required.';

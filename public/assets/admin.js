@@ -75,8 +75,8 @@ async function loadAccounts() {
         <td data-label="Email">${escapeHtml(g.Email)}</td>
         <td data-label="Location">${escapeHtml(g.Location || 'Not provided')}</td>
         <td data-label="Actions">
-          <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}">Archive</button>
-          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="gardener" data-id="${g.id}" ${g.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button>
+          <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}">Archive</button>
+          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="gardener" data-id="${g.id}" ${g.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="4" class="text-muted">No gardeners yet.</td></tr>';
@@ -92,8 +92,8 @@ async function loadAccounts() {
         <td data-label="Shift">${escapeHtml(c.Shift)}</td>
         <td data-label="Location">${escapeHtml(c.Location || 'Not provided')}</td>
         <td data-label="Actions">
-          <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Archive</button>
-          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="coordinator" data-id="${c.id}" ${c.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button>
+          <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Archive</button>
+          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="coordinator" data-id="${c.id}" ${c.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No coordinators yet.</td></tr>';
@@ -108,8 +108,8 @@ async function loadAccounts() {
         <td data-label="Email">${escapeHtml(a.Email)}</td>
         <td data-label="Location">${escapeHtml(a.Location || 'Not provided')}</td>
         <td data-label="Actions">
-          <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.id === data.current_user_id ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>Archive</button>
-          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="admin" data-id="${a.id}" ${a.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button>
+          <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.id === data.current_user_id ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>Archive</button>
+          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="admin" data-id="${a.id}" ${a.Status !== 'Disabled' || a.id === data.current_user_id ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="4" class="text-muted">No administrators yet.</td></tr>';
@@ -653,7 +653,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (createAdminForm) {
     createAdminForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+      const requiredFields = [
+        document.getElementById('new-admin-name'),
+        document.getElementById('new-admin-location'),
+        document.getElementById('new-admin-age'),
+        document.getElementById('new-admin-email'),
+        adminPasswordInput,
+      ];
+      const missingField = requiredFields.find(field => !field || !field.value.trim());
+      if (missingField) {
+        showToast('Please fill in all required fields.', 'danger');
+        missingField.focus();
+        return;
+      }
+
       const password = adminPasswordInput.value;
       const isPasswordValid = adminPasswordRules.every(([, test]) => test(password));
       if (!isPasswordValid) {
