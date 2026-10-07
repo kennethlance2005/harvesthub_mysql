@@ -26,9 +26,10 @@ function filterTableByName(inputId, tableId) {
     // Email is uniformly located in the second column (td:nth-child(2)) across all our tables
     const emailCell = row.querySelector('td:nth-child(2)');
     const email = emailCell ? emailCell.textContent.toLowerCase() : '';
+    const location = row.dataset.location ? row.dataset.location.toLowerCase() : '';
     
     // Hide row if the query is not empty AND it matches neither Name nor Email
-    row.hidden = query !== '' && !name.includes(query) && !email.includes(query);
+    row.hidden = query !== '' && !name.includes(query) && !email.includes(query) && !location.includes(query);
   });
 }
 
@@ -339,12 +340,13 @@ async function openDeleteModal(table, id, name) {
          </div>`;
      }
 
-     // Warning: Active Plots
+     // Hard Block: Active Plots
      if (d.plots && d.plots.length > 0) {
+         canArchive = false;
          html += `
-         <div style="margin-bottom: 14px;">
-            <strong style="color: var(--danger);">Active Plots (Will be unassigned):</strong>
-            <ul style="margin: 4px 0 0; padding-left: 20px; font-size: 0.92rem;">
+         <div class="form-alert" style="margin-top: 0; margin-bottom: 18px; padding: 14px;">
+            <strong>Cannot Archive:</strong> This user owns active plots and must be unassigned from them before archiving is permitted:
+            <ul style="margin: 8px 0 0; padding-left: 20px;">
                ${d.plots.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
             </ul>
          </div>`;
@@ -654,7 +656,8 @@ document.addEventListener('DOMContentLoaded', () => {
     createAdminForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const requiredFields = [
-        document.getElementById('new-admin-name'),
+        document.getElementById('new-admin-first-name'),
+        document.getElementById('new-admin-last-name'),
         document.getElementById('new-admin-location'),
         document.getElementById('new-admin-age'),
         document.getElementById('new-admin-email'),
@@ -685,7 +688,8 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           action: 'create_admin',
-          name: document.getElementById('new-admin-name').value,
+          first_name: document.getElementById('new-admin-first-name').value,
+          last_name: document.getElementById('new-admin-last-name').value,
           email: document.getElementById('new-admin-email').value,
           age: document.getElementById('new-admin-age').value,
           location: document.getElementById('new-admin-location').value,

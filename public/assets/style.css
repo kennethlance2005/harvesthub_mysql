@@ -2088,6 +2088,15 @@ input[data-table-search]:focus {
   color: var(--white) !important;
 }
 
+.delete-btn:disabled {
+  background-color: #b8b8b8 !important;
+  border-color: #b8b8b8 !important;
+  color: #fff !important;
+  cursor: not-allowed;
+  opacity: 1 !important;
+  outline: none;
+}
+
 .field select {
   width: 100%;
   font-family: var(--font-body);

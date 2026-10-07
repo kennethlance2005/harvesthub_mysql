@@ -1697,7 +1697,9 @@ try {
 
         case 'create_admin': {
             requireJsonRole('admin');
-            $name = trim($_POST['name'] ?? '');
+            $firstName = trim($_POST['first_name'] ?? '');
+            $lastName = trim($_POST['last_name'] ?? '');
+            $name = trim($firstName . ' ' . $lastName);
             $email = trim($_POST['email'] ?? '');
             $age = $_POST['age'] ?? '';
             $location = trim($_POST['location'] ?? '');

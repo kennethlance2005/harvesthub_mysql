@@ -10,7 +10,7 @@ $navTitle = 'Manage Administrators';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Admins</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=20">
+<link rel="stylesheet" href="assets/style.css?v=21">
 </head>
 <body class="account-page">
 <div class="app-layout">
@@ -25,12 +25,16 @@ $navTitle = 'Manage Administrators';
             <h2 style="margin-bottom: 4px;">Register New Administrator</h2>
             
             <form id="create-admin-form" novalidate>
-              <div class="admin-form-grid" style="display: grid; grid-template-columns: 2fr 1.5fr 100px; gap: 16px; align-items: start;">
+              <div class="admin-form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1.5fr 100px; gap: 16px; align-items: start;">
                 
-                <!-- Row 1: Full Name | Location | Age -->
+                <!-- Row 1: First Name | Last Name | Location | Age -->
                 <div class="field" style="margin: 0;">
-                    <label>Full Name <span class="required">*</span></label>
-                    <input type="text" id="new-admin-name" placeholder="e.g., Juan Dela Cruz" required>
+                    <label>First Name <span class="required">*</span></label>
+                    <input type="text" id="new-admin-first-name" placeholder="e.g., Juan" required>
+                </div>
+                <div class="field" style="margin: 0;">
+                    <label>Last Name <span class="required">*</span></label>
+                    <input type="text" id="new-admin-last-name" placeholder="e.g., Dela Cruz" required>
                 </div>
                 <div class="field" style="margin: 0;">
                     <label>Location <span class="required">*</span></label>
@@ -60,12 +64,12 @@ $navTitle = 'Manage Administrators';
                     <input type="number" id="new-admin-age" min="18" max="120" placeholder="18" required>
                 </div>
                 
-                <!-- Row 2: Email Address | Temporary Password (spanning Location + Age columns) -->
+                <!-- Row 2: Email Address | Temporary Password -->
                 <div class="field" style="margin: 0;">
                     <label>Email Address <span class="required">*</span></label>
                     <input type="email" id="new-admin-email" placeholder="admin@harvesthub.test" required>
                 </div>
-                <div class="field" style="margin: 0; grid-column: 2 / 4;">
+                <div class="field" style="margin: 0; grid-column: 2 / 5;">
                     <label>Temporary Password <span class="required">*</span></label>
                   <input type="password" id="new-admin-pass" placeholder="Min. 8 characters" autocomplete="new-password" minlength="8" required>
                   <ul id="admin-password-reqs" class="password-reqs password-reqs--columns" aria-live="polite">
