@@ -303,17 +303,17 @@ try {
             $email = trim($_POST['email'] ?? '');
             $password = $_POST['password'] ?? '';
             $confirmPassword = $_POST['confirm_password'] ?? '';
-            
-            // Automatically determine role based on email domain
-            $role = 'customer'; // Default role
-            if (str_ends_with(strtolower($email), '@staff.harvesthub.com')) {
-                $role = 'staff';
-            }
-
-            // Set a default shift for coordinators
-            $shift = 'Morning';
+            $role = $_POST['role'] ?? '';
+            $shift = $_POST['shift'] ?? '';
 
             $errors = [];
+
+            if (!in_array($role, ['customer', 'staff'], true)) {
+                $errors[] = 'Please select a valid account role.';
+            }
+            if ($role === 'staff' && !in_array($shift, ['Morning', 'Afternoon'], true)) {
+                $errors[] = 'Please select a valid coordinator shift.';
+            }
             
             if ($firstName === '' || mb_strlen($firstName) > 60) {
                 $errors[] = 'First name is required.';

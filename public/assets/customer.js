@@ -307,11 +307,30 @@ async function loadCustomerDashboard() {
 }
 
 // Unified DOM Initializer
+let plotStatusInterval = null;
+
+function startPlotStatusPolling() {
+  if (!document.getElementById('plot-status')) return;
+  if (plotStatusInterval) return;
+
+  plotStatusInterval = setInterval(() => {
+    if (!document.hidden && typeof loadPlot === 'function') {
+      loadPlot();
+    }
+  }, 20000);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadCustomerDashboard();
   if (typeof loadPlot === 'function') loadPlot();
   if (typeof loadCropLog === 'function') loadCropLog();
-  if (document.getElementById('plot-status')) {
-    setInterval(loadPlot, 5000);
+  startPlotStatusPolling();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (typeof loadPlot === 'function') loadPlot();
+  if (document.getElementById('plot-status') && !plotStatusInterval) {
+    startPlotStatusPolling();
   }
 });

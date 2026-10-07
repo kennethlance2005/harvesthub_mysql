@@ -20,77 +20,42 @@
     const missingRequiredFields = hasMissingRequiredFields(form);
 
     getSubmitButtons(form).forEach((button) => {
-      if (missingRequiredFields) {
-        if (!button.disabled) {
-          button.dataset.requiredFieldsDisabled = 'true';
-          button.disabled = true;
-        }
-      } else if (button.dataset.requiredFieldsDisabled === 'true') {
+      const shouldDisable = missingRequiredFields && !button.dataset.forceEnabled;
+      if (shouldDisable && !button.disabled) {
+        button.dataset.requiredFieldsDisabled = 'true';
+        button.disabled = true;
+      }
+      if (!shouldDisable && button.dataset.requiredFieldsDisabled === 'true') {
         button.disabled = false;
         delete button.dataset.requiredFieldsDisabled;
       }
     });
   };
 
-  const updateAllForms = () => {
-    document.querySelectorAll('form').forEach(updateForm);
+  const attachFormListeners = (form) => {
+    if (!form || form.dataset.formButtonListenerBound === 'true') return;
+    form.dataset.formButtonListenerBound = 'true';
+
+    form.addEventListener('input', () => updateForm(form));
+    form.addEventListener('change', () => updateForm(form));
+    form.addEventListener('submit', (event) => {
+      if (hasMissingRequiredFields(form)) {
+        event.preventDefault();
+        updateForm(form);
+        Array.from(form.querySelectorAll('input[required], select[required], textarea[required]'))
+          .find((field) => isMissingRequiredField(field))
+          ?.focus();
+      }
+    }, true);
   };
 
-  document.addEventListener('input', (event) => {
-    if (event.target.form) updateForm(event.target.form);
-  });
-
-  document.addEventListener('change', (event) => {
-    if (event.target.form) updateForm(event.target.form);
-  });
-
-  document.addEventListener('submit', (event) => {
-    if (!hasMissingRequiredFields(event.target)) {
-      getSubmitButtons(event.target).forEach((button) => {
-        delete button.dataset.requiredFieldsDisabled;
-      });
-      return;
-    }
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    updateForm(event.target);
-    Array.from(event.target.querySelectorAll('input[required], select[required], textarea[required]'))
-      .find((field) => isMissingRequiredField(field))
-      ?.focus();
-  }, true);
-
-  const observer = new MutationObserver((mutations) => {
-    const forms = new Set();
-
-    mutations.forEach((mutation) => {
-      if (mutation.type === 'childList') {
-        if (mutation.target.form) forms.add(mutation.target.form);
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType !== Node.ELEMENT_NODE) return;
-          if (node.matches('form')) forms.add(node);
-          node.querySelectorAll('form').forEach((form) => forms.add(form));
-          if (node.form) forms.add(node.form);
-          node.querySelectorAll('input[required], select[required], textarea[required]')
-            .forEach((field) => {
-              if (field.form) forms.add(field.form);
-            });
-        });
-      } else if (mutation.target.form) {
-        forms.add(mutation.target.form);
-      }
+  const initForms = () => {
+    document.querySelectorAll('form').forEach((form) => {
+      attachFormListeners(form);
+      updateForm(form);
     });
+  };
 
-    forms.forEach(updateForm);
-  });
-
-  updateAllForms();
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['required', 'disabled']
-  });
-
-  window.addEventListener('load', () => setTimeout(updateAllForms, 300));
+  initForms();
+  window.addEventListener('load', initForms);
 })();

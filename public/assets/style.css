@@ -2164,7 +2164,7 @@ input[data-table-search]:focus {
   grid-column: 1 / -1;
 }
 
-button:disabled,
+button:disabled:not(.garden-map-plot),
 input[type="button"]:disabled,
 input[type="submit"]:disabled,
 input[type="reset"]:disabled,

@@ -1,7 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
     let activePlotCategory = 'All';
+    let latestPlotsRequest = 0;
+    let pendingPlotsRefresh = null;
+
+    function requestPlotRefresh() {
+        if (pendingPlotsRefresh) return;
+        pendingPlotsRefresh = window.setTimeout(() => {
+            pendingPlotsRefresh = null;
+            loadPlots();
+        }, 150);
+    }
 
     async function loadPlots() {
+        const requestId = ++latestPlotsRequest;
         const listEl = document.getElementById('plots-list');
         if (listEl) {
             listEl.innerHTML = '<p class="empty-state">Loading your garden plots...</p>';
@@ -14,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: new URLSearchParams({ action: 'get_my_plots' })
             });
             const data = await res.json();
-            
+            if (requestId !== latestPlotsRequest) return;
             if (!data.ok) return;
 
             const cropOptions = document.getElementById('maintenance-crop-options');
@@ -98,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (result.ok) {
                             if (typeof showToast === 'function') showToast(`Status updated to ${newStatus}`, 'success');
                             if (typeof loadCropLog === 'function') loadCropLog();
-                            loadPlots(); 
+                            requestPlotRefresh();
                         } else {
                             if (typeof showToast === 'function') showToast(result.error || 'Failed to update status.', 'error');
                         }
@@ -170,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (result.ok) {
                     if (typeof showToast === 'function') showToast('Crop logged successfully!', 'success');
                     addForm.reset();
-                    await loadPlots();
+                    requestPlotRefresh();
                 } else {
                     if (typeof showToast === 'function') showToast(result.error || 'Failed to log crop.', 'error');
                 }
@@ -200,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (categoryFilterEl) {
         categoryFilterEl.addEventListener('change', (e) => {
             activePlotCategory = e.target.value;
-            loadPlots();
+            requestPlotRefresh();
         });
     }
 
