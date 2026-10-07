@@ -57,22 +57,27 @@ $navTitle = 'Exchange Board';
             
             <form id="add-exchange-form" style="display: flex; flex-direction: column; gap: 12px;" novalidate>
               
-              <label class="sr-only" for="exchange-item">Select a harvested crop</label>
-              <select id="exchange-item" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;" required>
-                <option value="" selected disabled>Loading harvested crops...</option>
-              </select>
+              <label class="sr-only" for="exchange-item">Select a harvested crop <span class="required">*</span></label>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <select id="exchange-item" style="flex: 1; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;" required>
+                  <option value="" selected disabled>Loading harvested crops...</option>
+                </select>
+                <span class="required" aria-hidden="true">*</span>
+              </div>
               
               <!-- Split Quantity: Full width container with flex spacing -->
               <div style="display: flex; gap: 8px; width: 100%;">
                 <input type="number" id="exchange-qty-num" placeholder="Qty (e.g., 2.5)" step="any" min="0.1"
-                    style="flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 28px 8px 8px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
+                    aria-label="Quantity" style="flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 28px 8px 8px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
+                <span class="required" aria-hidden="true">*</span>
                 <select id="exchange-qty-unit"
-                    style="width: 110px; flex-shrink: 0; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;" required>
+                    aria-label="Quantity unit" style="width: 110px; flex-shrink: 0; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;" required>
                     <option value="pcs">pcs</option>
                     <option value="kg">kg</option>
                     <option value="g">g</option>
                     <option value="bundles">bundles</option>
                 </select>
+                <span class="required" aria-hidden="true">*</span>
             </div>
 
               <textarea id="exchange-desc" placeholder="Details (Optional)" rows="2" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; resize: none;"></textarea>
@@ -116,12 +121,12 @@ $navTitle = 'Exchange Board';
       <input type="hidden" id="claim-post-id">
       
       <div>
-        <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; color: #475569;">Quantity Wanted</label>
+        <label for="claim-qty" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; color: #475569;">Quantity Wanted <span class="required">*</span></label>
         <input type="text" id="claim-qty" placeholder="e.g., 2 pcs, 1 kg" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
       </div>
       
       <div>
-        <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; color: #475569;">Preferred Pickup Details</label>
+        <label for="claim-pickup" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; color: #475569;">Preferred Pickup Details <span class="required">*</span></label>
         <textarea id="claim-pickup" placeholder="e.g., Tomorrow at 10 AM by the main gate" rows="3" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 4px; resize: none;" required></textarea>
       </div>
       

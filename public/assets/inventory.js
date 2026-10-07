@@ -31,7 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${isAvailable ? `
                     <form class="inline-request-form" data-id="${r.ResourceID}" style="display: flex; gap: 12px; align-items: center;" novalidate>
                         <div style="display: flex; align-items: center; gap: 6px;">
-                            <input type="number" name="qty" min="1" max="${r.AvailableQty}" value="1" style="width: 55px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
+                            <input type="number" name="qty" aria-label="Quantity" min="1" max="${r.AvailableQty}" value="1" style="width: 55px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
+                            <span class="required" aria-hidden="true">*</span>
                             <span style="font-weight: 600; color: #64748b; font-size: 0.9rem;">x</span>
                         </div>
                         <button type="submit" class="btn btn-accent btn-sm inventory-action-btn">Request</button>

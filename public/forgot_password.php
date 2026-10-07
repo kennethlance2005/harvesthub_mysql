@@ -22,7 +22,7 @@
 
     <form id="forgot-form" novalidate>
       <div class="field field-underline">
-        <label for="email">Enter your email address</label>
+        <label for="email">Enter your email address <span class="required">*</span></label>
         <input type="email" id="email" name="email" required>
       </div>
       <button type="submit" class="btn btn-light btn-block">Send Reset Link</button>

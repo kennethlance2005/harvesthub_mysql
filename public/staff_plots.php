@@ -37,8 +37,9 @@ $user = requireRole('staff');
         <div class="section-heading"><div><p class="eyebrow">Plot handling</p><h2 id="plot-map-heading">Plot map</h2></div>
           <div class="plot-map-controls">
             <form class="plot-management-form" id="create-plot-form">
-              <label class="sr-only" for="new-plot-label">New plot name</label>
+              <label class="sr-only" for="new-plot-label">New plot name <span class="required">*</span></label>
               <input id="new-plot-label" type="text" maxlength="80" placeholder="New plot name" required>
+              <span class="required" aria-hidden="true">*</span>
               <button class="btn btn-accent btn-sm" type="submit">Add plot</button>
             </form>
             <label class="sr-only" for="plot-status-filter">Filter plots by status</label>
