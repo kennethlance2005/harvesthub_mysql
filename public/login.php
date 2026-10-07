@@ -65,6 +65,6 @@ $savedEmail = $_COOKIE['remembered_email'] ?? '';
   </div>
 </div>
 
-<script src="assets/login.js?v=4"></script>
+<script src="assets/login.js?v=5"></script>
 </body>
 </html>

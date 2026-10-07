@@ -33,7 +33,7 @@ $navTitle = 'Manage Gardeners';
       <!-- Active Gardeners -->
       <div class="panel">
           <div class="admin-table-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <p class="panel-title" style="margin: 0;">Active Community Gardeners</p>
+          <p class="panel-title" style="margin: 0;">Community Gardeners</p>
           <input type="search" id="search-gardeners" data-table-search="gardeners-table" placeholder="Search gardeners...">
         </div>
         <div class="table-wrap">
@@ -50,6 +50,6 @@ $navTitle = 'Manage Gardeners';
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js?v=3"></script>
+<script src="assets/admin.js?v=4"></script>
 </body>
 </html>
