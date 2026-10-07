@@ -57,11 +57,11 @@ $navTitle = 'My Crops';
 					<p class="text-muted crops-form-intro">Add a planting to your garden log.</p>
 					<form id="add-plot-form" class="maintenance-form" novalidate>
 						<div class="field">
-							<label for="plot-crop-name">Crop name</label>
+							<label for="plot-crop-name">Crop name <span class="required">*</span></label>
 							<input type="text" id="plot-crop-name" placeholder="e.g., Cherry Tomatoes" pattern="[A-Za-z\s]+" title="Letters and spaces only." required>
 						</div>
 						<div class="field">
-							<label for="plot-planted-date">Planted date</label>
+							<label for="plot-planted-date">Planted date <span class="required">*</span></label>
 							<input type="date" id="plot-planted-date" required>
 						</div>
 						<div class="field">
@@ -79,7 +79,7 @@ $navTitle = 'My Crops';
 					<h2 class="panel-title" id="maintenance-form-title">Log Maintenance</h2>
 					<form id="croplog-form" class="maintenance-form" novalidate>
 						<div class="field">
-							<label for="crop-name">Select crop from your garden log</label>
+							<label for="crop-name">Select crop from your garden log <span class="required">*</span></label>
 							<input type="search" id="crop-name" list="maintenance-crop-options" maxlength="60" placeholder="Search your crops..." autocomplete="off" required>
 							<datalist id="maintenance-crop-options"></datalist>
 							<small id="maintenance-crop-hint" class="text-muted">Choose one of your crops to log its care.</small>

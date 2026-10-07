@@ -338,6 +338,7 @@ try {
                 respond(['ok' => false, 'error' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.'], 422);
             }
             if ($password !== $confirmPassword) $errors[] = 'Passwords do not match.';
+            if (($_POST['accept_terms'] ?? '') !== '1') $errors[] = 'You must agree to the Terms of Service.';
             
             if ($errors) respond(['ok' => false, 'errors' => $errors], 422);
 

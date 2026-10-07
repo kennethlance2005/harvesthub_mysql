@@ -14,7 +14,7 @@ if ($user = currentUser()) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=14">
+<link rel="stylesheet" href="assets/style.css?v=15">
 </head>
 <body>
 <div class="login-shell">
@@ -32,14 +32,14 @@ if ($user = currentUser()) {
       <!-- Row 1: The Trigger -->
       <div class="field-row">
         <div class="field">
-          <label for="email">Email Address</label>
+          <label for="email">Email Address <span class="required">*</span></label>
           <input type="email" id="email" name="email" autocomplete="email" aria-describedby="email-reqs" required>
           <ul id="email-reqs" class="password-reqs" aria-live="polite">
             <li id="email-req" class="invalid">Enter a valid email address</li>
           </ul>
         </div>
         <div class="field">
-          <label for="role">I am a...</label>
+          <label for="role">I am a... <span class="required">*</span></label>
           <select id="role" name="role" required>
             <option value="" disabled selected style="background: #1e3a2b; color: #fff;">Select a role&hellip;</option>
             <option value="customer" style="background: #1e3a2b; color: #fff;">Community Gardener</option>
@@ -51,11 +51,11 @@ if ($user = currentUser()) {
       <!-- Row 2: Identity -->
       <div class="field-row">
         <div class="field">
-          <label for="first-name">First Name</label>
-          <input type="text" id="first-name" name="first_name" autocomplete="given-name" pattern="[A-Za-z\s\-']+" title="Letters only" required maxle>
+          <label for="first-name">First Name <span class="required">*</span></label>
+          <input type="text" id="first-name" name="first_name" autocomplete="given-name" pattern="[A-Za-z\s\-']+" title="Letters only" required maxlength="25">
         </div>
         <div class="field">
-          <label for="last-name">Last Name</label>
+          <label for="last-name">Last Name <span class="required">*</span></label>
           <input type="text" id="last-name" name="last_name" autocomplete="family-name" pattern="[A-Za-z\s\-']+" title="Letters only" required maxlength="25">
         </div>
       </div>
@@ -63,14 +63,14 @@ if ($user = currentUser()) {
       <!-- Row 3: Age & Location (Standard) / Age & Shift (Coordinator) -->
       <div class="field-row">
         <div class="field">
-          <label for="age">Age</label>
+          <label for="age">Age <span class="required">*</span></label>
           <input type="text" id="age" name="age" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" autocomplete="off" aria-describedby="age-reqs" required>
           <ul id="age-reqs" class="password-reqs" aria-live="polite">
             <li id="age-req" class="invalid">At least 18 years old</li>
           </ul>
         </div>
         <div class="field">
-          <label for="location">Location</label>
+          <label for="location">Location <span class="required">*</span></label>
           <select id="location" name="location" autocomplete="address-level2" required>
             <option value="" disabled selected style="background: #1e3a2b; color: #fff;">Select your city&hellip;</option>
             <option value="Caloocan" style="background: #1e3a2b; color: #fff;">Caloocan</option>
@@ -97,7 +97,7 @@ if ($user = currentUser()) {
       <!-- Row 4: Dynamic Coordinator Shift (Appears below Location if selected) -->
       <div class="field-row" id="shift-field" hidden>
         <div class="field" style="grid-column: 1 / -1;">
-          <label for="shift">Coordinator Shift</label>
+          <label for="shift">Coordinator Shift <span class="required">*</span></label>
           <select id="shift" name="shift">
             <option value="Morning" style="background: #1e3a2b; color: #fff;">Morning</option>
             <option value="Afternoon" style="background: #1e3a2b; color: #fff;">Afternoon</option>
@@ -108,7 +108,7 @@ if ($user = currentUser()) {
       <!-- Row 5: Security -->
       <div class="field-row">
         <div class="field">
-          <label for="password">Password</label>
+          <label for="password">Password <span class="required">*</span></label>
           <input type="password" id="password" name="password" autocomplete="new-password" required>
           
           <!-- Live Password Checklist -->
@@ -121,12 +121,19 @@ if ($user = currentUser()) {
           </ul>
         </div>
         <div class="field">
-          <label for="confirm-password">Confirm Password</label>
+          <label for="confirm-password">Confirm Password <span class="required">*</span></label>
           <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password" minlength="8" required>
         </div>
       </div>
 
-      <button type="submit" class="btn btn-light btn-block" style="margin-top: 4px;">Request Account</button>
+      <!-- Terms of Service: required before the request can be sent -->
+      <label class="terms-check" for="accept-terms">
+        <input type="checkbox" id="accept-terms" name="accept_terms" value="1" required aria-required="true">
+        <span>I have read and agree to the <a href="terms.php" target="_blank" rel="noopener" class="terms-link">Terms of Service</a> <span class="required-mark" aria-hidden="true">*</span></span>
+      </label>
+
+      <button type="submit" id="register-submit" class="btn btn-light btn-block" style="margin-top: 4px;" disabled>Request Account</button>
+      <p class="register-hint" id="register-hint">Fill in all fields and agree to the Terms of Service to request an account.</p>
     </form>
 
     <p class="form-alert" id="register-alert" role="alert" hidden></p>
@@ -138,6 +145,6 @@ if ($user = currentUser()) {
   </div>
 </div>
 
-<script src="assets/register.js?v=5"></script>
+<script src="assets/register.js?v=6"></script>
 </body>
 </html>

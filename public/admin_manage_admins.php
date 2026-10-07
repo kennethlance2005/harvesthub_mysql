@@ -29,11 +29,11 @@ $navTitle = 'Manage Administrators';
                 
                 <!-- Row 1: Full Name | Location | Age -->
                 <div class="field" style="margin: 0;">
-                    <label>Full Name</label>
+                    <label>Full Name <span class="required">*</span></label>
                     <input type="text" id="new-admin-name" placeholder="e.g., Juan Dela Cruz" required>
                 </div>
                 <div class="field" style="margin: 0;">
-                    <label>Location</label>
+                    <label>Location <span class="required">*</span></label>
                     <select id="new-admin-location" required>
                         <option value="">Select city...</option>
                         <option value="Caloocan">Caloocan</option>
@@ -56,17 +56,17 @@ $navTitle = 'Manage Administrators';
                     </select>
                 </div>
                 <div class="field" style="margin: 0;">
-                    <label>Age</label>
+                    <label>Age <span class="required">*</span></label>
                     <input type="number" id="new-admin-age" min="18" max="120" placeholder="18" required>
                 </div>
                 
                 <!-- Row 2: Email Address | Temporary Password (spanning Location + Age columns) -->
                 <div class="field" style="margin: 0;">
-                    <label>Email Address</label>
+                    <label>Email Address <span class="required">*</span></label>
                     <input type="email" id="new-admin-email" placeholder="admin@harvesthub.test" required>
                 </div>
                 <div class="field" style="margin: 0; grid-column: 2 / 4;">
-                    <label>Temporary Password</label>
+                    <label>Temporary Password <span class="required">*</span></label>
                   <input type="password" id="new-admin-pass" placeholder="Min. 8 characters" autocomplete="new-password" minlength="8" required>
                   <ul id="admin-password-reqs" class="password-reqs password-reqs--columns" aria-live="polite">
                     <li data-requirement="length" class="invalid">At least 8 characters</li>

@@ -64,9 +64,11 @@ $navTitle = 'Resource Inventory';
                 
                 <!-- Add Personal Item Form -->
                 <form id="add-personal-form" style="display: flex; gap: 8px; align-items: center;" novalidate>
-                  <input type="text" id="personal-item-name" placeholder="E.g., Pruning Shears" style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; width: 200px;" required>
+                  <input type="text" id="personal-item-name" aria-label="Item name" placeholder="E.g., Pruning Shears" style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; width: 200px;" required>
+                  <span class="required" aria-hidden="true">*</span>
                   <div style="display: flex; align-items: center; gap: 6px;">
-                      <input type="number" id="personal-item-qty" min="1" value="1" style="width: 55px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
+                      <input type="number" id="personal-item-qty" aria-label="Quantity" min="1" value="1" style="width: 55px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
+                      <span class="required" aria-hidden="true">*</span>
                       <span style="font-weight: 600; color: #64748b; font-size: 0.9rem;">x</span>
                   </div>
                   <button type="submit" class="btn btn-accent btn-sm inventory-action-btn">Add Item</button>

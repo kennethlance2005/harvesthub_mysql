@@ -33,7 +33,7 @@ if (!$email || !$token) {
       <input type="hidden" id="token" value="<?= htmlspecialchars($token, ENT_QUOTES, 'UTF-8') ?>">
       
       <div class="field field-underline">
-        <label for="password">New Password</label>
+        <label for="password">New Password <span class="required">*</span></label>
         <input type="password" id="password" autocomplete="new-password" required minlength="8">
         <ul id="reset-password-reqs" class="password-reqs">
           <li data-requirement="length" class="invalid">At least 8 characters</li>

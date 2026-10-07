@@ -41,9 +41,9 @@ $user = requireRole('staff');
           </form>
         </div>
         <form class="inventory-add-form" id="add-resource-form">
-          <label for="resource-name">Add an item</label>
+          <label for="resource-name">Add an item <span class="required">*</span></label>
           <input id="resource-name" name="name" type="text" maxlength="80" placeholder="Resource name" required>
-          <label for="resource-qty">Quantity</label>
+          <label for="resource-qty">Quantity <span class="required">*</span></label>
           <input id="resource-qty" name="qty" type="number" min="1" max="100000" value="1" required>
           <button class="btn btn-accent btn-sm" type="submit">Add item</button>
         </form>

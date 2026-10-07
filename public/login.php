@@ -17,7 +17,7 @@ $savedEmail = $_COOKIE['remembered_email'] ?? '';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=14">
+<link rel="stylesheet" href="assets/style.css?v=16">
 </head>
 <body>
 <div class="login-shell">
@@ -32,13 +32,13 @@ $savedEmail = $_COOKIE['remembered_email'] ?? '';
 
     <form id="login-form" novalidate>
       <div class="field field-underline">
-        <label for="email">Email</label>
+        <label for="email">Email <span class="required">*</span></label>
         <!-- Inject the saved email here -->
         <input type="email" id="email" name="email" value="<?= htmlspecialchars($savedEmail, ENT_QUOTES, 'UTF-8') ?>" required>
       </div>
 
       <div class="field field-underline">
-        <label for="password">Password</label>
+        <label for="password">Password <span class="required">*</span></label>
         <input type="password" id="password" name="password" required>
       </div>
 
@@ -51,7 +51,7 @@ $savedEmail = $_COOKIE['remembered_email'] ?? '';
         <a href="forgot_password.php" class="forgot-link">Forgot Password</a>
       </div>
 
-      <button type="submit" class="btn btn-light btn-block">Log in</button>
+      <button type="submit" class="btn btn-light btn-block" disabled>Log in</button>
       <p class="form-alert" id="login-alert" role="alert" hidden></p>
     </form>
 
@@ -65,6 +65,6 @@ $savedEmail = $_COOKIE['remembered_email'] ?? '';
   </div>
 </div>
 
-<script src="assets/login.js?v=5"></script>
+<script src="assets/login.js?v=6"></script>
 </body>
 </html>

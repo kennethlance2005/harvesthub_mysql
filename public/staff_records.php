@@ -29,7 +29,7 @@ $user = requireRole('staff');
         </div>
         <div class="records-date-filter" role="group" aria-label="Filter timeline by date">
           <button class="btn btn-ghost records-day-button" id="records-previous-day" type="button">Previous Day</button>
-          <label for="records-date-filter-input">Date
+          <label for="records-date-filter-input">Date <span class="required">*</span>
             <input type="date" id="records-date-filter-input" required>
           </label>
           <button class="btn btn-ghost records-day-button" id="records-next-day" type="button">Next Day</button>
