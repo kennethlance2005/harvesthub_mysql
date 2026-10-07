@@ -51,6 +51,6 @@ $navTitle = 'Archived Accounts';
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=3"></script>
+<script src="assets/admin.js?v=4"></script>
 </body>
 </html>

@@ -211,38 +211,65 @@ try {
 
             $userRecord = null;
             $role = null;
+            $accountTable = null;
+            $attemptColumn = null;
 
-            // 1. Check if the user is a Community Gardener
-            $stmt = $pdo->prepare("SELECT GardenerID as id, Name, PasswordHash FROM COMMUNITY_GARDENER WHERE Email = ? AND Status = 'Active'");
+            // Look up the address in every account state so locked accounts can
+            // receive a clear notice and failed attempts can be recorded.
+            $stmt = $pdo->prepare("SELECT GardenerID as id, Name, PasswordHash, COALESCE(NULLIF(Status, ''), 'Active') AS Status, FailedLoginAttempts FROM COMMUNITY_GARDENER WHERE Email = ?");
             $stmt->execute([$email]);
             if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $userRecord = $row;
                 $role = 'customer';
+                $accountTable = 'COMMUNITY_GARDENER';
+                $attemptColumn = 'GardenerID';
             }
 
             // 2. Check if the user is a Garden Coordinator
             if (!$userRecord) {
-                $stmt = $pdo->prepare("SELECT CoordID as id, Name, PasswordHash FROM GARDEN_COORDINATOR WHERE Email = ? AND Status = 'Active'");
+                $stmt = $pdo->prepare("SELECT CoordID as id, Name, PasswordHash, COALESCE(NULLIF(Status, ''), 'Active') AS Status, FailedLoginAttempts FROM GARDEN_COORDINATOR WHERE Email = ?");
                 $stmt->execute([$email]);
                 if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                     $userRecord = $row;
                     $role = 'staff';
+                    $accountTable = 'GARDEN_COORDINATOR';
+                    $attemptColumn = 'CoordID';
                 }
             }
 
             // 3. Check if the user is a System Administrator
             if (!$userRecord) {
-                $stmt = $pdo->prepare("SELECT AdminID as id, Name, PasswordHash FROM SYSTEM_ADMINISTRATOR WHERE Email = ? AND Status = 'Active'");
+                $stmt = $pdo->prepare("SELECT AdminID as id, Name, PasswordHash, COALESCE(NULLIF(Status, ''), 'Active') AS Status, FailedLoginAttempts FROM SYSTEM_ADMINISTRATOR WHERE Email = ?");
                 $stmt->execute([$email]);
                 if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                     $userRecord = $row;
                     $role = 'admin';
+                    $accountTable = 'SYSTEM_ADMINISTRATOR';
+                    $attemptColumn = 'AdminID';
                 }
             }
 
-            if (!$userRecord || !password_verify($password, $userRecord['PasswordHash'])) {
+            if ($userRecord && $userRecord['Status'] === 'Disabled') {
+                respond(['ok' => false, 'error' => 'Your account has been disabled due to multiple failed login attempts. Please contact the administrator to have your account enabled.'], 403);
+            }
+            $passwordValid = $userRecord && $userRecord['Status'] === 'Active'
+                ? password_verify($password, $userRecord['PasswordHash'])
+                : false;
+            if (!$userRecord || !$passwordValid) {
+                if ($userRecord && $userRecord['Status'] === 'Active') {
+                    // Check the old count before incrementing. MySQL evaluates
+                    // UPDATE assignments from left to right, so this order makes
+                    // the third failed attempt (old count = 2) disable the account.
+                    $update = $pdo->prepare("UPDATE $accountTable SET Status = IF(FailedLoginAttempts >= 2, 'Disabled', COALESCE(NULLIF(Status, ''), 'Active')), FailedLoginAttempts = LEAST(FailedLoginAttempts + 1, 3) WHERE $attemptColumn = ?");
+                    $update->execute([(int) $userRecord['id']]);
+                    if ((int) $userRecord['FailedLoginAttempts'] >= 2) {
+                        respond(['ok' => false, 'error' => 'Your account has been disabled due to multiple failed login attempts. Please contact the administrator to have your account enabled.'], 403);
+                    }
+                }
                 respond(['ok' => false, 'error' => 'Invalid email or password.'], 401);
             }
+
+            $pdo->prepare("UPDATE $accountTable SET FailedLoginAttempts = 0 WHERE $attemptColumn = ?")->execute([(int) $userRecord['id']]);
 
             $_SESSION['user'] = [
                 'role' => $role,
@@ -256,8 +283,6 @@ try {
             } else {
                 setcookie('remembered_email', '', time() - 3600, '/');
             }
-
-            respond(['ok' => true, 'redirect' => loginRedirectFor($role)]);
 
             respond(['ok' => true, 'redirect' => loginRedirectFor($role)]);
         }
@@ -1586,9 +1611,9 @@ try {
 
         case 'accounts': {
             $user = requireJsonRole('admin');
-            $gardeners = $pdo->query("SELECT GardenerID AS id, Name, Email, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM COMMUNITY_GARDENER WHERE Status = 'Active' ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
-            $coordinators = $pdo->query("SELECT CoordID AS id, Name, Email, Shift, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM GARDEN_COORDINATOR WHERE Status = 'Active' ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
-            $admins = $pdo->query("SELECT AdminID AS id, Name, Email, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM SYSTEM_ADMINISTRATOR WHERE Status = 'Active' ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
+            $gardeners = $pdo->query("SELECT GardenerID AS id, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM COMMUNITY_GARDENER WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
+            $coordinators = $pdo->query("SELECT CoordID AS id, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, Shift, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM GARDEN_COORDINATOR WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
+            $admins = $pdo->query("SELECT AdminID AS id, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM SYSTEM_ADMINISTRATOR WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
             
             respond(['ok' => true, 'current_user_id' => $user['id'], 'gardeners' => $gardeners, 'coordinators' => $coordinators, 'admins' => $admins]);
         }
@@ -1755,6 +1780,23 @@ try {
             respond(['ok' => true]);
         }
 
+        case 'enable_account': {
+            requireJsonRole('admin');
+            $table = $_POST['table'] ?? '';
+            $id = $_POST['id'] ?? '';
+            $map = [
+                'gardener' => ['COMMUNITY_GARDENER', 'GardenerID'],
+                'coordinator' => ['GARDEN_COORDINATOR', 'CoordID'],
+                'admin' => ['SYSTEM_ADMINISTRATOR', 'AdminID'],
+            ];
+            if (!isset($map[$table]) || !ctype_digit((string)$id)) respond(['ok' => false, 'error' => 'Invalid request.'], 422);
+            [$tbl, $col] = $map[$table];
+            $stmt = $pdo->prepare("UPDATE $tbl SET Status = 'Active', FailedLoginAttempts = 0 WHERE $col = ? AND Status = 'Disabled'");
+            $stmt->execute([(int)$id]);
+            if ($stmt->rowCount() === 0) respond(['ok' => false, 'error' => 'This account is not locked.'], 409);
+            respond(['ok' => true]);
+        }
+
         case 'user_archive_details': {
             requireJsonRole('admin');
             $table = $_GET['table'] ?? '';
@@ -1822,7 +1864,7 @@ try {
             if (!isset($map[$role]) || !$id) respond(['ok' => false, 'error' => 'Invalid request.'], 422);
 
             [$tbl, $col] = $map[$role];
-            $pdo->prepare("UPDATE $tbl SET Status = 'Active' WHERE $col = ?")->execute([$id]);
+            $pdo->prepare("UPDATE $tbl SET Status = 'Active', FailedLoginAttempts = 0 WHERE $col = ?")->execute([$id]);
             respond(['ok' => true]);
         }
 

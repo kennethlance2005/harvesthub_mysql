@@ -86,10 +86,10 @@ $navTitle = 'Manage Administrators';
             </form>
           </div>
 
-          <!-- Active Admins Table -->
+          <!-- Admin Accounts Table -->
           <div class="panel">
             <div class="admin-table-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <p class="panel-title" style="margin: 0;">Active Administrators</p>
+              <p class="panel-title" style="margin: 0;">Administrators</p>
               <input type="search" id="search-admins" data-table-search="admins-table" placeholder="Search administrators...">
             </div>
             <div class="table-wrap">
@@ -108,6 +108,6 @@ $navTitle = 'Manage Administrators';
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js?v=3"></script>
+<script src="assets/admin.js?v=4"></script>
 </body>
 </html>

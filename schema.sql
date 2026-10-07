@@ -23,7 +23,8 @@ CREATE TABLE SYSTEM_ADMINISTRATOR (
     PasswordHash VARCHAR(255)  NOT NULL,
     Age          INT           NULL,
     Location     VARCHAR(60)   NULL,
-    Status       VARCHAR(20)   NOT NULL DEFAULT 'Active'
+    Status       VARCHAR(20)   NOT NULL DEFAULT 'Active',
+    FailedLoginAttempts TINYINT UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB;
 
 CREATE TABLE GARDEN_COORDINATOR (
@@ -33,7 +34,8 @@ CREATE TABLE GARDEN_COORDINATOR (
     PasswordHash VARCHAR(255)  NOT NULL,
     Shift        VARCHAR(20)   NOT NULL DEFAULT 'Morning',
     Location     VARCHAR(60)   NOT NULL DEFAULT 'Not provided',
-    Status       VARCHAR(20)   NOT NULL DEFAULT 'Active'
+    Status       VARCHAR(20)   NOT NULL DEFAULT 'Active',
+    FailedLoginAttempts TINYINT UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB;
 
 CREATE TABLE COMMUNITY_GARDENER (
@@ -43,7 +45,8 @@ CREATE TABLE COMMUNITY_GARDENER (
     PasswordHash VARCHAR(255)  NOT NULL,
     Age          INT           NULL,
     Location     VARCHAR(60)   NULL,
-    Status       VARCHAR(20)   NOT NULL DEFAULT 'Active'
+    Status       VARCHAR(20)   NOT NULL DEFAULT 'Active',
+    FailedLoginAttempts TINYINT UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB;
 
 

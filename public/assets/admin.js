@@ -76,6 +76,7 @@ async function loadAccounts() {
         <td data-label="Location">${escapeHtml(g.Location || 'Not provided')}</td>
         <td data-label="Actions">
           <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}">Archive</button>
+          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="gardener" data-id="${g.id}" ${g.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button>
         </td>
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="4" class="text-muted">No gardeners yet.</td></tr>';
@@ -92,6 +93,7 @@ async function loadAccounts() {
         <td data-label="Location">${escapeHtml(c.Location || 'Not provided')}</td>
         <td data-label="Actions">
           <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Archive</button>
+          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="coordinator" data-id="${c.id}" ${c.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button>
         </td>
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No coordinators yet.</td></tr>';
@@ -107,6 +109,7 @@ async function loadAccounts() {
         <td data-label="Location">${escapeHtml(a.Location || 'Not provided')}</td>
         <td data-label="Actions">
           <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.id === data.current_user_id ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>Archive</button>
+          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="admin" data-id="${a.id}" ${a.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button>
         </td>
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="4" class="text-muted">No administrators yet.</td></tr>';
@@ -115,6 +118,23 @@ async function loadAccounts() {
   document.querySelectorAll('.delete-btn').forEach(btn => {
     btn.onclick = () => {
       openDeleteModal(btn.dataset.table, btn.dataset.id, btn.dataset.name);
+    };
+  });
+
+  document.querySelectorAll('.enable-account-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const res = await fetch('api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'enable_account', table: btn.dataset.table, id: btn.dataset.id })
+      });
+      const result = await res.json();
+      if (result.ok) {
+        showToast('Account enabled and login attempts reset.', 'success');
+        loadAccounts();
+      } else {
+        showToast(result.error || 'Could not enable account.', 'danger');
+      }
     };
   });
 }
