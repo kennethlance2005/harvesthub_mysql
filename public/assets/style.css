@@ -2068,3 +2068,5 @@ input[data-table-search]:focus {
 
 /* Forces elements with the hidden attribute to actually disappear, overriding grid/flex layouts */
 [hidden] { display: none !important; }
+
+.required { color: #ff6b6b; font-weight: 700; }
