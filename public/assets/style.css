@@ -519,6 +519,31 @@ a { color: inherit; }
 .hh-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .hh-dialog-actions .btn { min-width: 110px; }
 
+/* Review dialog (hhDetails): wider, with a scrolling details area */
+.hh-dialog-wide { width: min(100% - 32px, 620px); }
+.hh-dialog-wide .hh-dialog-box { display: flex; flex-direction: column; max-height: calc(100vh - 40px); }
+.hh-dialog-body { min-height: 0; margin: 0 -26px 20px; padding: 0 26px; overflow-y: auto; }
+.review-section { margin-top: 18px; }
+.review-section:first-child { margin-top: 4px; }
+.review-section h4 { margin: 0 0 8px; color: var(--ink-600); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; margin: 0; }
+.review-grid div { min-width: 0; }
+.review-grid dt { color: var(--ink-600); font-size: 0.78rem; }
+.review-grid dd { margin: 2px 0 0; font-size: 0.93rem; font-weight: 600; overflow-wrap: anywhere; }
+.review-quote { margin: 0; padding: 12px 14px; border-left: 3px solid var(--brown-600); border-radius: var(--radius); background: var(--cream-100); font-size: 0.93rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-alert { margin: 0 0 8px; padding: 10px 12px; border-radius: var(--radius); font-size: 0.86rem; line-height: 1.45; }
+.review-alert-danger { border: 1px solid #ecc3bb; background: #f7e2de; color: var(--danger); }
+.review-alert-warn { border: 1px solid #ecd2a3; background: #fbefd5; color: #7a5312; }
+.review-history { margin: 0; padding: 0; list-style: none; }
+.review-history li { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.86rem; }
+.review-history li:last-child { border-bottom: none; }
+.review-history .review-reason { display: block; margin-top: 3px; color: var(--ink-600); }
+.review-muted { margin: 0; color: var(--ink-600); font-size: 0.86rem; }
+
+@media (max-width: 480px) {
+  .review-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .btn-danger { background: var(--danger); border-color: var(--danger); color: var(--white); }
 .btn-danger:hover { background: #842a22; border-color: #842a22; }
 
@@ -1160,13 +1185,14 @@ table.data-table {
   table.admin-responsive-table .admin-filter-empty { display: block; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
   table.admin-responsive-table .admin-filter-empty > td { display: block; padding: 0; border: 0; }
   table.admin-responsive-table .admin-filter-empty > td::before { content: none; }
-  table.admin-responsive-table .approve-signup,
-  table.admin-responsive-table .reject-signup,
+  table.admin-responsive-table .review-signup,
   table.admin-responsive-table .delete-btn { white-space: nowrap; }
 }
 
-.account-action-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 8px; }
-.account-action-buttons .btn { width: 100%; min-width: 0; white-space: normal; }
+.account-action-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.account-action-buttons .btn { flex: 1 1 auto; white-space: nowrap; }
+/* Pending coordinator table: short preview, the Review dialog shows the full text */
+.motivation-preview { display: -webkit-box; max-width: 320px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .enable-account-btn:disabled { background: #b8b8b8 !important; border-color: #b8b8b8 !important; color: #fff !important; cursor: not-allowed; opacity: 1; }
 .enable-account-btn:not(:disabled) { background: var(--brown-600) !important; border-color: var(--brown-600) !important; color: var(--white) !important; }
 .enable-account-btn:not(:disabled):hover { background: var(--brown-700) !important; border-color: var(--brown-700) !important; }

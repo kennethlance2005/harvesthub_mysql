@@ -17,7 +17,7 @@ if (!$email || !$token) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Set New Password</title>
-<link rel="stylesheet" href="assets/style.css?v=34">
+<link rel="stylesheet" href="assets/style.css?v=36">
 </head>
 <body>
 <div class="login-shell">
@@ -51,7 +51,7 @@ if (!$email || !$token) {
 
 <script src="assets/password-toggle.js?v=1"></script>
 <script src="assets/required-form-buttons.js?v=1"></script>
-<script src="assets/dialog.js?v=2"></script>
+<script src="assets/dialog.js?v=3"></script>
 <script>
 const resetForm = document.getElementById('reset-form');
 const passwordInput = document.getElementById('password');

@@ -146,4 +146,59 @@
   window.hhAlert = function ({ title, message = '', buttonText = 'OK' }) {
     return open({ title, message, confirmText: buttonText, cancelText: null, tone: 'default', cancelValue: undefined });
   };
+
+  // A wider dialog for reviewing details before a decision.
+  //   const choice = await hhDetails({ title, bodyHtml, actions: [{ label: 'Reject', value: 'reject', tone: 'danger' }, { label: 'Approve', value: 'approve' }] });
+  // Resolves to the clicked action's value, or null when closed.
+  // bodyHtml is inserted as HTML, so callers must escape any user data in it.
+  window.hhDetails = function ({ title, bodyHtml, actions = [], closeText = 'Close' }) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'hh-dialog hh-dialog-wide';
+    dialog.setAttribute('aria-labelledby', 'hh-dialog-title');
+
+    const box = document.createElement('div');
+    box.className = 'hh-dialog-box';
+    const heading = document.createElement('h3');
+    heading.id = 'hh-dialog-title';
+    heading.textContent = title;
+    const body = document.createElement('div');
+    body.className = 'hh-dialog-body';
+    body.innerHTML = bodyHtml;
+
+    const actionsEl = document.createElement('div');
+    actionsEl.className = 'hh-dialog-actions';
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'btn btn-ghost';
+    closeBtn.textContent = closeText;
+    actionsEl.appendChild(closeBtn);
+    const actionButtons = actions.map(action => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `btn ${action.tone === 'danger' ? 'btn-danger' : 'btn-accent'}`;
+      btn.textContent = action.label;
+      btn.disabled = Boolean(action.disabled);
+      if (action.title) btn.title = action.title;
+      actionsEl.appendChild(btn);
+      return { btn, value: action.value };
+    });
+
+    box.append(heading, body, actionsEl);
+    dialog.appendChild(box);
+    document.body.appendChild(dialog);
+
+    return new Promise(resolve => {
+      const finish = value => {
+        if (dialog.open) dialog.close();
+        dialog.remove();
+        resolve(value);
+      };
+      closeBtn.addEventListener('click', () => finish(null));
+      actionButtons.forEach(({ btn, value }) => btn.addEventListener('click', () => finish(value)));
+      dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
+      dialog.addEventListener('click', event => { if (event.target === dialog) finish(null); });
+      dialog.showModal();
+      closeBtn.focus();
+    });
+  };
 })();

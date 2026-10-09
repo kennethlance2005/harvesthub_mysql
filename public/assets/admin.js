@@ -261,9 +261,181 @@ function requestAdminRejectionReason(title) {
   });
 }
 
+// ---------- Review step for pending registrations and coordinator applications ----------
+
+// "2026-10-07 12:30:35" -> "Oct 7, 2026"
+function formatAdminDate(value) {
+  if (!value) return '';
+  const date = new Date(String(value).replace(' ', 'T'));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// "2026-10-07 12:30:35" -> "3 days ago"
+function timeAgo(value) {
+  const date = new Date(String(value || '').replace(' ', 'T'));
+  if (Number.isNaN(date.getTime())) return '';
+  const days = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return `${days} days ago`;
+}
+
+function reviewField(label, value) {
+  return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value ?? ''))}</dd></div>`;
+}
+
+function reviewHistory(items, describe) {
+  if (!items.length) return '<p class="review-muted">None.</p>';
+  return `<ul class="review-history">${items.map(item => `
+    <li>
+      <strong>${escapeHtml(item.Status)}</strong> · requested ${escapeHtml(formatAdminDate(item.RequestedAt))}${describe ? escapeHtml(describe(item)) : ''}
+      ${item.RejectionReason ? `<span class="review-reason">Reason: ${escapeHtml(item.RejectionReason)}</span>` : ''}
+    </li>`).join('')}</ul>`;
+}
+
+// Shows the review dialog; a cancelled rejection reason returns to the review.
+async function runReview({ title, bodyHtml, approveDisabledReason, rejectTitle, onDecision }) {
+  while (true) {
+    const choice = await hhDetails({
+      title,
+      bodyHtml,
+      actions: [
+        { label: 'Reject', value: 'reject', tone: 'danger' },
+        { label: 'Approve', value: 'approve', disabled: Boolean(approveDisabledReason), title: approveDisabledReason || '' },
+      ],
+    });
+    if (choice === 'approve') return onDecision('approve');
+    if (choice !== 'reject') return;
+    const reason = await requestAdminRejectionReason(rejectTitle);
+    if (reason) return onDecision('reject', reason);
+  }
+}
+
+async function reviewSignupRequest(requestId, button) {
+  button.disabled = true;
+  button.textContent = 'Loading…';
+  let data;
+  try {
+    data = await (await fetch(`api.php?action=signup_request_details&request_id=${encodeURIComponent(requestId)}`)).json();
+  } catch (error) {
+    data = { ok: false };
+  }
+  button.disabled = false;
+  button.textContent = 'Review';
+  if (!data.ok) {
+    showToast(data.error || 'Could not load this registration.', 'danger');
+    return;
+  }
+
+  const r = data.request;
+  const fullName = `${r.FirstName} ${r.LastName}`;
+  const alerts = [];
+  if (data.email_in_use) {
+    alerts.push(`<p class="review-alert review-alert-danger">This email already belongs to ${data.email_in_use.status === 'Archived' ? 'an archived' : 'an existing'} ${escapeHtml(data.email_in_use.role)} account, so it can't be approved. Reject it, or unarchive the existing account instead.</p>`);
+  }
+  if (data.previous_requests.some(p => p.Status === 'Rejected')) {
+    alerts.push('<p class="review-alert review-alert-warn">This email was declined before. Check the earlier reason below.</p>');
+  }
+
+  const bodyHtml = `
+    ${alerts.join('')}
+    <section class="review-section">
+      <h4>Applicant</h4>
+      <dl class="review-grid">
+        ${reviewField('Name', fullName)}
+        ${reviewField('Email', r.Email)}
+        ${reviewField('Age', r.Age)}
+        ${reviewField('Location', r.Location)}
+        ${reviewField('Requested', `${formatAdminDate(r.RequestedAt)} (${timeAgo(r.RequestedAt)})`)}
+        ${reviewField('Account type', 'Gardener')}
+      </dl>
+    </section>
+    <section class="review-section">
+      <h4>Earlier requests from this email</h4>
+      ${reviewHistory(data.previous_requests)}
+    </section>`;
+
+  await runReview({
+    title: `Review registration: ${fullName}`,
+    bodyHtml,
+    approveDisabledReason: data.email_in_use ? 'This email is already in use.' : '',
+    rejectTitle: 'Why is this registration being declined?',
+    onDecision: (decision, reason) => processSignup(requestId, decision, reason),
+  });
+}
+
+async function reviewCoordinatorApplication(applicationId, button) {
+  button.disabled = true;
+  button.textContent = 'Loading…';
+  let data;
+  try {
+    data = await (await fetch(`api.php?action=coordinator_application_details&application_id=${encodeURIComponent(applicationId)}`)).json();
+  } catch (error) {
+    data = { ok: false };
+  }
+  button.disabled = false;
+  button.textContent = 'Review';
+  if (!data.ok) {
+    showToast(data.error || 'Could not load this application.', 'danger');
+    return;
+  }
+
+  const app = data.application;
+  const a = data.activity;
+  const alerts = [];
+  if (app.AccountStatus !== 'Active') {
+    alerts.push(`<p class="review-alert review-alert-danger">This gardener's account is currently ${escapeHtml(app.AccountStatus.toLowerCase())}.</p>`);
+  }
+  if (data.previous_applications.some(p => p.Status === 'Rejected')) {
+    alerts.push('<p class="review-alert review-alert-warn">This gardener applied before and was declined. Check the earlier reason below.</p>');
+  }
+
+  const bodyHtml = `
+    ${alerts.join('')}
+    <section class="review-section">
+      <h4>Applicant</h4>
+      <dl class="review-grid">
+        ${reviewField('Name', app.Name)}
+        ${reviewField('Email', app.Email)}
+        ${reviewField('Location', app.Location)}
+        ${reviewField('Age', app.Age ?? 'Not provided')}
+        ${reviewField('Preferred shift', app.Shift)}
+        ${reviewField('Applied', `${formatAdminDate(app.RequestedAt)} (${timeAgo(app.RequestedAt)})`)}
+        ${data.member_since ? reviewField('Member since', formatAdminDate(data.member_since)) : ''}
+      </dl>
+    </section>
+    <section class="review-section">
+      <h4>Why they want to coordinate</h4>
+      <p class="review-quote">${escapeHtml(app.Motivation)}</p>
+    </section>
+    <section class="review-section">
+      <h4>Garden activity</h4>
+      <dl class="review-grid">
+        ${reviewField('Assigned plots', a.plots.length ? a.plots.join(', ') : 'None')}
+        ${reviewField('Crops logged', a.crops_logged)}
+        ${reviewField('Maintenance entries', a.maintenance_entries)}
+        ${reviewField('Items borrowed now', a.items_borrowed)}
+        ${reviewField('Active exchange listings', a.active_listings)}
+      </dl>
+    </section>
+    <section class="review-section">
+      <h4>Earlier coordinator applications</h4>
+      ${reviewHistory(data.previous_applications, item => ` · ${item.Shift} shift`)}
+    </section>`;
+
+  await runReview({
+    title: `Review application: ${app.Name}`,
+    bodyHtml,
+    approveDisabledReason: app.AccountStatus !== 'Active' ? 'The gardener account is not active.' : '',
+    rejectTitle: 'Why is this coordinator application being declined?',
+    onDecision: (decision, reason) => processCoordinatorApplication(applicationId, decision, reason),
+  });
+}
+
 async function loadSignupRequests() {
   const gardenersTable = document.getElementById('pending-gardeners-table');
-  
+
   if (!gardenersTable) return;
 
   const res = await fetch('api.php?action=pending_signups');
@@ -277,8 +449,7 @@ async function loadSignupRequests() {
       <td data-label="Age">${escapeHtml(String(r.Age))}</td>
       <td data-label="Location">${escapeHtml(r.Location)}</td>
       <td data-label="Actions" class="text-right" style="white-space: nowrap;">
-        <button class="btn btn-sm approve-signup" style="background: var(--green-700); color: var(--white);" data-id="${r.RequestID}" data-name="${escapeHtml(r.FirstName + ' ' + r.LastName)}" data-email="${escapeHtml(r.Email)}">Approve</button>
-        <button class="btn btn-sm reject-signup" style="background: var(--danger); color: var(--white);" data-id="${r.RequestID}">Reject</button>
+        <button type="button" class="btn btn-accent btn-sm review-signup" data-id="${r.RequestID}">Review</button>
       </td>
     </tr>
   `;
@@ -292,24 +463,8 @@ async function loadSignupRequests() {
     gardenersTable.innerHTML = data.requests.map(renderRow).join('');
   }
 
-  document.querySelectorAll('.approve-signup').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const confirmed = await hhConfirm({
-        title: `Approve ${btn.dataset.name}?`,
-        message: `This creates a gardener account for ${btn.dataset.email}, and they will be able to log in right away.`,
-        confirmText: 'Approve',
-      });
-      if (!confirmed) return;
-      btn.disabled = true;
-      await processSignup(btn.dataset.id, 'approve');
-      btn.disabled = false;
-    });
-  });
-  document.querySelectorAll('.reject-signup').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const reason = await requestAdminRejectionReason('Why is this registration being declined?');
-      if (reason) processSignup(btn.dataset.id, 'reject', reason);
-    });
+  gardenersTable.querySelectorAll('.review-signup').forEach(btn => {
+    btn.addEventListener('click', () => reviewSignupRequest(btn.dataset.id, btn));
   });
 }
 
@@ -346,31 +501,15 @@ async function loadCoordinatorApplications() {
       <td data-label="Email">${escapeHtml(app.Email)}</td>
       <td data-label="Location">${escapeHtml(app.Location || 'Not provided')}</td>
       <td data-label="Shift">${escapeHtml(app.Shift)}</td>
-      <td data-label="Motivation">${escapeHtml(app.Motivation)}</td>
+      <td data-label="Motivation"><span class="motivation-preview" title="${escapeHtml(app.Motivation)}">${escapeHtml(app.Motivation)}</span></td>
       <td data-label="Actions" class="text-right" style="white-space: nowrap;">
-        <button class="btn btn-sm approve-coordinator-application" data-id="${app.ApplicationID}" data-name="${escapeHtml(app.Name)}" data-shift="${escapeHtml(app.Shift)}">Approve</button>
-        <button class="btn btn-sm reject-coordinator-application" data-id="${app.ApplicationID}">Reject</button>
+        <button type="button" class="btn btn-accent btn-sm review-coordinator-application" data-id="${app.ApplicationID}">Review</button>
       </td>
     </tr>
   `).join('');
   if (empty) empty.hidden = data.applications.length > 0;
-  table.querySelectorAll('.approve-coordinator-application').forEach(btn =>
-    btn.addEventListener('click', async () => {
-      const confirmed = await hhConfirm({
-        title: `Make ${btn.dataset.name} a coordinator?`,
-        message: `They will get coordinator access for the ${btn.dataset.shift.toLowerCase()} shift, alongside their gardener account.`,
-        confirmText: 'Approve',
-      });
-      if (!confirmed) return;
-      btn.disabled = true;
-      await processCoordinatorApplication(btn.dataset.id, 'approve');
-      btn.disabled = false;
-    }));
-  table.querySelectorAll('.reject-coordinator-application').forEach(btn =>
-    btn.addEventListener('click', async () => {
-      const reason = await requestAdminRejectionReason('Why is this coordinator application being declined?');
-      if (reason) processCoordinatorApplication(btn.dataset.id, 'reject', reason);
-    }));
+  table.querySelectorAll('.review-coordinator-application').forEach(btn =>
+    btn.addEventListener('click', () => reviewCoordinatorApplication(btn.dataset.id, btn)));
 }
 
 async function processCoordinatorApplication(applicationId, decision, reason = '') {

@@ -1720,6 +1720,49 @@ try {
             respond(['ok' => true, 'requests' => $rows]);
         }
 
+        // Everything the admin needs to decide on one registration request.
+        case 'signup_request_details': {
+            requireJsonRole('admin');
+            $requestId = $_GET['request_id'] ?? '';
+            if (!ctype_digit((string) $requestId)) {
+                respond(['ok' => false, 'error' => 'Invalid request.'], 422);
+            }
+
+            $stmt = $pdo->prepare("
+                SELECT RequestID, FirstName, LastName, Age, Location, Email, Status, RequestedAt
+                FROM SIGNUP_REQUEST WHERE RequestID = ?
+            ");
+            $stmt->execute([(int) $requestId]);
+            $request = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$request) respond(['ok' => false, 'error' => 'Registration request not found.'], 404);
+
+            // Approving would fail if the email already belongs to an account.
+            $emailInUse = null;
+            foreach (['COMMUNITY_GARDENER' => 'gardener', 'GARDEN_COORDINATOR' => 'coordinator', 'SYSTEM_ADMINISTRATOR' => 'administrator'] as $table => $label) {
+                $check = $pdo->prepare("SELECT COALESCE(NULLIF(Status, ''), 'Active') FROM $table WHERE Email = ?");
+                $check->execute([$request['Email']]);
+                $status = $check->fetchColumn();
+                if ($status !== false) {
+                    $emailInUse = ['role' => $label, 'status' => $status];
+                    break;
+                }
+            }
+
+            $previous = $pdo->prepare("
+                SELECT Status, RejectionReason, RequestedAt, ReviewedAt
+                FROM SIGNUP_REQUEST WHERE Email = ? AND RequestID <> ?
+                ORDER BY RequestedAt DESC LIMIT 5
+            ");
+            $previous->execute([$request['Email'], (int) $requestId]);
+
+            respond([
+                'ok' => true,
+                'request' => $request,
+                'email_in_use' => $emailInUse,
+                'previous_requests' => $previous->fetchAll(PDO::FETCH_ASSOC),
+            ]);
+        }
+
         case 'my_coordinator_application': {
             $user = requireJsonRole('customer');
             $stmt = $pdo->prepare("
@@ -1794,6 +1837,63 @@ try {
                 ORDER BY A.RequestedAt ASC
             ")->fetchAll(PDO::FETCH_ASSOC);
             respond(['ok' => true, 'applications' => $rows]);
+        }
+
+        // The applicant's profile and garden activity, for reviewing one
+        // coordinator application before deciding on it.
+        case 'coordinator_application_details': {
+            requireJsonRole('admin');
+            $applicationId = $_GET['application_id'] ?? '';
+            if (!ctype_digit((string) $applicationId)) {
+                respond(['ok' => false, 'error' => 'Invalid application.'], 422);
+            }
+
+            $stmt = $pdo->prepare("
+                SELECT A.ApplicationID, A.GardenerID, A.Shift, A.Motivation, A.Status, A.RequestedAt,
+                       G.Name, G.Email, G.Age, COALESCE(NULLIF(G.Location, ''), 'Not provided') AS Location,
+                       COALESCE(NULLIF(G.Status, ''), 'Active') AS AccountStatus
+                FROM COORDINATOR_APPLICATION A
+                JOIN COMMUNITY_GARDENER G ON G.GardenerID = A.GardenerID
+                WHERE A.ApplicationID = ?
+            ");
+            $stmt->execute([(int) $applicationId]);
+            $application = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$application) respond(['ok' => false, 'error' => 'Application not found.'], 404);
+
+            $gardenerId = (int) $application['GardenerID'];
+            $count = function (string $sql) use ($pdo, $gardenerId): int {
+                $q = $pdo->prepare($sql);
+                $q->execute([$gardenerId]);
+                return (int) $q->fetchColumn();
+            };
+
+            $plots = $pdo->prepare("SELECT Label FROM PLOT WHERE GardenerID = ? AND Status = 'Occupied' ORDER BY Label");
+            $plots->execute([$gardenerId]);
+
+            // When the gardener's own registration was approved, if it went through a request.
+            $memberSince = $pdo->prepare("SELECT ReviewedAt FROM SIGNUP_REQUEST WHERE Email = ? AND Status = 'Approved' ORDER BY ReviewedAt DESC LIMIT 1");
+            $memberSince->execute([$application['Email']]);
+
+            $previous = $pdo->prepare("
+                SELECT Shift, Status, RejectionReason, RequestedAt, ReviewedAt
+                FROM COORDINATOR_APPLICATION WHERE GardenerID = ? AND ApplicationID <> ?
+                ORDER BY RequestedAt DESC LIMIT 5
+            ");
+            $previous->execute([$gardenerId, (int) $applicationId]);
+
+            respond([
+                'ok' => true,
+                'application' => $application,
+                'member_since' => $memberSince->fetchColumn() ?: null,
+                'activity' => [
+                    'plots' => $plots->fetchAll(PDO::FETCH_COLUMN),
+                    'crops_logged' => $count('SELECT COUNT(*) FROM GARDEN_PLOTS WHERE GardenerID = ?'),
+                    'maintenance_entries' => $count('SELECT COUNT(*) FROM CROP_LOG WHERE GardenerID = ?'),
+                    'items_borrowed' => $count("SELECT COALESCE(SUM(Qty), 0) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status IN ('Approved', 'Return Requested')"),
+                    'active_listings' => $count("SELECT COUNT(*) FROM EXCHANGE_BOARD WHERE GardenerID = ? AND Status = 'Active'"),
+                ],
+                'previous_applications' => $previous->fetchAll(PDO::FETCH_ASSOC),
+            ]);
         }
 
         case 'process_coordinator_application': {
