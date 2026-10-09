@@ -1118,15 +1118,19 @@ table.data-table {
   table.admin-responsive-table tbody { display: block; width: 100%; min-width: 0; table-layout: auto; }
   table.admin-responsive-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   table.admin-responsive-table tbody { display: grid; gap: 12px; }
-  table.admin-responsive-table tbody > tr:not(.admin-empty-row) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
-  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding: 8px 0; border: 0; overflow-wrap: anywhere; word-break: normal; }
-  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td::before { content: attr(data-label); color: var(--ink-600); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
-  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td:first-child,
-  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td:nth-child(2),
-  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td:last-child { grid-column: 1 / -1; }
-  table.admin-responsive-table tbody > tr:not(.admin-empty-row) > td:last-child { flex-direction: row; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--line); margin-top: 4px; }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row):not(.admin-filter-empty) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row):not(.admin-filter-empty) > td { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding: 8px 0; border: 0; overflow-wrap: anywhere; word-break: normal; }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row):not(.admin-filter-empty) > td::before { content: attr(data-label); color: var(--ink-600); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row):not(.admin-filter-empty) > td:first-child,
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row):not(.admin-filter-empty) > td:nth-child(2),
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row):not(.admin-filter-empty) > td:last-child { grid-column: 1 / -1; }
+  table.admin-responsive-table tbody > tr:not(.admin-empty-row):not(.admin-filter-empty) > td:last-child { flex-direction: row; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--line); margin-top: 4px; }
   table.admin-responsive-table .admin-empty-row { display: block; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
   table.admin-responsive-table .admin-empty-row > td { display: block; padding: 0; border: 0; }
+  table.admin-responsive-table tbody > tr > td > .badge { align-self: flex-start; }
+  table.admin-responsive-table .admin-filter-empty { display: block; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+  table.admin-responsive-table .admin-filter-empty > td { display: block; padding: 0; border: 0; }
+  table.admin-responsive-table .admin-filter-empty > td::before { content: none; }
   table.admin-responsive-table .approve-signup,
   table.admin-responsive-table .reject-signup,
   table.admin-responsive-table .delete-btn { white-space: nowrap; }
@@ -1176,6 +1180,7 @@ table.data-table {
 .badge-green { background: #e4ebe0; color: var(--green-800); border: 1px solid #c9d6c1; }
 .badge-brown { background: #f3e3d8; color: var(--brown-700); border: 1px solid #e6c9b3; }
 .badge-neutral { background: var(--cream-200); color: var(--ink-600); border: 1px solid var(--line); }
+.badge-danger { background: #f7e2de; color: var(--danger); border: 1px solid #ecc3bb; }
 
 /* ---------- Action rows (pending applications / resource requests) ---------- */
 
@@ -1941,6 +1946,18 @@ table.data-table {
 .inv-empty { margin: 0; padding: 20px 0; color: var(--ink-600); font-size: 0.88rem; }
 .inv-error { color: var(--danger); }
 
+.inv-limit-note { margin: 4px 0 8px; padding: 10px 12px; border: 1px solid #e6c9b3; border-radius: var(--radius); background: #fbf3ee; color: var(--brown-700); font-size: 0.85rem; }
+
+/* Briefly highlight an availability number that changed during a live refresh */
+.inv-stock-changed { border-radius: 4px; animation: inv-stock-flash 2.4s ease-out; }
+@keyframes inv-stock-flash {
+  0%, 30% { background: #fbefd5; box-shadow: 0 0 0 3px #fbefd5; }
+  100% { background: transparent; box-shadow: 0 0 0 3px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-stock-changed { animation: none; }
+}
+
 @media (max-width: 900px) {
   .inv-layout { grid-template-columns: minmax(0, 1fr); }
   .inv-requests { position: static; }
@@ -2129,6 +2146,9 @@ table.data-table {
   .admin-form-grid > .field { grid-column: 1 / -1 !important; }
   .admin-table-heading { flex-wrap: wrap; }
   .admin-table-heading input[type="search"] { flex: 1 1 100%; max-width: none; }
+  .admin-table-controls { flex: 1 1 100%; flex-wrap: wrap; }
+  .admin-table-controls input[type="search"] { flex: 1 1 200px; }
+  .admin-status-filter { flex: 1 1 140px; }
 }
 
 /* Mobile fallback */
@@ -2372,6 +2392,21 @@ input[data-table-search] {
   border-radius: 10px; 
   transition: all 0.2s ease;
 }
+
+/* Account tables: search box + status filter side by side */
+.admin-table-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.admin-status-filter {
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--ink-900);
+  background: var(--cream-100);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.admin-status-filter:focus { outline: none; background: var(--white); border-color: var(--brown-600); box-shadow: 0 0 0 3px rgba(168, 86, 46, 0.15); }
+.admin-you-badge { margin-left: 6px; }
 
 input[data-table-search]:focus {
   outline: none;

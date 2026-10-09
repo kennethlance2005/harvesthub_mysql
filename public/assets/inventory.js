@@ -11,37 +11,100 @@ document.addEventListener('DOMContentLoaded', () => {
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
+    // Live refresh state. Background refreshes skip redrawing when nothing
+    // changed, and never redraw while one of the gardener's own actions is
+    // still being sent (busyCount > 0).
+    const REFRESH_INTERVAL_MS = 10000;
+    let busyCount = 0;
+    let lastResourcesSig = null;
+    let lastRequestsSig = null;
+    let lastAvailability = null;
+    let pendingLimit = { count: 0, max: 5 };
+
+    async function whileBusy(task) {
+        busyCount++;
+        try {
+            return await task();
+        } finally {
+            busyCount--;
+        }
+    }
+
+    function updateLimitText() {
+        const sub = document.getElementById('my-requests-sub');
+        if (sub) sub.textContent = `${pendingLimit.count} of ${pendingLimit.max} pending requests are waiting for a coordinator.`;
+
+        const note = document.getElementById('inv-limit-note');
+        if (note) {
+            const atLimit = pendingLimit.count >= pendingLimit.max;
+            note.hidden = !atLimit;
+            note.textContent = atLimit
+                ? `You have reached the limit of ${pendingLimit.max} pending requests. Cancel one or wait for a coordinator to review them before requesting more.`
+                : '';
+        }
+    }
+
     // 1. Load the Interactive Catalog
-    async function loadResources() {
+    async function loadResources({ background = false } = {}) {
         try {
             const res = await fetch('api.php?action=resources');
             const data = await res.json();
-            
+
             if (!data.ok) return;
+            if (background && busyCount > 0) return;
+
+            const sig = JSON.stringify(data);
+            if (background && sig === lastResourcesSig) return;
+            lastResourcesSig = sig;
+
+            pendingLimit = { count: Number(data.my_pending_count) || 0, max: Number(data.max_pending) || 5 };
+            updateLimitText();
+            const atLimit = pendingLimit.count >= pendingLimit.max;
 
             const listEl = document.getElementById('inventory-list');
 
             if (data.resources.length === 0) {
                 listEl.innerHTML = '<p class="inv-empty">No resources in the catalog yet.</p>';
+                lastAvailability = {};
                 return;
             }
+
+            // Remember what the gardener typed and where the cursor was, so a
+            // refresh doesn't wipe a quantity they're in the middle of entering.
+            const typedQty = {};
+            listEl.querySelectorAll('.inline-request-form').forEach(form => {
+                typedQty[form.dataset.id] = form.querySelector('input[name="qty"]').value;
+            });
+            const focusedForm = document.activeElement && document.activeElement.closest
+                ? document.activeElement.closest('.inline-request-form')
+                : null;
+            const focusedId = focusedForm ? focusedForm.dataset.id : null;
+
+            const previousAvailability = lastAvailability;
+            lastAvailability = {};
 
             listEl.innerHTML = data.resources.map(r => {
                 const availableQty = Number(r.AvailableQty) || 0;
                 const isAvailable = availableQty > 0;
                 const myPendingQty = Number(r.MyPendingQty) || 0;
+                lastAvailability[r.ResourceID] = availableQty;
+                const changed = previousAvailability !== null
+                    && previousAvailability[r.ResourceID] !== undefined
+                    && previousAvailability[r.ResourceID] !== availableQty;
 
                 let action;
                 if (myPendingQty > 0) {
                     action = `<span class="badge badge-brown" title="Cancel it under My requests to change the quantity.">Requested (${myPendingQty})</span>`;
                 } else if (isAvailable) {
+                    const typed = Number(typedQty[r.ResourceID]);
+                    const qtyValue = Number.isInteger(typed) && typed >= 1 ? Math.min(typed, availableQty) : 1;
                     action = `
                     <form class="inline-request-form inv-request-form" data-id="${r.ResourceID}" novalidate>
                         <label class="inv-qty">
                             <span>Qty <span class="required">*</span></span>
-                            <input type="number" name="qty" min="1" max="${availableQty}" value="1" required>
+                            <input type="number" name="qty" min="1" max="${availableQty}" value="${qtyValue}" required>
                         </label>
-                        <button type="submit" class="btn btn-accent btn-sm inv-btn">Request</button>
+                        <button type="submit" class="btn btn-accent btn-sm inv-btn" ${atLimit ? 'disabled title="You have reached the pending request limit."' : ''}>Request</button>
                     </form>`;
                 } else {
                     action = '<span class="badge badge-neutral">Out of stock</span>';
@@ -51,12 +114,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="inv-row catalog-item" data-search="${escapeHtml(r.Name).toLowerCase()}">
                     <div class="inv-row-main">
                         <strong class="inv-row-title">${escapeHtml(r.Name)}</strong>
-                        <span class="inv-row-meta ${isAvailable ? 'inv-stock-ok' : 'inv-stock-out'}">${availableQty} of ${escapeHtml(String(r.TotalQty))} available</span>
+                        <span class="inv-row-meta ${isAvailable ? 'inv-stock-ok' : 'inv-stock-out'}${changed ? ' inv-stock-changed' : ''}">${availableQty} of ${escapeHtml(String(r.TotalQty))} available</span>
                     </div>
                     <div class="inv-row-actions">${action}</div>
                 </div>
                 `;
             }).join('');
+
+            if (focusedId) {
+                listEl.querySelector(`.inline-request-form[data-id="${CSS.escape(focusedId)}"] input[name="qty"]`)?.focus();
+            }
 
             document.querySelectorAll('.inline-request-form').forEach(form => {
                 form.addEventListener('submit', async (e) => {
@@ -69,50 +136,63 @@ document.addEventListener('DOMContentLoaded', () => {
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Requesting…';
 
-                    try {
-                        const res = await fetch('api.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: new URLSearchParams({ action: 'resource_request', resource_id: resourceId, qty: qty })
-                        });
-                        const result = await res.json();
+                    await whileBusy(async () => {
+                        try {
+                            const res = await fetch('api.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: new URLSearchParams({ action: 'resource_request', resource_id: resourceId, qty: qty })
+                            });
+                            const result = await res.json();
 
-                        if (result.ok) {
-                            if (typeof showToast === 'function') showToast('Resource requested!', 'success');
-                            loadResources();
-                            loadMyRequests();
-                            return;
+                            if (result.ok) {
+                                if (typeof showToast === 'function') showToast('Resource requested!', 'success');
+                                return;
+                            }
+                            if (typeof showToast === 'function') showToast(result.error || 'Could not submit request.', 'danger');
+                        } catch (err) {
+                            console.error('Network error:', err);
+                            if (typeof showToast === 'function') showToast('Network error. Please try again.', 'danger');
                         }
-                        if (typeof showToast === 'function') showToast(result.error || 'Could not submit request.', 'danger');
-                        if (res.status === 409) loadResources();
-                    } catch (err) {
-                        console.error('Network error:', err);
-                        if (typeof showToast === 'function') showToast('Network error. Please try again.', 'danger');
-                    }
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Request';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Request';
+                    });
+                    // Redraw both lists so the badge, counts and limit note are current.
+                    loadResources();
+                    loadMyRequests();
                 });
             });
-            
+
             // Re-apply search filter if user is actively searching during a refresh
             triggerSearch('search-catalog', '.catalog-item');
-            
+
         } catch (err) {
             console.error("Error loading resources:", err);
-            document.getElementById('inventory-list').innerHTML = '<p class="inv-empty inv-error">Failed to load the catalog.</p>';
+            if (!background) {
+                document.getElementById('inventory-list').innerHTML = '<p class="inv-empty inv-error">Failed to load the catalog.</p>';
+            }
         }
     }
 
     // 2. Load the Request Tracker & Combined Inventory
-    async function loadMyRequests() {
+    async function loadMyRequests({ background = false } = {}) {
         try {
             const [resReq, resPers] = await Promise.all([
                 fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ action: 'my_resource_requests' }) }),
                 fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ action: 'get_personal_inventory' }) })
             ]);
-            
+
             const dataReq = await resReq.json();
             const dataPers = await resPers.json();
+
+            if (background) {
+                if (busyCount > 0 || !dataReq.ok || !dataPers.ok) return;
+                const sig = JSON.stringify([dataReq, dataPers]);
+                if (sig === lastRequestsSig) return;
+                lastRequestsSig = sig;
+            } else {
+                lastRequestsSig = JSON.stringify([dataReq, dataPers]);
+            }
 
             if (!dataReq.ok || !dataPers.ok) {
                 document.getElementById('my-requests-list').innerHTML = '<p class="inv-empty inv-error">Error loading requests.</p>';
@@ -127,6 +207,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const historyRequests = dataReq.requests.filter(r => ['Rejected', 'Approved', 'Return Requested'].includes(r.Status));
             const borrowedItems = dataReq.requests.filter(r => ['Approved', 'Return Requested'].includes(r.Status));
             const personalItems = dataPers.items;
+
+            pendingLimit.count = activeRequests.length;
+            updateLimitText();
 
             // Render Request Tracker: pending requests first, older decisions behind a toggle
             const badgeClass = { Requested: 'badge-brown', Rejected: 'badge-neutral', Approved: 'badge-green', 'Return Requested': 'badge-brown' };
@@ -220,6 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!window.confirm(`Cancel your pending request for "${btn.dataset.name}"?`)) return;
                     btn.disabled = true;
                     btn.textContent = 'Cancelling…';
+                    busyCount++;
                     try {
                         const res = await fetch('api.php', {
                             method: 'POST',
@@ -235,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch (err) {
                         if (typeof showToast === 'function') showToast('Network error. Please try again.', 'danger');
                     }
+                    busyCount--;
                     loadResources(); loadMyRequests();
                 });
             });
@@ -244,6 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.addEventListener('click', async (e) => {
                     btn.disabled = true; 
                     const txnId = btn.dataset.txn;
+                    busyCount++;
                     try {
                         const res = await fetch('api.php', {
                             method: 'POST',
@@ -260,6 +346,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } catch (err) {
                         btn.disabled = false;
+                    } finally {
+                        busyCount--;
                     }
                 });
             });
@@ -269,6 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.addEventListener('click', async (e) => {
                     btn.disabled = true; 
                     const itemId = btn.dataset.id;
+                    busyCount++;
                     try {
                         const res = await fetch('api.php', {
                             method: 'POST',
@@ -285,6 +374,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } catch (err) {
                         btn.disabled = false;
+                    } finally {
+                        busyCount--;
                     }
                 });
             });
@@ -309,6 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const itemName = document.getElementById('personal-item-name').value;
             const itemQty = document.getElementById('personal-item-qty').value;
 
+            busyCount++;
             try {
                 const res = await fetch('api.php', {
                     method: 'POST',
@@ -328,6 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Error adding personal item:", err);
             } finally {
                 btn.disabled = false;
+                busyCount--;
             }
         });
     }
@@ -362,4 +455,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize the data fetches immediately when the page loads
     loadResources();
     loadMyRequests();
+
+    // Live refresh: keep availability and request statuses current while the
+    // page is open, and catch up as soon as the gardener returns to the tab.
+    function refreshInBackground() {
+        if (document.hidden) return;
+        loadResources({ background: true });
+        loadMyRequests({ background: true });
+    }
+    window.setInterval(refreshInBackground, REFRESH_INTERVAL_MS);
+    document.addEventListener('visibilitychange', refreshInBackground);
 });

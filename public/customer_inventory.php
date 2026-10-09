@@ -12,7 +12,7 @@ $navTitle = 'Resource Inventory';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=29">
+<link rel="stylesheet" href="assets/style.css?v=30">
 </head>
 <body class="account-page">
 
@@ -43,10 +43,12 @@ $navTitle = 'Resource Inventory';
             <div class="inv-card-head">
               <div>
                 <h2 class="panel-title">Resource catalog</h2>
-                <p class="inv-card-sub">Request community tools or garden materials.</p>
+                <p class="inv-card-sub">Request community tools or garden materials. Availability updates automatically.</p>
               </div>
               <input type="search" id="search-catalog" class="inv-search" placeholder="Search catalog..." aria-label="Search catalog">
             </div>
+
+            <p class="inv-limit-note" id="inv-limit-note" role="status" hidden></p>
 
             <div id="inventory-list" class="inv-list" aria-live="polite">
               <p class="inv-empty">Loading inventory data...</p>
@@ -86,7 +88,7 @@ $navTitle = 'Resource Inventory';
         <!-- NARROW RIGHT COLUMN: My Requests -->
         <aside class="panel inv-card inv-requests">
           <h2 class="panel-title">My requests</h2>
-          <p class="inv-card-sub">Requests waiting for a coordinator.</p>
+          <p class="inv-card-sub" id="my-requests-sub">Requests waiting for a coordinator.</p>
           
           <div id="my-requests-list" aria-live="polite">
             <p class="inv-empty">Loading your requests...</p>
@@ -103,6 +105,6 @@ $navTitle = 'Resource Inventory';
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
 <script src="assets/app.js"></script>
-<script src="assets/inventory.js?v=10"></script>
+<script src="assets/inventory.js?v=11"></script>
 </body>
 </html>

@@ -18,18 +18,51 @@ function filterTableByName(inputId, tableId) {
   if (!input || !table) return;
 
   const query = input.value.trim().toLowerCase();
+  // Optional status dropdown next to the search box (account tables only)
+  const statusSelect = document.querySelector(`[data-status-filter="${tableId}"]`);
+  const status = statusSelect ? statusSelect.value : '';
 
+  let visibleRows = 0;
   table.querySelectorAll('tr[data-name]').forEach(row => {
     // Name is stored in the data attribute
     const name = row.dataset.name ? row.dataset.name.toLowerCase() : '';
-    
+
     // Email is uniformly located in the second column (td:nth-child(2)) across all our tables
     const emailCell = row.querySelector('td:nth-child(2)');
     const email = emailCell ? emailCell.textContent.toLowerCase() : '';
     const location = row.dataset.location ? row.dataset.location.toLowerCase() : '';
-    
+
     // Hide row if the query is not empty AND it matches neither Name nor Email
-    row.hidden = query !== '' && !name.includes(query) && !email.includes(query) && !location.includes(query);
+    const matchesQuery = query === '' || name.includes(query) || email.includes(query) || location.includes(query);
+    const matchesStatus = status === '' || row.dataset.status === status;
+    row.hidden = !(matchesQuery && matchesStatus);
+    if (!row.hidden) visibleRows++;
+  });
+
+  // Tell the admin when a search/filter hides every row
+  table.querySelector('tr.admin-filter-empty')?.remove();
+  const hasRows = table.querySelector('tr[data-name]') !== null;
+  if (hasRows && visibleRows === 0) {
+    const columns = table.closest('table')?.querySelectorAll('thead th').length || 1;
+    const message = query === ''
+      ? `No ${status.toLowerCase()} accounts.`
+      : `No ${status ? status.toLowerCase() + ' ' : ''}accounts match "${escapeHtml(input.value.trim())}".`;
+    table.insertAdjacentHTML('beforeend', `<tr class="admin-filter-empty"><td colspan="${columns}" class="text-muted">${message}</td></tr>`);
+  }
+}
+
+// Status pill for account tables: Active, or Disabled (locked after failed logins)
+function accountStatusBadge(status) {
+  if (status === 'Disabled') {
+    return '<span class="badge badge-danger" title="Locked after 3 failed login attempts. Use Enable Account to unlock it.">Disabled</span>';
+  }
+  return '<span class="badge badge-green">Active</span>';
+}
+
+// Re-apply each account table's search box and status filter after a reload
+function reapplyAccountFilters() {
+  document.querySelectorAll('[data-table-search]').forEach(input => {
+    filterTableByName(input.id, input.dataset.tableSearch);
   });
 }
 
@@ -71,49 +104,52 @@ async function loadAccounts() {
   const gardenersTable = document.getElementById('gardeners-table');
   if (gardenersTable) {
     gardenersTable.innerHTML = data.gardeners.map(g => `
-      <tr data-name="${escapeHtml(g.Name)}" data-location="${escapeHtml(g.Location || '')}">
+      <tr data-name="${escapeHtml(g.Name)}" data-location="${escapeHtml(g.Location || '')}" data-status="${escapeHtml(g.Status)}">
         <td data-label="Name">${escapeHtml(g.Name)}</td>
         <td data-label="Email">${escapeHtml(g.Email)}</td>
         <td data-label="Location">${escapeHtml(g.Location || 'Not provided')}</td>
+        <td data-label="Status">${accountStatusBadge(g.Status)}</td>
         <td data-label="Actions">
           <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}">Archive</button>
           <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="gardener" data-id="${g.id}" ${g.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
-    `).join('') || '<tr class="admin-empty-row"><td colspan="4" class="text-muted">No gardeners yet.</td></tr>';
+    `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No gardeners yet.</td></tr>';
   }
 
   // Render Coordinators if table exists
   const coordsTable = document.getElementById('coordinators-table');
   if (coordsTable) {
     coordsTable.innerHTML = data.coordinators.map(c => `
-      <tr data-name="${escapeHtml(c.Name)}" data-location="${escapeHtml(c.Location || '')}">
+      <tr data-name="${escapeHtml(c.Name)}" data-location="${escapeHtml(c.Location || '')}" data-status="${escapeHtml(c.Status)}">
         <td data-label="Name">${escapeHtml(c.Name)}</td>
         <td data-label="Email">${escapeHtml(c.Email)}</td>
         <td data-label="Shift">${escapeHtml(c.Shift)}</td>
         <td data-label="Location">${escapeHtml(c.Location || 'Not provided')}</td>
+        <td data-label="Status">${accountStatusBadge(c.Status)}</td>
         <td data-label="Actions">
           <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Archive</button>
           <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="coordinator" data-id="${c.id}" ${c.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
-    `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No coordinators yet.</td></tr>';
+    `).join('') || '<tr class="admin-empty-row"><td colspan="6" class="text-muted">No coordinators yet.</td></tr>';
   }
 
   // Render Admins if table exists
   const adminsTable = document.getElementById('admins-table');
   if (adminsTable) {
     adminsTable.innerHTML = data.admins.map(a => `
-      <tr data-name="${escapeHtml(a.Name)}" data-location="${escapeHtml(a.Location || '')}">
-        <td data-label="Name">${escapeHtml(a.Name)}</td>
+      <tr data-name="${escapeHtml(a.Name)}" data-location="${escapeHtml(a.Location || '')}" data-status="${escapeHtml(a.Status)}">
+        <td data-label="Name">${escapeHtml(a.Name)}${a.id === data.current_user_id ? ' <span class="badge badge-neutral admin-you-badge">You</span>' : ''}</td>
         <td data-label="Email">${escapeHtml(a.Email)}</td>
         <td data-label="Location">${escapeHtml(a.Location || 'Not provided')}</td>
+        <td data-label="Status">${accountStatusBadge(a.Status)}</td>
         <td data-label="Actions">
           <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.id === data.current_user_id ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>Archive</button>
           <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="admin" data-id="${a.id}" ${a.Status !== 'Disabled' || a.id === data.current_user_id ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
-    `).join('') || '<tr class="admin-empty-row"><td colspan="4" class="text-muted">No administrators yet.</td></tr>';
+    `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No administrators yet.</td></tr>';
   }
 
   document.querySelectorAll('.delete-btn').forEach(btn => {
@@ -138,6 +174,8 @@ async function loadAccounts() {
       }
     };
   });
+
+  reapplyAccountFilters();
 }
 
 async function loadArchivedAccounts() {
@@ -718,6 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filter();
       }
     });
+    document.querySelector(`[data-status-filter="${input.dataset.tableSearch}"]`)?.addEventListener('change', filter);
   });
 
   // 3. Create Admin Form Logic
