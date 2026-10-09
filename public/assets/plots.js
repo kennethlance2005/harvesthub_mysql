@@ -312,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function requestPlotUnassignment(plotId, button) {
-        if (!window.confirm('Send an unassignment request to the coordinator? The plot stays assigned to you until it is approved.')) return;
+        if (!await hhConfirm({ title: 'Request unassignment?', message: 'The coordinator will review your request. The plot stays assigned to you until it is approved.', confirmText: 'Send request' })) return;
         button.disabled = true;
         button.textContent = 'Sending...';
 

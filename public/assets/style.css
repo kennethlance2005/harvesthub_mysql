@@ -470,7 +470,8 @@ a { color: inherit; }
 
 .modal {
   background: var(--white);
-  border-radius: var(--radius);
+  border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
   padding: 28px;
   max-width: 520px;
   width: 100%;
@@ -495,6 +496,34 @@ a { color: inherit; }
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* Shared confirm / prompt / alert dialog (assets/dialog.js) — same look as .modal */
+.hh-dialog {
+  width: min(100% - 32px, 460px);
+  max-height: calc(100vh - 40px);
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink-900);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+.hh-dialog::backdrop { background: rgba(22, 40, 28, 0.55); }
+.hh-dialog-box { padding: 26px; }
+.hh-dialog-box h3 { margin: 0 0 10px; font-family: var(--font-display); font-size: 1.3rem; font-weight: 600; }
+.hh-dialog-message { margin: 0 0 20px; color: var(--ink-600); font-size: 0.95rem; line-height: 1.5; white-space: pre-line; }
+.hh-dialog-field { margin-bottom: 20px; }
+.hh-dialog-field textarea { resize: vertical; }
+.hh-dialog-error { margin: 6px 0 0; color: var(--danger); font-size: 0.85rem; }
+.hh-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.hh-dialog-actions .btn { min-width: 110px; }
+
+.btn-danger { background: var(--danger); border-color: var(--danger); color: var(--white); }
+.btn-danger:hover { background: #842a22; border-color: #842a22; }
+
+@media (max-width: 480px) {
+  .hh-dialog-actions .btn { flex: 1 1 0; min-width: 0; }
 }
 
 #delete-notice {

@@ -50,7 +50,7 @@ async function loadPlot() {
     }
     document.querySelectorAll('.unassign-plot-btn').forEach(button => {
       button.addEventListener('click', async () => {
-        if (!window.confirm(`Request unassignment of "${button.dataset.label}"?`)) return;
+        if (!await hhConfirm({ title: `Request unassignment of ${button.dataset.label}?`, message: 'The coordinator will review your request. The plot stays assigned to you until it is approved.', confirmText: 'Send request' })) return;
         const result = await postAction('request_plot_unassignment', { plt_id: button.dataset.id });
         if (result.ok) {
           showToast('Unassignment request submitted.', 'success');

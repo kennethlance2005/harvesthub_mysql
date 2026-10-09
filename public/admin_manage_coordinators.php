@@ -10,7 +10,7 @@ $navTitle = 'Manage Coordinators';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Coordinators</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=32">
+<link rel="stylesheet" href="assets/style.css?v=34">
 </head>
 <body class="account-page">
 <div class="app-layout">
@@ -55,9 +55,8 @@ $navTitle = 'Manage Coordinators';
   </div>
 </div>
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
-<?php include __DIR__ . '/admin_modal_reason.php'; ?>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js?v=12"></script>
+<script src="assets/admin.js?v=13"></script>
 </body>
 </html>

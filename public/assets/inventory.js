@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.cancel-request-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     if (btn.disabled) return;
-                    if (!window.confirm(`Cancel your pending request for "${btn.dataset.name}"?`)) return;
+                    if (!await hhConfirm({ title: 'Cancel this request?', message: `Your pending request for ${btn.dataset.name} will be withdrawn. You can request it again later.`, confirmText: 'Cancel request', cancelText: 'Keep request', tone: 'danger' })) return;
                     btn.disabled = true;
                     btn.textContent = 'Cancelling…';
                     busyCount++;

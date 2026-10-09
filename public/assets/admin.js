@@ -111,7 +111,7 @@ async function loadAccounts() {
         <td data-label="Status">${accountStatusBadge(g.Status)}</td>
         <td data-label="Actions">
           <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}">Archive</button>
-          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="gardener" data-id="${g.id}" ${g.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
+          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}" ${g.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No gardeners yet.</td></tr>';
@@ -129,7 +129,7 @@ async function loadAccounts() {
         <td data-label="Status">${accountStatusBadge(c.Status)}</td>
         <td data-label="Actions">
           <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Archive</button>
-          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="coordinator" data-id="${c.id}" ${c.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
+          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}" ${c.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="6" class="text-muted">No coordinators yet.</td></tr>';
@@ -146,7 +146,7 @@ async function loadAccounts() {
         <td data-label="Status">${accountStatusBadge(a.Status)}</td>
         <td data-label="Actions">
           <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.id === data.current_user_id ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>Archive</button>
-          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="admin" data-id="${a.id}" ${a.Status !== 'Disabled' || a.id === data.current_user_id ? 'disabled' : ''}>Enable Account</button></div>
+          <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="admin" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" ${a.Status !== 'Disabled' || a.id === data.current_user_id ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No administrators yet.</td></tr>';
@@ -160,6 +160,13 @@ async function loadAccounts() {
 
   document.querySelectorAll('.enable-account-btn').forEach(btn => {
     btn.onclick = async () => {
+      const confirmed = await hhConfirm({
+        title: `Enable ${btn.dataset.name}'s account?`,
+        message: 'This unlocks the account and resets its failed login attempts, so they can log in again.',
+        confirmText: 'Enable account',
+      });
+      if (!confirmed) return;
+      btn.disabled = true;
       const res = await fetch('api.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -171,6 +178,7 @@ async function loadAccounts() {
         loadAccounts();
       } else {
         showToast(result.error || 'Could not enable account.', 'danger');
+        btn.disabled = false;
       }
     };
   });
@@ -203,7 +211,7 @@ async function loadArchivedAccounts() {
           ? `<strong class="archive-reason-title">${escapeHtml(a.ArchiveReason)}</strong><span class="archive-reason-details">${escapeHtml(a.ArchiveDetails || '')}</span>`
           : '<span class="text-muted">Not recorded</span>'}</td>
         <td data-label="Actions">
-          <button type="button" class="btn btn-accent btn-sm unarchive-btn" data-role="${a.Role}" data-id="${a.id}">Unarchive</button>
+          <button type="button" class="btn btn-accent btn-sm unarchive-btn" data-role="${a.Role}" data-id="${a.id}" data-name="${escapeHtml(a.Name)}" data-role-label="${escapeHtml(displayRole)}">Unarchive</button>
         </td>
       </tr>
     `;
@@ -217,6 +225,12 @@ async function loadArchivedAccounts() {
 
   document.querySelectorAll('.unarchive-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      const confirmed = await hhConfirm({
+        title: `Restore ${btn.dataset.name}'s account?`,
+        message: `This ${btn.dataset.roleLabel.toLowerCase()} account becomes active again and can log in.`,
+        confirmText: 'Unarchive',
+      });
+      if (!confirmed) return;
       btn.disabled = true;
       const res = await fetch('api.php', {
         method: 'POST',
@@ -238,41 +252,12 @@ async function loadArchivedAccounts() {
 // ---------- Pending Account Requests ----------
 
 function requestAdminRejectionReason(title) {
-  const modal = document.getElementById('admin-reason-modal');
-  const titleEl = document.getElementById('admin-reason-title');
-  const input = document.getElementById('admin-reason-input');
-  const form = document.getElementById('admin-reason-form');
-  if (!modal || !titleEl || !input || !form) {
-    return Promise.reject(new Error('The rejection-reason dialog is unavailable.'));
-  }
-  titleEl.textContent = title;
-  input.value = '';
-  modal.hidden = false;
-  modal.style.display = 'grid';
-  input.focus();
-  return new Promise(resolve => {
-    const finish = reason => {
-      modal.hidden = true;
-      modal.style.display = '';
-      form.removeEventListener('submit', submit);
-      document.getElementById('admin-reason-cancel').removeEventListener('click', cancel);
-      resolve(reason);
-    };
-    const submit = event => {
-      event.preventDefault();
-      const reason = input.value.trim();
-      if (!reason) {
-        input.setCustomValidity('Please provide a reason.');
-        input.reportValidity();
-        return;
-      }
-      input.setCustomValidity('');
-      finish(reason);
-    };
-    const cancel = () => finish(null);
-    input.addEventListener('input', () => input.setCustomValidity(''), { once: true });
-    form.addEventListener('submit', submit);
-    document.getElementById('admin-reason-cancel').addEventListener('click', cancel);
+  return hhPrompt({
+    title,
+    message: 'The applicant will see this reason.',
+    label: 'Reason for declining',
+    confirmText: 'Decline',
+    tone: 'danger',
   });
 }
 
@@ -292,7 +277,7 @@ async function loadSignupRequests() {
       <td data-label="Age">${escapeHtml(String(r.Age))}</td>
       <td data-label="Location">${escapeHtml(r.Location)}</td>
       <td data-label="Actions" class="text-right" style="white-space: nowrap;">
-        <button class="btn btn-sm approve-signup" style="background: var(--green-700); color: var(--white);" data-id="${r.RequestID}">Approve</button>
+        <button class="btn btn-sm approve-signup" style="background: var(--green-700); color: var(--white);" data-id="${r.RequestID}" data-name="${escapeHtml(r.FirstName + ' ' + r.LastName)}" data-email="${escapeHtml(r.Email)}">Approve</button>
         <button class="btn btn-sm reject-signup" style="background: var(--danger); color: var(--white);" data-id="${r.RequestID}">Reject</button>
       </td>
     </tr>
@@ -308,7 +293,17 @@ async function loadSignupRequests() {
   }
 
   document.querySelectorAll('.approve-signup').forEach(btn => {
-    btn.addEventListener('click', () => processSignup(btn.dataset.id, 'approve'));
+    btn.addEventListener('click', async () => {
+      const confirmed = await hhConfirm({
+        title: `Approve ${btn.dataset.name}?`,
+        message: `This creates a gardener account for ${btn.dataset.email}, and they will be able to log in right away.`,
+        confirmText: 'Approve',
+      });
+      if (!confirmed) return;
+      btn.disabled = true;
+      await processSignup(btn.dataset.id, 'approve');
+      btn.disabled = false;
+    });
   });
   document.querySelectorAll('.reject-signup').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -353,14 +348,24 @@ async function loadCoordinatorApplications() {
       <td data-label="Shift">${escapeHtml(app.Shift)}</td>
       <td data-label="Motivation">${escapeHtml(app.Motivation)}</td>
       <td data-label="Actions" class="text-right" style="white-space: nowrap;">
-        <button class="btn btn-sm approve-coordinator-application" data-id="${app.ApplicationID}">Approve</button>
+        <button class="btn btn-sm approve-coordinator-application" data-id="${app.ApplicationID}" data-name="${escapeHtml(app.Name)}" data-shift="${escapeHtml(app.Shift)}">Approve</button>
         <button class="btn btn-sm reject-coordinator-application" data-id="${app.ApplicationID}">Reject</button>
       </td>
     </tr>
   `).join('');
   if (empty) empty.hidden = data.applications.length > 0;
   table.querySelectorAll('.approve-coordinator-application').forEach(btn =>
-    btn.addEventListener('click', () => processCoordinatorApplication(btn.dataset.id, 'approve')));
+    btn.addEventListener('click', async () => {
+      const confirmed = await hhConfirm({
+        title: `Make ${btn.dataset.name} a coordinator?`,
+        message: `They will get coordinator access for the ${btn.dataset.shift.toLowerCase()} shift, alongside their gardener account.`,
+        confirmText: 'Approve',
+      });
+      if (!confirmed) return;
+      btn.disabled = true;
+      await processCoordinatorApplication(btn.dataset.id, 'approve');
+      btn.disabled = false;
+    }));
   table.querySelectorAll('.reject-coordinator-application').forEach(btn =>
     btn.addEventListener('click', async () => {
       const reason = await requestAdminRejectionReason('Why is this coordinator application being declined?');

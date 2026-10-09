@@ -136,7 +136,7 @@ async function loadApplications() {
 async function processApplication(appId, decision) {
   let reason = '';
   if (decision === 'reject') {
-    reason = window.prompt('Please explain why this plot request is declined:')?.trim() || '';
+    reason = await hhPrompt({ title: 'Decline this plot request?', message: 'The gardener will see this reason.', label: 'Reason for declining', placeholder: 'e.g., This plot is reserved for the school program.', confirmText: 'Decline request', tone: 'danger' });
     if (!reason) return;
   }
   const data = await postAction('process_application', { app_id: appId, decision, reason });
@@ -164,7 +164,7 @@ async function loadResourceTxns() {
 async function processResourceTxn(txnId, decision, qty) {
   const params = { txn_id: txnId, decision };
   if (decision === 'reject') {
-    params.reason = window.prompt('Please explain why this resource request is declined:')?.trim() || '';
+    params.reason = await hhPrompt({ title: 'Decline this resource request?', message: 'The gardener will see this reason.', label: 'Reason for declining', placeholder: 'e.g., Not enough stock this week.', confirmText: 'Decline request', tone: 'danger' });
     if (!params.reason) return;
   }
   if (qty) params.qty = qty;
@@ -229,7 +229,7 @@ async function createPlot(label) {
 }
 
 async function deletePlot(plotId, label) {
-  if (!window.confirm(`Delete plot "${label}"? This cannot be undone.`)) return;
+  if (!await hhConfirm({ title: `Delete plot ${label}?`, message: 'This removes the plot from the garden map. This cannot be undone.', confirmText: 'Delete plot', tone: 'danger' })) return;
   const data = await postAction('delete_plot', { plot_id: plotId });
   if (data.ok) {
     showToast('Plot deleted.', 'success');

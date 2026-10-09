@@ -17,7 +17,7 @@ if (!$email || !$token) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Set New Password</title>
-<link rel="stylesheet" href="assets/style.css?v=29">
+<link rel="stylesheet" href="assets/style.css?v=34">
 </head>
 <body>
 <div class="login-shell">
@@ -51,6 +51,7 @@ if (!$email || !$token) {
 
 <script src="assets/password-toggle.js?v=1"></script>
 <script src="assets/required-form-buttons.js?v=1"></script>
+<script src="assets/dialog.js?v=2"></script>
 <script>
 const resetForm = document.getElementById('reset-form');
 const passwordInput = document.getElementById('password');
@@ -109,7 +110,7 @@ resetForm.addEventListener('submit', async (e) => {
         const data = await res.json();
         
         if (data.ok) {
-            alert('Password successfully updated. You can now log in.');
+            await hhAlert({ title: 'Password updated', message: 'Your password has been changed. You can now log in with your new password.', buttonText: 'Go to login' });
             window.location.href = 'login.php';
         } else {
           resetAlert.textContent = data.error;
