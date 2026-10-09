@@ -134,7 +134,12 @@ async function loadApplications() {
 }
 
 async function processApplication(appId, decision) {
-  const data = await postAction('process_application', { app_id: appId, decision });
+  let reason = '';
+  if (decision === 'reject') {
+    reason = window.prompt('Please explain why this plot request is declined:')?.trim() || '';
+    if (!reason) return;
+  }
+  const data = await postAction('process_application', { app_id: appId, decision, reason });
   if (data.ok) {
     const resultMessage = decision === 'approve' && data.auto_rejected
       ? `Request accepted. ${data.auto_rejected} competing request${data.auto_rejected === 1 ? '' : 's'} rejected.`
@@ -158,6 +163,10 @@ async function loadResourceTxns() {
 
 async function processResourceTxn(txnId, decision, qty) {
   const params = { txn_id: txnId, decision };
+  if (decision === 'reject') {
+    params.reason = window.prompt('Please explain why this resource request is declined:')?.trim() || '';
+    if (!params.reason) return;
+  }
   if (qty) params.qty = qty;
   const data = await postAction('process_resource_txn', params);
   if (data.ok) {

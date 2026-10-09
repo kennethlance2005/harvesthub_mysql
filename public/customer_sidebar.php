@@ -32,6 +32,11 @@ $currentPage = basename($_SERVER['PHP_SELF']);
       <a href="customer_exchange.php" class="sidebar-link <?= $currentPage === 'customer_exchange.php' ? 'active' : '' ?>">
         Exchange Board
       </a>
+      <?php if (hasRole('staff')): ?>
+      <a href="staff_dashboard.php" class="sidebar-link <?= str_starts_with($currentPage, 'staff_') ? 'active' : '' ?>">
+        Coordinator Workspace
+      </a>
+      <?php endif; ?>
     </nav>
 
     <div class="sidebar-footer" id="customerSidebarLogout">

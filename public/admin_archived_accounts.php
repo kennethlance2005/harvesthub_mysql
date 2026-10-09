@@ -10,7 +10,7 @@ $navTitle = 'Archived Accounts';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Archived Accounts</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=24">
+<link rel="stylesheet" href="assets/style.css?v=25">
 </head>
 <body class="account-page">
 
@@ -29,6 +29,15 @@ $navTitle = 'Archived Accounts';
         
         <div class="table-wrap">
           <table class="data-table" id="archived-data-table">
+            <colgroup>
+              <col class="archived-col-name">
+              <col class="archived-col-email">
+              <col class="archived-col-role">
+              <col class="archived-col-location">
+              <col class="archived-col-shift">
+              <col class="archived-col-reason">
+              <col class="archived-col-actions">
+            </colgroup>
             <thead>
               <tr>
                 <th style="cursor: pointer;" onclick="sortTable(0)">Name <span id="sort-icon-0"></span></th>
@@ -36,11 +45,12 @@ $navTitle = 'Archived Accounts';
                 <th style="cursor: pointer;" onclick="sortTable(2)">Role <span id="sort-icon-2"></span></th>
                 <th style="cursor: pointer;" onclick="sortTable(3)">Location <span id="sort-icon-3"></span></th>
                 <th style="cursor: pointer;" onclick="sortTable(4)">Shift <span id="sort-icon-4"></span></th>
+                <th>Archive reason</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="archived-table">
-               <tr><td colspan="6" class="text-muted">Loading archives...</td></tr>
+               <tr><td colspan="7" class="text-muted">Loading archives...</td></tr>
             </tbody>
           </table>
         </div>
@@ -51,6 +61,6 @@ $navTitle = 'Archived Accounts';
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=4"></script>
+<script src="assets/admin.js?v=11"></script>
 </body>
 </html>

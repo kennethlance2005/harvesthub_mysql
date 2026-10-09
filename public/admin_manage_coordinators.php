@@ -10,7 +10,7 @@ $navTitle = 'Manage Coordinators';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Coordinators</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=24">
+<link rel="stylesheet" href="assets/style.css?v=25">
 </head>
 <body class="account-page">
 <div class="app-layout">
@@ -18,16 +18,16 @@ $navTitle = 'Manage Coordinators';
   <div class="main-content">
     <main class="wrap" id="top" style="max-width: 1200px; padding-top: 32px;">
       
-      <!-- Pending Coordinator Requests -->
+      <!-- Pending Coordinator Applications -->
       <div class="panel" style="margin-bottom: 24px;">
-        <p class="panel-title">Pending Coordinator Requests</p>
+        <p class="panel-title">Pending Coordinator Applications</p>
         <div class="table-wrap">
           <table class="data-table admin-responsive-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Age</th><th>Location</th><th>Shift</th><th>Actions</th></tr></thead>
-            <tbody id="pending-coordinators-table"></tbody>
+            <thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Shift</th><th>Why they want to coordinate</th><th>Actions</th></tr></thead>
+            <tbody id="pending-coordinator-applications-table"></tbody>
           </table>
         </div>
-        <p class="text-muted" id="pending-coordinators-empty" hidden style="margin-top: 12px;">No pending coordinator requests.</p>
+        <p class="text-muted" id="pending-coordinator-applications-empty" hidden style="margin-top: 12px;">No pending coordinator applications.</p>
       </div>
 
       <!-- Active Coordinators -->
@@ -48,8 +48,9 @@ $navTitle = 'Manage Coordinators';
   </div>
 </div>
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
+<?php include __DIR__ . '/admin_modal_reason.php'; ?>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js?v=5"></script>
+<script src="assets/admin.js?v=11"></script>
 </body>
 </html>

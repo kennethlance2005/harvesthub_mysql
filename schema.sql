@@ -49,6 +49,37 @@ CREATE TABLE COMMUNITY_GARDENER (
     FailedLoginAttempts TINYINT UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB;
 
+ALTER TABLE GARDEN_COORDINATOR
+    ADD COLUMN GardenerID INT NULL UNIQUE,
+    ADD CONSTRAINT fk_coordinator_gardener
+        FOREIGN KEY (GardenerID) REFERENCES COMMUNITY_GARDENER(GardenerID) ON DELETE SET NULL;
+
+CREATE TABLE ACCOUNT_ARCHIVE_NOTICE (
+    NoticeID   INT AUTO_INCREMENT PRIMARY KEY,
+    GardenerID INT          NOT NULL,
+    AdminID    INT          NULL,
+    Reason     VARCHAR(50)  NOT NULL,
+    Details    VARCHAR(1000) NOT NULL,
+    CreatedAt  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_archive_notice_gardener (GardenerID, CreatedAt),
+    FOREIGN KEY (GardenerID) REFERENCES COMMUNITY_GARDENER(GardenerID) ON DELETE CASCADE,
+    FOREIGN KEY (AdminID) REFERENCES SYSTEM_ADMINISTRATOR(AdminID) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE COORDINATOR_APPLICATION (
+    ApplicationID INT AUTO_INCREMENT PRIMARY KEY,
+    GardenerID    INT          NOT NULL,
+    Shift         VARCHAR(20)  NOT NULL,
+    Motivation    VARCHAR(1000) NOT NULL,
+    Status        VARCHAR(20)  NOT NULL DEFAULT 'Pending',
+    RejectionReason VARCHAR(1000) NULL,
+    ReviewedAt    DATETIME     NULL,
+    ReviewedBy    INT          NULL,
+    RequestedAt   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_coordinator_application_status (Status, RequestedAt),
+    FOREIGN KEY (GardenerID) REFERENCES COMMUNITY_GARDENER(GardenerID) ON DELETE CASCADE,
+    FOREIGN KEY (ReviewedBy) REFERENCES SYSTEM_ADMINISTRATOR(AdminID) ON DELETE SET NULL
+) ENGINE=InnoDB;
 
 CREATE TABLE PASSWORD_RESET (
     Email VARCHAR(255) NOT NULL,
@@ -100,6 +131,7 @@ CREATE TABLE PLOT_APPLICATION (
     PltID       INT          NOT NULL,
     Status      VARCHAR(20)  NOT NULL DEFAULT 'Pending',
     RequestType VARCHAR(20)  NOT NULL DEFAULT 'Apply',
+    RejectionReason VARCHAR(1000) NULL,
     AppliedAt   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ProcessedAt DATETIME     NULL,
     FOREIGN KEY (GardenerID) REFERENCES COMMUNITY_GARDENER(GardenerID),
@@ -167,6 +199,7 @@ CREATE TABLE RESOURCE_TXN (
     ApprovedAt  DATETIME     NULL,
     ReturnRequestedAt DATETIME NULL,
     ReturnedAt  DATETIME     NULL,
+    RejectionReason VARCHAR(1000) NULL,
     FOREIGN KEY (GardenerID) REFERENCES COMMUNITY_GARDENER(GardenerID),
     FOREIGN KEY (CoordID) REFERENCES GARDEN_COORDINATOR(CoordID),
     FOREIGN KEY (ResourceID) REFERENCES RESOURCE(ResourceID),
@@ -263,7 +296,9 @@ CREATE TABLE SIGNUP_REQUEST (
     Status       VARCHAR(20)  NOT NULL DEFAULT 'Pending',
     RequestedAt  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ReviewedAt   DATETIME     NULL,
-    ReviewedBy   INT          NULL
+    ReviewedBy   INT          NULL,
+    RejectionReason VARCHAR(1000) NULL,
+    StatusToken  CHAR(64)     NULL UNIQUE
 ) ENGINE=InnoDB;
 
 -- =========================================================

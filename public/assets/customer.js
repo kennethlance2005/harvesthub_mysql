@@ -260,6 +260,13 @@ async function loadCustomerDashboard() {
     const data = await res.json();
     if (!data.ok) return;
 
+    const noticePanel = document.getElementById('archive-notice-panel');
+    if (noticePanel && data.archive_notice) {
+      document.getElementById('archive-notice-reason').textContent = data.archive_notice.Reason;
+      document.getElementById('archive-notice-details').textContent = data.archive_notice.Details;
+      noticePanel.hidden = false;
+    }
+
     // 1. Update KPI numbers
     kpiPlots.textContent = data.stats.active_plots;
     document.getElementById('kpi-resources').textContent = data.stats.pending_resources;
@@ -306,9 +313,65 @@ async function loadCustomerDashboard() {
   }
 }
 
+async function loadCoordinatorApplication() {
+  const panel = document.getElementById('coordinator-application-panel');
+  if (!panel) return;
+  const status = document.getElementById('coordinator-application-status');
+  const form = document.getElementById('coordinator-application-form');
+  panel.hidden = false;
+  if (form.dataset.bound !== 'true') {
+    form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      const result = await postAction('apply_coordinator', {
+        shift: document.getElementById('coordinator-shift').value,
+        motivation: document.getElementById('coordinator-motivation').value.trim(),
+      });
+      if (!result.ok) {
+        showToast(result.error || 'Could not submit your application.', 'danger');
+      } else {
+        showToast('Coordinator application submitted for review.', 'success');
+        await loadCoordinatorApplication();
+      }
+    } catch (error) {
+      showToast('Could not submit your application. Please try again.', 'danger');
+    } finally {
+      submit.disabled = false;
+    }
+    });
+    form.dataset.bound = 'true';
+  }
+
+  try {
+    const data = await postAction('my_coordinator_application', {});
+    if (!data.ok) throw new Error(data.error || 'Could not load your coordinator application.');
+    if (data.approved) {
+      status.innerHTML = '<p>You already have coordinator access. <a href="staff_dashboard.php">Open your coordinator workspace</a>.</p>';
+      form.hidden = true;
+    } else if (data.has_coordinator) {
+      status.innerHTML = '<p>Your coordinator access is inactive. Please contact an administrator for assistance.</p>';
+      form.hidden = true;
+    } else if (data.application?.Status === 'Pending') {
+      status.innerHTML = '<p>Your coordinator application is awaiting administrator review.</p>';
+      form.hidden = true;
+    } else {
+      if (data.application?.Status === 'Rejected') {
+        status.innerHTML = `<p class="form-alert" style="display:block;">Your previous application was declined. Reason: ${escapeHtml(data.application.RejectionReason || 'No reason was provided.')}</p><p>You may submit a new application below.</p>`;
+      }
+      form.hidden = false;
+    }
+  } catch (error) {
+    status.textContent = error.message;
+    form.hidden = true;
+  }
+}
+
 // Unified DOM Initializer
 document.addEventListener('DOMContentLoaded', () => {
   loadCustomerDashboard();
+  loadCoordinatorApplication();
   if (typeof loadPlot === 'function') loadPlot();
   if (typeof loadCropLog === 'function') loadCropLog();
   if (document.getElementById('plot-status')) {

@@ -118,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div>
                             <strong>${escapeHtml(String(r.Qty))}x ${escapeHtml(r.Name)}</strong><br>
                             <span class="text-muted" style="font-size: 0.8em;">${dateLabel}</span>
+                            ${r.Status === 'Rejected' && r.RejectionReason ? `<p class="text-muted" style="font-size: 0.85em; margin: 4px 0 0;">Reason: ${escapeHtml(r.RejectionReason)}</p>` : ''}
                         </div>
                         <span class="badge ${badgeClass[r.Status] || 'badge-neutral'}">${escapeHtml(r.Status)}</span>
                     </div>

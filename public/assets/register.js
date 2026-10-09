@@ -3,10 +3,6 @@
 const form = document.getElementById('register-form');
 const alertEl = document.getElementById('register-alert');
 const successEl = document.getElementById('register-success');
-const roleSelect = document.getElementById('role');
-const shiftField = document.getElementById('shift-field');
-const shiftSelect = document.getElementById('shift');
-
 const firstNameInput = document.getElementById('first-name');
 const lastNameInput = document.getElementById('last-name');
 const emailInput = document.getElementById('email');
@@ -54,7 +50,6 @@ let isSubmitting = false;
 const allFieldsFilled = () => {
   const requiredValues = [
     emailInput.value.trim(),
-    roleSelect.value,
     firstNameInput.value.trim(),
     lastNameInput.value.trim(),
     ageInput.value.trim(),
@@ -62,7 +57,6 @@ const allFieldsFilled = () => {
     document.getElementById('password').value,
     document.getElementById('confirm-password').value,
   ];
-  if (roleSelect.value === 'staff' && shiftSelect) requiredValues.push(shiftSelect.value);
   return requiredValues.every(Boolean) && termsCheckbox.checked;
 };
 
@@ -79,16 +73,6 @@ form.addEventListener('change', updateSubmitState);
 window.addEventListener('load', () => setTimeout(updateSubmitState, 300));
 updateSubmitState();
 
-roleSelect.addEventListener('change', () => {
-  const isCoordinator = roleSelect.value === 'staff';
-  
-  // Toggle the entire shift row visibility
-  if (shiftField) shiftField.hidden = !isCoordinator;
-  
-  // Toggle Required Status so the form can still submit when hidden
-  if (shiftSelect) shiftSelect.required = isCoordinator;
-});
-
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   alertEl.hidden = true;
@@ -102,8 +86,6 @@ form.addEventListener('submit', async (e) => {
   const email = emailInput.value.trim();
   const password = document.getElementById('password').value;
   const confirmPassword = document.getElementById('confirm-password').value;
-  const role = roleSelect.value;
-  const shift = shiftSelect ? shiftSelect.value : 'Morning';
 
   const namePattern = /^[A-Za-z\s\-']+$/;
   if (!firstName || !namePattern.test(firstName)) {
@@ -141,13 +123,6 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
-  if (!['customer', 'staff'].includes(role)) {
-    alertEl.textContent = 'Please select a role.';
-    alertEl.hidden = false;
-    roleSelect.focus();
-    return;
-  }
-
   if (password.length < 6) {
     alertEl.textContent = 'Password must be at least 6 characters.';
     alertEl.hidden = false;
@@ -176,8 +151,6 @@ form.addEventListener('submit', async (e) => {
     email: email,
     password: password,
     confirm_password: confirmPassword,
-    role: role,
-    shift: role === 'staff' ? shift : 'Morning',
     accept_terms: '1',
   });
 
@@ -195,7 +168,7 @@ form.addEventListener('submit', async (e) => {
     if (data.ok) {
       form.reset();
       form.hidden = true;
-      successEl.textContent = "Request sent! An administrator will review your account request, and you'll be able to log in once it's approved.";
+      successEl.innerHTML = `Gardener account request submitted. An administrator will review it. <a href="application_status.php?token=${encodeURIComponent(data.status_token)}">Check your request status</a>.`;
       successEl.hidden = false;
     } else {
       alertEl.textContent = (data.errors || [data.error]).filter(Boolean).join(' ') || 'Could not submit request.';

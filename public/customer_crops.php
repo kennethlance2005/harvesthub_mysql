@@ -117,6 +117,6 @@ $navTitle = 'My Crops';
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
 <script src="assets/customer.js?v=8"></script>
-<script src="assets/plots.js?v=6"></script>
+<script src="assets/plots.js?v=7"></script>
 </body>
 </html>

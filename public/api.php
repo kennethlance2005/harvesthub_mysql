@@ -32,8 +32,9 @@
  *  ADMIN (requires admin session)
  *    GET  action=stats
  *    GET  action=accounts
- *    POST action=add_coordinator      { name, email, password, shift }
+ *    POST action=process_coordinator_application { application_id, decision, reason }
  *    POST action=delete_account       { table: gardener|coordinator, id }
+ *    POST action=send_archive_notice  { id, reason, details }
  */
 
 require_once __DIR__ . '/../db.php';
@@ -103,9 +104,11 @@ function respond(array $data, int $status = 200): void {
 
 function requireJsonRole(string $role): array {
     $user = currentUser();
-    if (!$user || $user['role'] !== $role) {
+    if (!$user || !in_array($role, $user['roles'], true)) {
         respond(['ok' => false, 'error' => 'Not authorized.'], 403);
     }
+    $user['id'] = $user['ids'][$role] ?? $user['id'];
+    $user['role'] = $role;
     return $user;
 }
 
@@ -271,10 +274,24 @@ try {
 
             $pdo->prepare("UPDATE $accountTable SET FailedLoginAttempts = 0 WHERE $attemptColumn = ?")->execute([(int) $userRecord['id']]);
 
+            $roles = [$role];
+            $ids = [$role => (int) $userRecord['id']];
+            if ($role === 'customer') {
+                $coordinator = $pdo->prepare("SELECT CoordID FROM GARDEN_COORDINATOR WHERE GardenerID = ? AND COALESCE(NULLIF(Status, ''), 'Active') = 'Active'");
+                $coordinator->execute([(int) $userRecord['id']]);
+                $coordinatorId = $coordinator->fetchColumn();
+                if ($coordinatorId !== false) {
+                    $roles[] = 'staff';
+                    $ids['staff'] = (int) $coordinatorId;
+                }
+            }
+
             $_SESSION['user'] = [
                 'role' => $role,
                 'id' => (int) $userRecord['id'],
                 'name' => $userRecord['Name'],
+                'roles' => $roles,
+                'ids' => $ids,
             ];
 
             // If checked, save the email. If unchecked, delete the cookie.
@@ -304,15 +321,6 @@ try {
             $password = $_POST['password'] ?? '';
             $confirmPassword = $_POST['confirm_password'] ?? '';
             
-            // Automatically determine role based on email domain
-            $role = 'customer'; // Default role
-            if (str_ends_with(strtolower($email), '@staff.harvesthub.com')) {
-                $role = 'staff';
-            }
-
-            // Set a default shift for coordinators
-            $shift = 'Morning';
-
             $errors = [];
             
             if ($firstName === '' || mb_strlen($firstName) > 60) {
@@ -355,9 +363,10 @@ try {
                 respond(['ok' => false, 'error' => 'That email already has an account or a pending request.'], 409);
             }
 
+            $statusToken = bin2hex(random_bytes(32));
             $pdo->prepare("
-                INSERT INTO SIGNUP_REQUEST (FirstName, LastName, Age, Location, Email, PasswordHash, Role, Shift)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO SIGNUP_REQUEST (FirstName, LastName, Age, Location, Email, PasswordHash, Role, Shift, StatusToken)
+                VALUES (?, ?, ?, ?, ?, ?, 'customer', 'Morning', ?)
             ")->execute([
                 htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8'),
                 htmlspecialchars($lastName, ENT_QUOTES, 'UTF-8'),
@@ -365,10 +374,21 @@ try {
                 htmlspecialchars($location, ENT_QUOTES, 'UTF-8'),
                 $email,
                 password_hash($password, PASSWORD_BCRYPT),
-                $role,
-                $shift,
+                hash('sha256', $statusToken),
             ]);
-            respond(['ok' => true]);
+            respond(['ok' => true, 'status_token' => $statusToken]);
+        }
+
+        case 'application_status': {
+            $token = trim($_GET['token'] ?? '');
+            if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+                respond(['ok' => false, 'error' => 'Invalid status link.'], 422);
+            }
+            $stmt = $pdo->prepare('SELECT Status, RejectionReason FROM SIGNUP_REQUEST WHERE StatusToken = ?');
+            $stmt->execute([hash('sha256', $token)]);
+            $request = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$request) respond(['ok' => false, 'error' => 'This request status link is invalid or expired.'], 404);
+            respond(['ok' => true, 'status' => $request['Status'], 'reason' => $request['RejectionReason']]);
         }
 
         // ---------------- PASSWORD RESET ----------------
@@ -848,7 +868,7 @@ try {
         case 'my_resource_requests': {
             $user = requireJsonRole('customer');
             $stmt = $pdo->prepare("
-                SELECT T.TxnID, R.Name, T.Qty, T.Status, T.RequestedAt, T.ApprovedAt, T.ReturnRequestedAt
+                SELECT T.TxnID, R.Name, T.Qty, T.Status, T.RejectionReason, T.RequestedAt, T.ApprovedAt, T.ReturnRequestedAt
                 FROM RESOURCE_TXN T JOIN RESOURCE R ON R.ResourceID = T.ResourceID
                 WHERE T.GardenerID = ? ORDER BY T.RequestedAt DESC
             ");
@@ -976,6 +996,15 @@ try {
             $exchangeStmt->execute([$user['id']]);
             $recentExchange = $exchangeStmt->fetchAll(PDO::FETCH_ASSOC);
 
+            $noticeStmt = $pdo->prepare("
+                SELECT Reason, Details, CreatedAt
+                FROM ACCOUNT_ARCHIVE_NOTICE
+                WHERE GardenerID = ?
+                ORDER BY CreatedAt DESC, NoticeID DESC
+                LIMIT 1
+            ");
+            $noticeStmt->execute([$user['id']]);
+
             respond([
                 'ok' => true,
                 'stats' => [
@@ -984,7 +1013,8 @@ try {
                     'my_listings' => $myListings
                 ],
                 'recent_logs' => $recentLogs,
-                'recent_exchange' => $recentExchange
+                'recent_exchange' => $recentExchange,
+                'archive_notice' => $noticeStmt->fetch(PDO::FETCH_ASSOC) ?: null
             ]);
         }
 
@@ -1015,8 +1045,12 @@ try {
             $user = requireJsonRole('staff');
             $appId = $_POST['app_id'] ?? '';
             $decision = $_POST['decision'] ?? '';
+            $rejectionReason = trim($_POST['reason'] ?? '');
             if (!ctype_digit((string) $appId) || !in_array($decision, ['approve', 'reject'], true)) {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
+            }
+            if ($decision === 'reject' && ($rejectionReason === '' || mb_strlen($rejectionReason) > 1000)) {
+                respond(['ok' => false, 'error' => 'Please provide a rejection reason of no more than 1,000 characters.'], 422);
             }
 
             $pdo->beginTransaction();
@@ -1046,8 +1080,8 @@ try {
                 }
 
                 $newStatus = $decision === 'approve' ? 'Approved' : 'Rejected';
-                $pdo->prepare("UPDATE PLOT_APPLICATION SET Status = ?, CoordID = ?, ProcessedAt = NOW() WHERE AppID = ?")
-                    ->execute([$newStatus, $user['id'], (int) $appId]);
+                $pdo->prepare("UPDATE PLOT_APPLICATION SET Status = ?, CoordID = ?, ProcessedAt = NOW(), RejectionReason = ? WHERE AppID = ?")
+                    ->execute([$newStatus, $user['id'], $decision === 'reject' ? $rejectionReason : null, (int) $appId]);
                 $autoRejected = 0;
 
                 if ($decision === 'approve') {
@@ -1070,8 +1104,8 @@ try {
                         $otherRequests->execute([$row['PltID'], (int) $appId]);
                         $rejectedRequests = $otherRequests->fetchAll(PDO::FETCH_ASSOC);
                         if ($rejectedRequests) {
-                            $rejectOthers = $pdo->prepare("UPDATE PLOT_APPLICATION SET Status = 'Rejected', CoordID = ?, ProcessedAt = NOW() WHERE PltID = ? AND AppID <> ? AND Status = 'Pending' AND RequestType = 'Apply'");
-                            $rejectOthers->execute([$user['id'], $row['PltID'], (int) $appId]);
+                            $rejectOthers = $pdo->prepare("UPDATE PLOT_APPLICATION SET Status = 'Rejected', CoordID = ?, ProcessedAt = NOW(), RejectionReason = ? WHERE PltID = ? AND AppID <> ? AND Status = 'Pending' AND RequestType = 'Apply'");
+                            $rejectOthers->execute([$user['id'], 'Another gardener was approved for this plot.', $row['PltID'], (int) $appId]);
                             foreach ($rejectedRequests as $rejectedRequest) {
                                 recordPlotEvent($pdo, 'Request Rejected', 'staff', $user['name'], $plot['Label'], (int) $row['PltID'], (int) $rejectedRequest['GardenerID'], $rejectedRequest['GardenerName'], (int) $user['id'], (int) $rejectedRequest['AppID']);
                             }
@@ -1166,6 +1200,11 @@ try {
                 respond(['ok' => false, 'error' => "Choose a quantity between 1 and {$requestedQty}."], 422);
             }
             $remainder = $requestedQty - $chosenQty;
+            $rejectionReason = trim($_POST['reason'] ?? '');
+            if ($decision === 'reject' && ($rejectionReason === '' || mb_strlen($rejectionReason) > 1000)) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'A rejection reason of no more than 1,000 characters is required.'], 422);
+            }
 
             if ($decision === 'approve') {
                 $res = $pdo->prepare('SELECT TotalQty FROM RESOURCE WHERE ResourceID = ? FOR UPDATE');
@@ -1213,11 +1252,11 @@ try {
                     // Leave the rest of the request pending — don't approve it.
                     $pdo->prepare('UPDATE RESOURCE_TXN SET Qty = ? WHERE TxnID = ?')
                         ->execute([$remainder, (int) $txnId]);
-                    $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, CoordID, ResourceID, Qty, Status) VALUES (?, ?, ?, ?, 'Rejected')")
-                        ->execute([(int) $row['GardenerID'], (int) $user['id'], (int) $row['ResourceID'], $chosenQty]);
+                    $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, CoordID, ResourceID, Qty, Status, RejectionReason) VALUES (?, ?, ?, ?, 'Rejected', ?)")
+                        ->execute([(int) $row['GardenerID'], (int) $user['id'], (int) $row['ResourceID'], $chosenQty, $rejectionReason]);
                 } else {
-                    $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Rejected', CoordID = ? WHERE TxnID = ?")
-                        ->execute([$user['id'], (int) $txnId]);
+                    $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Rejected', CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
+                        ->execute([$user['id'], $rejectionReason, (int) $txnId]);
                 }
             }
             $pdo->commit();
@@ -1546,7 +1585,7 @@ try {
                         $plots = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         $rejectedStmt = $pdo->prepare("
-                            SELECT PA.AppID, P.Label AS PlotName
+                            SELECT PA.AppID, P.Label AS PlotName, PA.RejectionReason
                             FROM PLOT_APPLICATION PA
                             JOIN PLOT P ON P.PltID = PA.PltID
                             WHERE PA.GardenerID = ? AND PA.Status = 'Rejected' AND PA.RequestType = 'Apply'
@@ -1605,6 +1644,7 @@ try {
                 'pending_applications' => $count("SELECT COUNT(*) FROM PLOT_APPLICATION WHERE Status = 'Pending'"),
                 'pending_resource_txns' => $count("SELECT COUNT(*) FROM RESOURCE_TXN WHERE Status = 'Requested'"),
                 'pending_signups' => $count("SELECT COUNT(*) FROM SIGNUP_REQUEST WHERE Status = 'Pending'"),
+                'pending_coordinator_applications' => $count("SELECT COUNT(*) FROM COORDINATOR_APPLICATION WHERE Status = 'Pending'"),
                 'active_listings' => $count("SELECT COUNT(*) FROM EXCHANGE_LISTING WHERE ListingID NOT IN (SELECT ListingID FROM EXCHANGE_ORDER)"),
                 'completed_trades' => $count("SELECT COUNT(*) FROM EXCHANGE_ORDER"),
             ]]);
@@ -1628,70 +1668,197 @@ try {
             respond(['ok' => true, 'requests' => $rows]);
         }
 
+        case 'my_coordinator_application': {
+            $user = requireJsonRole('customer');
+            $stmt = $pdo->prepare("
+                SELECT ApplicationID, Shift, Motivation, Status, RejectionReason, RequestedAt, ReviewedAt
+                FROM COORDINATOR_APPLICATION
+                WHERE GardenerID = ?
+                ORDER BY ApplicationID DESC LIMIT 1
+            ");
+            $stmt->execute([$user['id']]);
+            $application = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            $coordinator = $pdo->prepare("SELECT CoordID, COALESCE(NULLIF(Status, ''), 'Active') AS Status FROM GARDEN_COORDINATOR WHERE GardenerID = ?");
+            $coordinator->execute([$user['id']]);
+            $coordinatorRecord = $coordinator->fetch(PDO::FETCH_ASSOC);
+            if ($coordinatorRecord && $coordinatorRecord['Status'] === 'Active') {
+                $user['roles'] = array_values(array_unique(array_merge($user['roles'], ['staff'])));
+                $user['ids']['staff'] = (int) $coordinatorRecord['CoordID'];
+            } else {
+                $user['roles'] = array_values(array_diff($user['roles'], ['staff']));
+                unset($user['ids']['staff']);
+            }
+            $_SESSION['user']['roles'] = $user['roles'];
+            $_SESSION['user']['ids'] = $user['ids'];
+            respond([
+                'ok' => true,
+                'application' => $application,
+                'approved' => $coordinatorRecord && $coordinatorRecord['Status'] === 'Active',
+                'has_coordinator' => $coordinatorRecord !== false,
+            ]);
+        }
+
+        case 'apply_coordinator': {
+            $user = requireJsonRole('customer');
+            $shift = trim($_POST['shift'] ?? '');
+            $motivation = trim($_POST['motivation'] ?? '');
+            if (!in_array($shift, ['Morning', 'Afternoon', 'Evening'], true)
+                || mb_strlen($motivation) < 20 || mb_strlen($motivation) > 1000) {
+                respond(['ok' => false, 'error' => 'Choose a shift and explain your interest in 20–1,000 characters.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $coordinator = $pdo->prepare('SELECT CoordID FROM GARDEN_COORDINATOR WHERE GardenerID = ? FOR UPDATE');
+                $coordinator->execute([$user['id']]);
+                if ($coordinator->fetchColumn() !== false) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'You already have coordinator access.'], 409);
+                }
+                $pending = $pdo->prepare("SELECT ApplicationID FROM COORDINATOR_APPLICATION WHERE GardenerID = ? AND Status = 'Pending' FOR UPDATE");
+                $pending->execute([$user['id']]);
+                if ($pending->fetchColumn() !== false) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Your coordinator application is already under review.'], 409);
+                }
+                $pdo->prepare("INSERT INTO COORDINATOR_APPLICATION (GardenerID, Shift, Motivation) VALUES (?, ?, ?)")
+                    ->execute([$user['id'], $shift, $motivation]);
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
+            respond(['ok' => true]);
+        }
+
+        case 'pending_coordinator_applications': {
+            requireJsonRole('admin');
+            $rows = $pdo->query("
+                SELECT A.ApplicationID, A.GardenerID, A.Shift, A.Motivation, A.RequestedAt,
+                       G.Name, G.Email, G.Location
+                FROM COORDINATOR_APPLICATION A
+                JOIN COMMUNITY_GARDENER G ON G.GardenerID = A.GardenerID
+                WHERE A.Status = 'Pending'
+                ORDER BY A.RequestedAt ASC
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            respond(['ok' => true, 'applications' => $rows]);
+        }
+
+        case 'process_coordinator_application': {
+            $admin = requireJsonRole('admin');
+            $applicationId = $_POST['application_id'] ?? '';
+            $decision = $_POST['decision'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
+            if (!ctype_digit((string) $applicationId) || !in_array($decision, ['approve', 'reject'], true)
+                || ($decision === 'reject' && ($reason === '' || mb_strlen($reason) > 1000))) {
+                respond(['ok' => false, 'error' => 'A rejection reason is required and must not exceed 1,000 characters.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT A.GardenerID, A.Shift, A.Status, G.Name, G.Email, G.PasswordHash, G.Location,
+                           COALESCE(NULLIF(G.Status, ''), 'Active') AS GardenerStatus
+                    FROM COORDINATOR_APPLICATION A
+                    JOIN COMMUNITY_GARDENER G ON G.GardenerID = A.GardenerID
+                    WHERE A.ApplicationID = ? FOR UPDATE
+                ");
+                $stmt->execute([(int) $applicationId]);
+                $application = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$application || $application['Status'] !== 'Pending') {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'This coordinator application has already been reviewed.'], 409);
+                }
+                if ($decision === 'approve') {
+                    if ($application['GardenerStatus'] !== 'Active') {
+                        $pdo->rollBack();
+                        respond(['ok' => false, 'error' => 'Coordinator access cannot be granted to an inactive gardener account.'], 409);
+                    }
+                    $pdo->prepare("
+                        INSERT INTO GARDEN_COORDINATOR (GardenerID, Name, Email, PasswordHash, Shift, Location)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ")->execute([
+                        (int) $application['GardenerID'],
+                        $application['Name'],
+                        $application['Email'],
+                        $application['PasswordHash'],
+                        $application['Shift'],
+                        $application['Location'],
+                    ]);
+                }
+                $pdo->prepare("
+                    UPDATE COORDINATOR_APPLICATION
+                    SET Status = ?, RejectionReason = ?, ReviewedAt = NOW(), ReviewedBy = ?
+                    WHERE ApplicationID = ?
+                ")->execute([
+                    $decision === 'approve' ? 'Approved' : 'Rejected',
+                    $decision === 'reject' ? $reason : null,
+                    $admin['id'],
+                    (int) $applicationId,
+                ]);
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                if ($error instanceof PDOException && (int) ($error->errorInfo[1] ?? 0) === 1062) {
+                    respond(['ok' => false, 'error' => 'Coordinator access could not be granted because this email is already assigned to another coordinator.'], 409);
+                }
+                throw $error;
+            }
+            respond(['ok' => true]);
+        }
+
         case 'process_signup': {
             $user = requireJsonRole('admin');
             $requestId = $_POST['request_id'] ?? '';
             $decision = $_POST['decision'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
             if (!ctype_digit((string) $requestId) || !in_array($decision, ['approve', 'reject'], true)) {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
             }
-
-            $stmt = $pdo->prepare("SELECT * FROM SIGNUP_REQUEST WHERE RequestID = ?");
-            $stmt->execute([(int) $requestId]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!$row || $row['Status'] !== 'Pending') respond(['ok' => false, 'error' => 'Already processed.'], 409);
-
-            if ($decision === 'approve') {
-                // Re-check the email hasn't been taken since the request came in.
-                $table = $row['Role'] === 'staff' ? 'GARDEN_COORDINATOR' : 'COMMUNITY_GARDENER';
-                $dupe = $pdo->prepare("SELECT 1 FROM $table WHERE Email = ?");
-                $dupe->execute([$row['Email']]);
-                if ($dupe->fetchColumn()) {
-                    respond(['ok' => false, 'error' => 'That email is already in use.'], 409);
-                }
-
-                $name = trim($row['FirstName'] . ' ' . $row['LastName']);
-                try {
-                    if ($row['Role'] === 'staff') {
-                        $pdo->prepare("INSERT INTO GARDEN_COORDINATOR (Name, Email, PasswordHash, Shift, Location) VALUES (?, ?, ?, ?, ?)")
-                            ->execute([$name, $row['Email'], $row['PasswordHash'], $row['Shift'], $row['Location']]);
-                    } else {
-                        $pdo->prepare("INSERT INTO COMMUNITY_GARDENER (Name, Email, PasswordHash, Age, Location) VALUES (?, ?, ?, ?, ?)")
-                            ->execute([$name, $row['Email'], $row['PasswordHash'], $row['Age'], $row['Location']]);
-                    }
-                } catch (PDOException $e) {
-                    respond(['ok' => false, 'error' => 'That email is already in use.'], 409);
-                }
+            if ($decision === 'reject' && ($reason === '' || mb_strlen($reason) > 1000)) {
+                respond(['ok' => false, 'error' => 'Please provide a rejection reason of no more than 1,000 characters.'], 422);
             }
 
-            $newStatus = $decision === 'approve' ? 'Approved' : 'Rejected';
-            $pdo->prepare("UPDATE SIGNUP_REQUEST SET Status = ?, ReviewedAt = NOW(), ReviewedBy = ? WHERE RequestID = ?")
-                ->execute([$newStatus, $user['id'], (int) $requestId]);
-
-            respond(['ok' => true]);
-        }
-
-        case 'add_coordinator': {
-            requireJsonRole('admin');
-            $name = trim($_POST['name'] ?? '');
-            $email = trim($_POST['email'] ?? '');
-            $password = $_POST['password'] ?? '';
-            $shift = trim($_POST['shift'] ?? 'Morning');
-            $location = trim($_POST['location'] ?? 'Not provided');
-
-            $errors = [];
-            if ($name === '' || mb_strlen($name) > 80) $errors[] = 'Name is required.';
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'A valid email is required.';
-            if (mb_strlen($password) < 6) $errors[] = 'Password must be at least 6 characters.';
-            if (!in_array($shift, ['Morning', 'Afternoon', 'Evening'], true)) $errors[] = 'Invalid shift.';
-            if ($errors) respond(['ok' => false, 'errors' => $errors], 422);
-
+            $pdo->beginTransaction();
             try {
-                $pdo->prepare("INSERT INTO GARDEN_COORDINATOR (Name, Email, PasswordHash, Shift, Location) VALUES (?, ?, ?, ?, ?)")
-                    ->execute([htmlspecialchars($name, ENT_QUOTES, 'UTF-8'), $email, password_hash($password, PASSWORD_BCRYPT), $shift, $location]);
-            } catch (PDOException $e) {
-                respond(['ok' => false, 'error' => 'That email is already in use.'], 409);
+                $stmt = $pdo->prepare("SELECT * FROM SIGNUP_REQUEST WHERE RequestID = ? FOR UPDATE");
+                $stmt->execute([(int) $requestId]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$row || $row['Status'] !== 'Pending') {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'This registration request has already been reviewed.'], 409);
+                }
+                if ($decision === 'approve') {
+                    $dupe = $pdo->prepare("
+                        SELECT 1 FROM COMMUNITY_GARDENER WHERE Email = ?
+                        UNION SELECT 1 FROM GARDEN_COORDINATOR WHERE Email = ?
+                        UNION SELECT 1 FROM SYSTEM_ADMINISTRATOR WHERE Email = ?
+                    ");
+                    $dupe->execute([$row['Email'], $row['Email'], $row['Email']]);
+                    if ($dupe->fetchColumn()) {
+                        $pdo->rollBack();
+                        respond(['ok' => false, 'error' => 'That email is already in use.'], 409);
+                    }
+                    $name = trim($row['FirstName'] . ' ' . $row['LastName']);
+                    $pdo->prepare("INSERT INTO COMMUNITY_GARDENER (Name, Email, PasswordHash, Age, Location) VALUES (?, ?, ?, ?, ?)")
+                        ->execute([$name, $row['Email'], $row['PasswordHash'], $row['Age'], $row['Location']]);
+                }
+                $pdo->prepare("UPDATE SIGNUP_REQUEST SET Status = ?, RejectionReason = ?, ReviewedAt = NOW(), ReviewedBy = ? WHERE RequestID = ?")
+                    ->execute([
+                        $decision === 'approve' ? 'Approved' : 'Rejected',
+                        $decision === 'reject' ? $reason : null,
+                        $user['id'],
+                        (int) $requestId,
+                    ]);
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                if ($error instanceof PDOException && (int) ($error->errorInfo[1] ?? 0) === 1062) {
+                    respond(['ok' => false, 'error' => 'That email is already in use.'], 409);
+                }
+                throw $error;
             }
+
             respond(['ok' => true]);
         }
 
@@ -1763,9 +1930,42 @@ try {
                 $gardenerName = null;
                 $assignedPlots = [];
                 if ($table === 'gardener') {
-                    $gardener = $pdo->prepare('SELECT Name FROM COMMUNITY_GARDENER WHERE GardenerID = ?');
+                    $reason = trim($_POST['reason'] ?? '');
+                    $details = trim($_POST['details'] ?? '');
+                    $allowedReasons = ['Inactive account', 'Spam or abuse', 'Policy violation', 'Other'];
+                    if (!in_array($reason, $allowedReasons, true) || $details === '' || mb_strlen($details) > 1000) {
+                        $pdo->rollBack();
+                        respond(['ok' => false, 'error' => 'Choose a valid reason and explain it in 1,000 characters or fewer.'], 422);
+                    }
+
+                    $gardener = $pdo->prepare("SELECT Name FROM COMMUNITY_GARDENER WHERE GardenerID = ? AND Status <> 'Archived' FOR UPDATE");
                     $gardener->execute([$idNum]);
-                    $gardenerName = $gardener->fetchColumn() ?: null;
+                    $gardenerName = $gardener->fetchColumn();
+                    if ($gardenerName === false) {
+                        $pdo->rollBack();
+                        respond(['ok' => false, 'error' => 'Gardener not found or already archived.'], 404);
+                    }
+
+                    $activePlots = $pdo->prepare("SELECT PltID FROM PLOT WHERE GardenerID = ? AND Status = 'Occupied' FOR UPDATE");
+                    $activePlots->execute([$idNum]);
+                    $hasActivePlots = $activePlots->fetchColumn() !== false;
+                    $borrowedResources = $pdo->prepare("
+                        SELECT TxnID
+                        FROM RESOURCE_TXN
+                        WHERE GardenerID = ? AND Status IN ('Approved', 'Return Requested')
+                        FOR UPDATE
+                    ");
+                    $borrowedResources->execute([$idNum]);
+                    $hasBorrowedResources = $borrowedResources->fetchColumn() !== false;
+                    if ($hasActivePlots || $hasBorrowedResources) {
+                        $pdo->rollBack();
+                        respond(['ok' => false, 'error' => 'Resolve active plots and borrowed resources before archiving.'], 409);
+                    }
+
+                    $pdo->prepare("
+                        INSERT INTO ACCOUNT_ARCHIVE_NOTICE (GardenerID, AdminID, Reason, Details)
+                        VALUES (?, ?, ?, ?)
+                    ")->execute([$idNum, (int) $user['id'], $reason, $details]);
                     $plotsStmt = $pdo->prepare('SELECT PltID, Label FROM PLOT WHERE GardenerID = ? FOR UPDATE');
                     $plotsStmt->execute([$idNum]);
                     $assignedPlots = $plotsStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1778,6 +1978,42 @@ try {
                         recordPlotEvent($pdo, 'Plot Unassigned', 'admin', $user['name'], $plot['Label'], (int) $plot['PltID'], $idNum, $gardenerName, (int) $user['id']);
                     }
                 }
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
+
+            respond(['ok' => true]);
+        }
+
+        case 'send_archive_notice': {
+            $user = requireJsonRole('admin');
+            $id = $_POST['id'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
+            $details = trim($_POST['details'] ?? '');
+            $allowedReasons = ['Inactive account', 'Spam or abuse', 'Policy violation', 'Other'];
+            if (!ctype_digit((string) $id) || (int) $id < 1 || !in_array($reason, $allowedReasons, true)) {
+                respond(['ok' => false, 'error' => 'Invalid request.'], 422);
+            }
+            if ($details === '' || mb_strlen($details) > 1000) {
+                respond(['ok' => false, 'error' => 'Explain the reason in 1,000 characters or fewer.'], 422);
+            }
+
+            $gardenerId = (int) $id;
+            $pdo->beginTransaction();
+            try {
+                $gardenerStmt = $pdo->prepare("SELECT 1 FROM COMMUNITY_GARDENER WHERE GardenerID = ? AND Status <> 'Archived' FOR UPDATE");
+                $gardenerStmt->execute([$gardenerId]);
+                if (!$gardenerStmt->fetchColumn()) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Gardener not found or already archived.'], 404);
+                }
+
+                $pdo->prepare("
+                    INSERT INTO ACCOUNT_ARCHIVE_NOTICE (GardenerID, AdminID, Reason, Details)
+                    VALUES (?, ?, ?, ?)
+                ")->execute([$gardenerId, (int) $user['id'], $reason, $details]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -1816,9 +2052,20 @@ try {
             $details = ['profile' => [], 'plots' => [], 'listings' => [], 'borrowed' => []];
 
             if ($table === 'gardener') {
+                $details['archiveNotice'] = null;
                 $stmt = $pdo->prepare("SELECT Name, Email, Age, Location FROM COMMUNITY_GARDENER WHERE GardenerID = ?");
                 $stmt->execute([$id]);
                 $details['profile'] = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                $stmt = $pdo->prepare("
+                    SELECT Reason, Details
+                    FROM ACCOUNT_ARCHIVE_NOTICE
+                    WHERE GardenerID = ?
+                    ORDER BY CreatedAt DESC, NoticeID DESC
+                    LIMIT 1
+                ");
+                $stmt->execute([$id]);
+                $details['archiveNotice'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
                 $stmt = $pdo->prepare("SELECT Label FROM PLOT WHERE GardenerID = ? AND Status = 'Occupied'");
                 $stmt->execute([$id]);
@@ -1832,7 +2079,7 @@ try {
                     SELECT R.Name, T.Qty 
                     FROM RESOURCE_TXN T 
                     JOIN RESOURCE R ON T.ResourceID = R.ResourceID 
-                    WHERE T.GardenerID = ? AND T.Status = 'Approved'
+                    WHERE T.GardenerID = ? AND T.Status IN ('Approved', 'Return Requested')
                 ");
                 $stmt->execute([$id]);
                 $details['borrowed'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1854,7 +2101,18 @@ try {
 
         case 'archived_accounts': {
             requireJsonRole('admin');
-            $gardeners = $pdo->query("SELECT GardenerID AS id, Name, Email, 'Customer' as Role, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location, '—' as Shift FROM COMMUNITY_GARDENER WHERE Status = 'Archived'");
+            $gardeners = $pdo->query("
+                SELECT G.GardenerID AS id, G.Name, G.Email, 'Customer' AS Role,
+                       COALESCE(NULLIF(G.Location, ''), 'Not provided') AS Location,
+                       '—' AS Shift, N.Reason AS ArchiveReason, N.Details AS ArchiveDetails
+                FROM COMMUNITY_GARDENER G
+                LEFT JOIN ACCOUNT_ARCHIVE_NOTICE N ON N.NoticeID = (
+                    SELECT MAX(N2.NoticeID)
+                    FROM ACCOUNT_ARCHIVE_NOTICE N2
+                    WHERE N2.GardenerID = G.GardenerID
+                )
+                WHERE G.Status = 'Archived'
+            ");
             $coords = $pdo->query("SELECT CoordID AS id, Name, Email, 'Staff' as Role, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location, Shift FROM GARDEN_COORDINATOR WHERE Status = 'Archived'");
             $admins = $pdo->query("SELECT AdminID AS id, Name, Email, 'Admin' as Role, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location, '—' as Shift FROM SYSTEM_ADMINISTRATOR WHERE Status = 'Archived'");
             

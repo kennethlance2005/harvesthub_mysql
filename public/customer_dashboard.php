@@ -39,6 +39,45 @@ $navTitle = 'Gardener Dashboard';
         <p class="text-muted">Here is your high-level overview for today.</p>
       </div>
 
+      <section class="panel" id="archive-notice-panel" hidden aria-live="polite"
+        style="margin-bottom: 24px; border: 1px solid #c98a32; background: #fff8e8;">
+        <h2 style="margin-top: 0;">Important account notice</h2>
+        <p style="margin-bottom: 6px;">Your account will be archived for this reason unless the issue is resolved:</p>
+        <p><strong id="archive-notice-reason"></strong></p>
+        <p id="archive-notice-details" style="white-space: pre-wrap;"></p>
+        <p style="margin-bottom: 8px;">To resolve this, please return borrowed items and request unassignment of any plots assigned to you.</p>
+        <p style="margin-bottom: 0;">
+          <a href="customer_inventory.php">Go to Resource Inventory</a>
+          <span aria-hidden="true"> · </span>
+          <a href="customer_plots.php">Go to My Plots</a>
+        </p>
+      </section>
+
+      <?php if (hasRole('staff')): ?>
+      <section class="panel" style="margin-bottom: 24px;">
+        <h2 style="margin-top: 0;">Coordinator workspace</h2>
+        <p>You have coordinator access as well as your gardener account.</p>
+        <a class="btn btn-accent btn-sm" href="staff_dashboard.php">Open coordinator dashboard</a>
+      </section>
+      <?php else: ?>
+      <section class="panel" id="coordinator-application-panel" style="margin-bottom: 24px;" hidden>
+        <h2 style="margin-top: 0;">Apply to become a garden coordinator</h2>
+        <div id="coordinator-application-status" aria-live="polite"></div>
+        <form id="coordinator-application-form">
+          <label for="coordinator-shift">Preferred shift</label>
+          <select id="coordinator-shift" name="shift" required>
+            <option value="Morning">Morning</option>
+            <option value="Afternoon">Afternoon</option>
+            <option value="Evening">Evening</option>
+          </select>
+          <label for="coordinator-motivation">Why would you like to coordinate?</label>
+          <textarea id="coordinator-motivation" name="motivation" minlength="20" maxlength="1000" rows="4" required></textarea>
+          <p class="text-muted">Please write at least 20 characters. An administrator will review your application.</p>
+          <button class="btn btn-accent" type="submit">Submit application</button>
+        </form>
+      </section>
+      <?php endif; ?>
+
       <!-- Top Row: KPI Cards -->
       <div class="grid grid-3" style="margin-bottom: 32px;">
         <div class="panel">
@@ -85,6 +124,6 @@ $navTitle = 'Gardener Dashboard';
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
-<script src="assets/customer.js?v=5"></script>
+<script src="assets/customer.js?v=8"></script>
 </body>
 </html>

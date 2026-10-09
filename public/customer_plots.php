@@ -76,6 +76,6 @@ $navTitle = 'My Plots';
   </div>
 </div>
 <script src="assets/app.js"></script>
-<script src="assets/plots.js?v=6"></script>
+<script src="assets/plots.js?v=7"></script>
 </body>
 </html>

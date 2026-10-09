@@ -148,7 +148,7 @@ async function loadArchivedAccounts() {
   const data = await res.json();
   
   if (!data.ok || data.accounts.length === 0) {
-    table.innerHTML = '<tr class="archived-empty-row"><td colspan="6" class="text-muted">No archived accounts found.</td></tr>';
+    table.innerHTML = '<tr class="archived-empty-row"><td colspan="7" class="text-muted">No archived accounts found.</td></tr>';
     return;
   }
 
@@ -161,6 +161,9 @@ async function loadArchivedAccounts() {
         <td data-label="Role">${escapeHtml(displayRole)}</td>
         <td data-label="Location">${escapeHtml(a.Location)}</td>
         <td data-label="Shift">${escapeHtml(a.Shift)}</td>
+        <td data-label="Archive reason" class="archive-reason-cell">${a.ArchiveReason
+          ? `<strong class="archive-reason-title">${escapeHtml(a.ArchiveReason)}</strong><span class="archive-reason-details">${escapeHtml(a.ArchiveDetails || '')}</span>`
+          : '<span class="text-muted">Not recorded</span>'}</td>
         <td data-label="Actions">
           <button type="button" class="btn btn-accent btn-sm unarchive-btn" data-role="${a.Role}" data-id="${a.id}">Unarchive</button>
         </td>
@@ -196,12 +199,49 @@ async function loadArchivedAccounts() {
 
 // ---------- Pending Account Requests ----------
 
+function requestAdminRejectionReason(title) {
+  const modal = document.getElementById('admin-reason-modal');
+  const titleEl = document.getElementById('admin-reason-title');
+  const input = document.getElementById('admin-reason-input');
+  const form = document.getElementById('admin-reason-form');
+  if (!modal || !titleEl || !input || !form) {
+    return Promise.reject(new Error('The rejection-reason dialog is unavailable.'));
+  }
+  titleEl.textContent = title;
+  input.value = '';
+  modal.hidden = false;
+  modal.style.display = 'grid';
+  input.focus();
+  return new Promise(resolve => {
+    const finish = reason => {
+      modal.hidden = true;
+      modal.style.display = '';
+      form.removeEventListener('submit', submit);
+      document.getElementById('admin-reason-cancel').removeEventListener('click', cancel);
+      resolve(reason);
+    };
+    const submit = event => {
+      event.preventDefault();
+      const reason = input.value.trim();
+      if (!reason) {
+        input.setCustomValidity('Please provide a reason.');
+        input.reportValidity();
+        return;
+      }
+      input.setCustomValidity('');
+      finish(reason);
+    };
+    const cancel = () => finish(null);
+    input.addEventListener('input', () => input.setCustomValidity(''), { once: true });
+    form.addEventListener('submit', submit);
+    document.getElementById('admin-reason-cancel').addEventListener('click', cancel);
+  });
+}
+
 async function loadSignupRequests() {
   const gardenersTable = document.getElementById('pending-gardeners-table');
-  const coordsTable = document.getElementById('pending-coordinators-table');
   
-  // If neither table is on the page, don't fetch data
-  if (!gardenersTable && !coordsTable) return;
+  if (!gardenersTable) return;
 
   const res = await fetch('api.php?action=pending_signups');
   const data = await res.json();
@@ -213,7 +253,6 @@ async function loadSignupRequests() {
       <td data-label="Email">${escapeHtml(r.Email)}</td>
       <td data-label="Age">${escapeHtml(String(r.Age))}</td>
       <td data-label="Location">${escapeHtml(r.Location)}</td>
-      ${r.Role === 'staff' ? `<td data-label="Shift">${escapeHtml(r.Shift || 'Morning')}</td>` : ''}
       <td data-label="Actions" class="text-right" style="white-space: nowrap;">
         <button class="btn btn-sm approve-signup" style="background: var(--green-700); color: var(--white);" data-id="${r.RequestID}">Approve</button>
         <button class="btn btn-sm reject-signup" style="background: var(--danger); color: var(--white);" data-id="${r.RequestID}">Reject</button>
@@ -221,43 +260,31 @@ async function loadSignupRequests() {
     </tr>
   `;
 
-  if (gardenersTable) {
-    const gardeners = data.requests.filter(r => r.Role !== 'staff');
-    const emptyEl = document.getElementById('pending-gardeners-empty');
-    if (gardeners.length === 0) {
-      gardenersTable.innerHTML = '';
-      if (emptyEl) emptyEl.hidden = false;
-    } else {
-      if (emptyEl) emptyEl.hidden = true;
-      gardenersTable.innerHTML = gardeners.map(renderRow).join('');
-    }
-  }
-
-  if (coordsTable) {
-    const coords = data.requests.filter(r => r.Role === 'staff');
-    const emptyEl = document.getElementById('pending-coordinators-empty');
-    if (coords.length === 0) {
-      coordsTable.innerHTML = '';
-      if (emptyEl) emptyEl.hidden = false;
-    } else {
-      if (emptyEl) emptyEl.hidden = true;
-      coordsTable.innerHTML = coords.map(renderRow).join('');
-    }
+  const emptyEl = document.getElementById('pending-gardeners-empty');
+  if (data.requests.length === 0) {
+    gardenersTable.innerHTML = '';
+    if (emptyEl) emptyEl.hidden = false;
+  } else {
+    if (emptyEl) emptyEl.hidden = true;
+    gardenersTable.innerHTML = data.requests.map(renderRow).join('');
   }
 
   document.querySelectorAll('.approve-signup').forEach(btn => {
     btn.addEventListener('click', () => processSignup(btn.dataset.id, 'approve'));
   });
   document.querySelectorAll('.reject-signup').forEach(btn => {
-    btn.addEventListener('click', () => processSignup(btn.dataset.id, 'reject'));
+    btn.addEventListener('click', async () => {
+      const reason = await requestAdminRejectionReason('Why is this registration being declined?');
+      if (reason) processSignup(btn.dataset.id, 'reject', reason);
+    });
   });
 }
 
-async function processSignup(requestId, decision) {
+async function processSignup(requestId, decision, reason = '') {
   const res = await fetch('api.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ action: 'process_signup', request_id: requestId, decision }),
+    body: new URLSearchParams({ action: 'process_signup', request_id: requestId, decision, reason }),
   });
   const data = await res.json();
   if (data.ok) {
@@ -270,6 +297,56 @@ async function processSignup(requestId, decision) {
   }
 }
 
+async function loadCoordinatorApplications() {
+  const table = document.getElementById('pending-coordinator-applications-table');
+  if (!table) return;
+  const res = await fetch('api.php?action=pending_coordinator_applications');
+  const data = await res.json();
+  if (!data.ok) {
+    showToast(data.error || 'Could not load coordinator applications.', 'danger');
+    return;
+  }
+  const empty = document.getElementById('pending-coordinator-applications-empty');
+  table.innerHTML = data.applications.map(app => `
+    <tr>
+      <td data-label="Name">${escapeHtml(app.Name)}</td>
+      <td data-label="Email">${escapeHtml(app.Email)}</td>
+      <td data-label="Location">${escapeHtml(app.Location || 'Not provided')}</td>
+      <td data-label="Shift">${escapeHtml(app.Shift)}</td>
+      <td data-label="Motivation">${escapeHtml(app.Motivation)}</td>
+      <td data-label="Actions" class="text-right" style="white-space: nowrap;">
+        <button class="btn btn-sm approve-coordinator-application" data-id="${app.ApplicationID}">Approve</button>
+        <button class="btn btn-sm reject-coordinator-application" data-id="${app.ApplicationID}">Reject</button>
+      </td>
+    </tr>
+  `).join('');
+  if (empty) empty.hidden = data.applications.length > 0;
+  table.querySelectorAll('.approve-coordinator-application').forEach(btn =>
+    btn.addEventListener('click', () => processCoordinatorApplication(btn.dataset.id, 'approve')));
+  table.querySelectorAll('.reject-coordinator-application').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      const reason = await requestAdminRejectionReason('Why is this coordinator application being declined?');
+      if (reason) processCoordinatorApplication(btn.dataset.id, 'reject', reason);
+    }));
+}
+
+async function processCoordinatorApplication(applicationId, decision, reason = '') {
+  const res = await fetch('api.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'process_coordinator_application', application_id: applicationId, decision, reason }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showToast(`Coordinator application ${decision === 'approve' ? 'approved' : 'declined'}.`, 'success');
+    loadCoordinatorApplications();
+    loadAccounts();
+    loadStats();
+  } else {
+    showToast(data.error || 'Could not process coordinator application.', 'danger');
+  }
+}
+
 // ---------- Delete confirmation modal ----------
 
 const deleteModal = document.getElementById('delete-modal');
@@ -277,11 +354,14 @@ const deleteModalBody = document.getElementById('delete-modal-body');
 const deleteModalTitle = document.getElementById('delete-modal-title');
 const deleteCancelBtn = document.getElementById('delete-cancel');
 const deleteConfirmBtn = document.getElementById('delete-confirm');
+const deleteNoticeBtn = document.getElementById('delete-notice');
 let pendingDelete = null;
 
 async function openDeleteModal(table, id, name) {
   if (!deleteModal) return; 
   pendingDelete = { table, id };
+  if (deleteConfirmBtn) deleteConfirmBtn.hidden = false;
+  if (deleteNoticeBtn) deleteNoticeBtn.hidden = true;
   
   // Reset modal state to loading
   if (deleteModalTitle) deleteModalTitle.textContent = `Archive ${name}?`;
@@ -308,6 +388,7 @@ async function openDeleteModal(table, id, name) {
   const d = data.details;
   let html = ``;
   let canArchive = true;
+  const archiveNotice = d.archiveNotice || null;
 
   // 1. Basic Information Block (Shown for everyone)
   if (d.profile) {
@@ -333,7 +414,7 @@ async function openDeleteModal(table, id, name) {
          canArchive = false;
          html += `
          <div class="form-alert" style="margin-top: 0; margin-bottom: 18px; padding: 14px;">
-            <strong>Cannot Archive:</strong> This gardener currently possesses unreturned tools. They must return these items before archiving is permitted:
+            <strong>Cannot Archive:</strong> This gardener currently possesses unreturned tools. Ask them to return these items:
             <ul style="margin: 8px 0 0; padding-left: 20px;">
                ${d.borrowed.map(i => `<li>${escapeHtml(i.Name)} (Qty:${i.Qty})</li>`).join('')}
             </ul>
@@ -345,7 +426,7 @@ async function openDeleteModal(table, id, name) {
          canArchive = false;
          html += `
          <div class="form-alert" style="margin-top: 0; margin-bottom: 18px; padding: 14px;">
-            <strong>Cannot Archive:</strong> This user owns active plots and must be unassigned from them before archiving is permitted:
+            <strong>Cannot Archive:</strong> This user owns active plots. Ask them to request plot unassignment:
             <ul style="margin: 8px 0 0; padding-left: 20px;">
                ${d.plots.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
             </ul>
@@ -364,6 +445,27 @@ async function openDeleteModal(table, id, name) {
      }
   }
 
+  if (table === 'gardener') {
+     const reasons = ['Inactive account', 'Spam or abuse', 'Policy violation', 'Other'];
+     html += `
+       <div class="archive-notice-form">
+         <label for="archive-notice-reason"><strong>Reason for proposed archive</strong></label>
+         <select id="archive-notice-reason" required>
+           <option value="">Choose a reason</option>
+           ${reasons.map(reason => `<option value="${reason}" ${archiveNotice && archiveNotice.Reason === reason ? 'selected' : ''}>${reason}</option>`).join('')}
+         </select>
+         <label for="archive-notice-details"><strong>Explain why</strong></label>
+         <textarea id="archive-notice-details" rows="3" maxlength="1000" required
+           placeholder="Explain the reason and what the gardener should do next."
+           >${archiveNotice ? escapeHtml(archiveNotice.Details) : ''}</textarea>
+         <p class="text-muted archive-notice-hint">
+           ${canArchive
+             ? 'This reason will be recorded with the archived account.'
+             : 'The gardener will be asked to return borrowed items and request plot unassignment.'}
+         </p>
+       </div>`;
+  }
+
   // Final permissive text if they pass the guardrails
   if (canArchive) {
      html += `<p style="margin: 0; font-size: 0.95rem; color: var(--ink-600);">They will lose login access, but their past records will remain intact.</p>`;
@@ -373,6 +475,11 @@ async function openDeleteModal(table, id, name) {
          deleteConfirmBtn.disabled = false;
          deleteConfirmBtn.style.opacity = '1'; 
          deleteConfirmBtn.style.cursor = 'pointer';
+     }
+  } else {
+     if (deleteConfirmBtn) deleteConfirmBtn.hidden = true;
+     if (deleteNoticeBtn && table === 'gardener') {
+         deleteNoticeBtn.hidden = false;
      }
   }
 
@@ -399,12 +506,23 @@ if (deleteConfirmBtn) {
     deleteConfirmBtn.addEventListener('click', async () => {
       if (!pendingDelete) return;
       const { table, id } = pendingDelete;
+      const params = { action: 'archive_account', table, id };
+      if (table === 'gardener') {
+        const reasonInput = document.getElementById('archive-notice-reason');
+        const detailsInput = document.getElementById('archive-notice-details');
+        params.reason = reasonInput ? reasonInput.value : '';
+        params.details = detailsInput ? detailsInput.value.trim() : '';
+        if (!params.reason || !params.details) {
+          showToast('Choose a reason and explain why this account should be archived.', 'danger');
+          return;
+        }
+      }
       closeDeleteModal();
 
       const res = await fetch('api.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ action: 'archive_account', table, id }),
+        body: new URLSearchParams(params),
       });
       const data = await res.json();
       if (data.ok) {
@@ -416,59 +534,40 @@ if (deleteConfirmBtn) {
     });
 }
 
-// ---------- Archived Accounts Logic ----------
-async function loadArchivedAccounts() {
-  const table = document.getElementById('archived-table');
-  if (!table) return; // Only run on the archived page
+if (deleteNoticeBtn) {
+    deleteNoticeBtn.addEventListener('click', async () => {
+      if (!pendingDelete || pendingDelete.table !== 'gardener') return;
+      const reasonInput = document.getElementById('archive-notice-reason');
+      const detailsInput = document.getElementById('archive-notice-details');
+      const reason = reasonInput ? reasonInput.value : '';
+      const details = detailsInput ? detailsInput.value.trim() : '';
+      if (!reason || !details) {
+        showToast('Choose a reason and explain the notice.', 'danger');
+        return;
+      }
 
-  const res = await fetch('api.php?action=archived_accounts');
-  const data = await res.json();
-  
-  if (!data.ok || data.accounts.length === 0) {
-    table.innerHTML = '<tr class="archived-empty-row"><td colspan="6" class="text-muted">No archived accounts found.</td></tr>';
-    return;
-  }
+      const { id } = pendingDelete;
+      deleteNoticeBtn.disabled = true;
 
-  table.innerHTML = data.accounts.map(a => {
-    const displayRole = a.Role === 'Customer' ? 'Gardener' : a.Role;
-    return `
-      <tr data-name="${escapeHtml(a.Name)}">
-        <td data-label="Name">${escapeHtml(a.Name)}</td>
-        <td data-label="Email">${escapeHtml(a.Email)}</td>
-        <td data-label="Role">${escapeHtml(displayRole)}</td>
-        <td data-label="Location">${escapeHtml(a.Location)}</td>
-        <td data-label="Shift">${escapeHtml(a.Shift)}</td>
-        <td data-label="Actions">
-          <button type="button" class="btn btn-accent btn-sm unarchive-btn" data-role="${a.Role}" data-id="${a.id}">Unarchive</button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-
-  // Re-apply any active search filter immediately after table loads
-  const searchInput = document.getElementById('search-archived');
-  if (searchInput && searchInput.value) {
-    filterTableByName('search-archived', 'archived-table');
-  }
-
-  document.querySelectorAll('.unarchive-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      const res = await fetch('api.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ action: 'unarchive_account', role: btn.dataset.role, id: btn.dataset.id })
-      });
-      const result = await res.json();
-      if (result.ok) {
-        showToast('Account successfully unarchived and restored.', 'success');
-        loadArchivedAccounts();
-      } else {
-        showToast(result.error || 'Failed to unarchive.', 'danger');
-        btn.disabled = false;
+      try {
+        const res = await fetch('api.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ action: 'send_archive_notice', id, reason, details }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('Account archive notice sent to the gardener.', 'success');
+          closeDeleteModal();
+        } else {
+          showToast(data.error || 'Could not send archive notice.', 'danger');
+        }
+      } catch (error) {
+        showToast('Could not send archive notice. Please try again.', 'danger');
+      } finally {
+        deleteNoticeBtn.disabled = false;
       }
     });
-  });
 }
 
 // Clean table sorting helper using direct element reference
@@ -604,6 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadStats();
   loadAccounts();
   loadSignupRequests();
+  loadCoordinatorApplications();
   loadArchivedAccounts();
   renderActivityGraph();
 

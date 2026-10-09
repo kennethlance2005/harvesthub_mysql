@@ -229,7 +229,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             seenPlotRejections.add(appId);
-            showToast(`Your request for ${application.PlotName} was rejected. You can request another available plot.`, 'danger');
+            const reason = application.RejectionReason ? ` Reason: ${application.RejectionReason}` : '';
+            showToast(`Your request for ${application.PlotName} was declined.${reason} You can request another available plot.`, 'danger');
         });
     }
     

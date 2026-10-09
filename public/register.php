@@ -14,7 +14,7 @@ if ($user = currentUser()) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=24">
+<link rel="stylesheet" href="assets/style.css?v=25">
 </head>
 <body>
 <div class="login-shell">
@@ -29,22 +29,14 @@ if ($user = currentUser()) {
 
     <form id="register-form" novalidate>
 
-      <!-- Row 1: The Trigger -->
-      <div class="field-row">
+      <!-- Row 1: Email -->
+      <div class="field-row field-row-single">
         <div class="field">
           <label for="email">Email Address <span class="required">*</span></label>
           <input type="email" id="email" name="email" autocomplete="email" aria-describedby="email-reqs" required>
           <ul id="email-reqs" class="password-reqs" aria-live="polite">
             <li id="email-req" class="invalid">Enter a valid email address</li>
           </ul>
-        </div>
-        <div class="field">
-          <label for="role">I am a... <span class="required">*</span></label>
-          <select id="role" name="role" required>
-            <option value="" disabled selected style="background: #1e3a2b; color: #fff;">Select a role&hellip;</option>
-            <option value="customer" style="background: #1e3a2b; color: #fff;">Community Gardener</option>
-            <option value="staff" style="background: #1e3a2b; color: #fff;">Garden Coordinator</option>
-          </select>
         </div>
       </div>
 
@@ -60,7 +52,7 @@ if ($user = currentUser()) {
         </div>
       </div>
 
-      <!-- Row 3: Age & Location (Standard) / Age & Shift (Coordinator) -->
+      <!-- Row 3: Age & Location -->
       <div class="field-row">
         <div class="field">
           <label for="age">Age <span class="required">*</span></label>
@@ -94,18 +86,7 @@ if ($user = currentUser()) {
         </div>
       </div>
 
-      <!-- Row 4: Dynamic Coordinator Shift (Appears below Location if selected) -->
-      <div class="field-row" id="shift-field" hidden>
-        <div class="field" style="grid-column: 1 / -1;">
-          <label for="shift">Coordinator Shift <span class="required">*</span></label>
-          <select id="shift" name="shift">
-            <option value="Morning" style="background: #1e3a2b; color: #fff;">Morning</option>
-            <option value="Afternoon" style="background: #1e3a2b; color: #fff;">Afternoon</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Row 5: Security -->
+      <!-- Row 4: Security -->
       <div class="field-row">
         <div class="field">
           <label for="password">Password <span class="required">*</span></label>
@@ -145,6 +126,6 @@ if ($user = currentUser()) {
   </div>
 </div>
 
-<script src="assets/register.js?v=6"></script>
+<script src="assets/register.js?v=7"></script>
 </body>
 </html>

@@ -11,6 +11,13 @@
       <a href="staff_plots.php" class="sidebar-link <?= $currentPage === 'staff_plots.php' ? 'active' : '' ?>">Plots</a>
       <a href="staff_inventory.php" class="sidebar-link <?= $currentPage === 'staff_inventory.php' ? 'active' : '' ?>">Inventory</a>
       <a href="staff_records.php" class="sidebar-link <?= $currentPage === 'staff_records.php' ? 'active' : '' ?>">Records</a>
+      <?php if (hasRole('customer')): ?>
+      <a href="customer_dashboard.php" class="sidebar-link <?= $currentPage === 'customer_dashboard.php' ? 'active' : '' ?>">Gardener Dashboard</a>
+      <a href="customer_crops.php" class="sidebar-link <?= $currentPage === 'customer_crops.php' ? 'active' : '' ?>">My Crops</a>
+      <a href="customer_plots.php" class="sidebar-link <?= $currentPage === 'customer_plots.php' ? 'active' : '' ?>">My Plots</a>
+      <a href="customer_inventory.php" class="sidebar-link <?= $currentPage === 'customer_inventory.php' ? 'active' : '' ?>">Resource Inventory</a>
+      <a href="customer_exchange.php" class="sidebar-link <?= $currentPage === 'customer_exchange.php' ? 'active' : '' ?>">Exchange Board</a>
+      <?php endif; ?>
     </nav>
     <div class="sidebar-footer" id="coordinatorSidebarLogout"><a href="logout.php" class="sidebar-link coordinator-logout">Log Out</a></div>
   </div>

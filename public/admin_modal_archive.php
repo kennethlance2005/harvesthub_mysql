@@ -6,6 +6,7 @@
     </div>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" id="delete-cancel">Cancel</button>
+      <button type="button" class="btn btn-ghost" id="delete-notice" hidden>Notify Gardener</button>
       <button type="button" class="btn btn-accent" id="delete-confirm" style="background: var(--brown-600);">Archive</button>
     </div>
   </div>

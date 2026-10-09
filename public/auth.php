@@ -11,15 +11,27 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 function currentUser(): ?array {
-    return $_SESSION['user'] ?? null;
+    $user = $_SESSION['user'] ?? null;
+    if (!$user) return null;
+
+    $user['roles'] = $user['roles'] ?? [$user['role']];
+    $user['ids'] = $user['ids'] ?? [$user['role'] => $user['id']];
+    return $user;
+}
+
+function hasRole(string $role): bool {
+    $user = currentUser();
+    return $user !== null && in_array($role, $user['roles'], true);
 }
 
 function requireRole(string $role): array {
     $user = currentUser();
-    if (!$user || $user['role'] !== $role) {
+    if (!$user || !in_array($role, $user['roles'], true)) {
         header('Location: login.php');
         exit;
     }
+    $user['id'] = $user['ids'][$role] ?? $user['id'];
+    $user['role'] = $role;
     return $user;
 }
 
