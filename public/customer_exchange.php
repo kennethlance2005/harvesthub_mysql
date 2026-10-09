@@ -12,95 +12,98 @@ $navTitle = 'Exchange Board';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=24">
+<link rel="stylesheet" href="assets/style.css?v=29">
 </head>
 <body class="account-page">
 
 <div class="app-layout">
-  
+
   <?php include __DIR__ . '/customer_sidebar.php'; ?>
 
   <div class="main-content">
-    <main class="wrap exchange-page" id="top" style="max-width: 1200px; padding-top: 32px;">
+    <main class="wrap gardener-page exchange-page" id="top">
 
-      <div class="exchange-layout">
-        
-        <!-- WIDE LEFT COLUMN: Community Exchange Feed (flex: 3) -->
-        <div class="exchange-feed-column">
-          
-          <div class="board-panel">
-            <div class="board-head" style="margin-bottom: 24px; padding: 0 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
-              <div>
-                <h2 style="margin-bottom: 8px;">Community Exchange</h2>
-                <p class="text-muted" style="margin: 0;">Trade surplus crops, seeds, or homemade goods with other gardeners.</p>
-              </div>
-              
-              <input type="search" id="search-exchange" placeholder="Search produce..." style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; width: 220px;">
-            </div>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Share the harvest</p>
+          <h1>Community Exchange</h1>
+          <p class="text-muted">Trade surplus crops, seeds, or homemade goods with other gardeners.</p>
+        </div>
+      </header>
 
-            <div class="panel" style="padding: 0 24px;">
-              <div id="exchange-feed-list" class="scroll-y" aria-live="polite" style="max-height: 600px;">
-                  <p class="empty-state">Loading exchange feed...</p>
-              </div>
+      <div class="ex-layout">
+
+        <!-- WIDE LEFT COLUMN: Community Exchange Feed -->
+        <section class="panel ex-card" aria-labelledby="exchange-feed-title">
+          <div class="ex-card-head">
+            <div>
+              <h2 class="panel-title" id="exchange-feed-title">Available now</h2>
+              <p class="ex-card-sub">Claim something you'd like and arrange a pickup with the grower.</p>
             </div>
+            <input type="search" id="search-exchange" class="ex-search" placeholder="Search produce..." aria-label="Search produce">
           </div>
 
-        </div>
+          <div id="exchange-feed-list" aria-live="polite">
+            <p class="ex-empty">Loading exchange feed...</p>
+          </div>
+        </section>
 
-        <!-- NARROW RIGHT COLUMN: My Listings & Post Form (flex: 1) -->
-        <div class="exchange-sidebar">
-          
+        <!-- NARROW RIGHT COLUMN: Post Form, My Listings, Requests -->
+        <div class="ex-side">
+
           <!-- Create Listing Form -->
-          <div class="board-panel" style="padding: 24px;">
-            <h2 style="font-size: 1.25rem; margin-bottom: 8px;">Post an Item</h2>
-            <p class="text-muted" style="margin-bottom: 16px; font-size: 0.9rem;">Have extra harvest? List it here.</p>
-            
-            <form id="add-exchange-form" style="display: flex; flex-direction: column; gap: 12px;" novalidate>
-              
-              <label class="sr-only" for="exchange-item">Select a harvested crop <span class="required">*</span></label>
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <select id="exchange-item" style="flex: 1; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;" required>
+          <section class="panel ex-card" aria-labelledby="post-item-title">
+            <h2 class="panel-title" id="post-item-title">Post an item</h2>
+            <p class="ex-card-sub">Have extra harvest? List it here.</p>
+
+            <form id="add-exchange-form" class="ex-form" novalidate>
+              <div class="field">
+                <label for="exchange-item">Harvested crop <span class="required">*</span></label>
+                <select id="exchange-item" required>
                   <option value="" selected disabled>Loading harvested crops...</option>
                 </select>
-                <span class="required" aria-hidden="true">*</span>
+                <small id="exchange-crop-hint" class="ex-hint">Only crops marked as Harvested in My Crops can be listed.</small>
               </div>
-              
-              <!-- Split Quantity: Full width container with flex spacing -->
-              <div style="display: flex; gap: 8px; width: 100%;">
-                <input type="number" id="exchange-qty-num" placeholder="Qty (e.g., 2.5)" step="any" min="0.1"
-                    aria-label="Quantity" style="flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 28px 8px 8px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
-                <span class="required" aria-hidden="true">*</span>
-                <select id="exchange-qty-unit"
-                    aria-label="Quantity unit" style="width: 110px; flex-shrink: 0; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;" required>
+
+              <div class="ex-form-row">
+                <div class="field">
+                  <label for="exchange-qty-num">Quantity <span class="required">*</span></label>
+                  <input type="number" id="exchange-qty-num" placeholder="e.g., 2.5" step="any" min="0.1" required>
+                </div>
+                <div class="field">
+                  <label for="exchange-qty-unit">Unit <span class="required">*</span></label>
+                  <select id="exchange-qty-unit" required>
                     <option value="pcs">pcs</option>
                     <option value="kg">kg</option>
                     <option value="g">g</option>
                     <option value="bundles">bundles</option>
-                </select>
-                <span class="required" aria-hidden="true">*</span>
-            </div>
+                  </select>
+                </div>
+              </div>
 
-              <textarea id="exchange-desc" placeholder="Details (Optional)" rows="2" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; resize: none;"></textarea>
-              <button type="submit" class="btn btn-accent" style="width: 100%; padding: 10px; margin-top: 4px;">Post to Board</button>
+              <div class="field">
+                <label for="exchange-desc">Details <span class="field-optional">(optional)</span></label>
+                <textarea id="exchange-desc" placeholder="e.g., Freshly picked, pesticide-free" rows="2"></textarea>
+              </div>
+              <button type="submit" class="btn btn-accent btn-block">Post to board</button>
             </form>
-        </div>
+          </section>
 
           <!-- My Active Listings -->
-          <div class="board-panel" style="padding: 24px;">
-            <h2 style="font-size: 1.25rem; margin-bottom: 16px;">My Active Listings</h2>
-            
-            <div id="my-exchange-list" class="scroll-y" style="max-height: 300px; padding-right: 8px;" aria-live="polite">
-              <p class="empty-state">Loading your listings...</p>
+          <section class="panel ex-card" aria-labelledby="my-listings-title">
+            <h2 class="panel-title" id="my-listings-title">My active listings</h2>
+            <div id="my-exchange-list" class="ex-list" aria-live="polite">
+              <p class="ex-empty">Loading your listings...</p>
             </div>
-          </div>
+          </section>
 
           <!-- Pending Requests (Action Needed) -->
-          <div class="board-panel" style="padding: 24px;">
-            <h2 style="font-size: 1.25rem; margin-bottom: 16px;">Pending Requests</h2>
-            <div id="pending-claims-list" class="scroll-y" style="max-height: 300px; padding-right: 8px;" aria-live="polite">
-              <p class="empty-state">Loading requests...</p>
+          <section class="panel ex-card" aria-labelledby="pending-claims-title">
+            <h2 class="panel-title" id="pending-claims-title">Requests for my items</h2>
+            <div id="pending-claims-list" class="ex-list" aria-live="polite">
+              <p class="ex-empty">Loading requests...</p>
             </div>
-          </div>
+          </section>
 
         </div>
 
@@ -111,33 +114,33 @@ $navTitle = 'Exchange Board';
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<!-- Claim Request Modal Overlay -->
-<div id="claim-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; padding: 16px;">
-  <div class="board-panel" style="padding: 24px; width: 100%; max-width: 420px; background: #fff; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-    <h3 style="margin-bottom: 16px; font-size: 1.25rem;">Request to Claim</h3>
-    
-    <form id="submit-claim-form" style="display: flex; flex-direction: column; gap: 16px;" novalidate>
+<!-- Claim Request Modal Overlay (shown by exchange.js) -->
+<div id="claim-modal" class="gardener-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="claim-modal-title">
+  <div class="gardener-modal-box gardener-modal-form">
+    <h3 id="claim-modal-title">Request to claim</h3>
+
+    <form id="submit-claim-form" class="ex-form" novalidate>
       <!-- Hidden input to remember which post is being claimed -->
       <input type="hidden" id="claim-post-id">
-      
-      <div>
-        <label for="claim-qty" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; color: #475569;">Quantity Wanted <span class="required">*</span></label>
-        <input type="text" id="claim-qty" placeholder="e.g., 2 pcs, 1 kg" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
+
+      <div class="field">
+        <label for="claim-qty">Quantity wanted <span class="required">*</span></label>
+        <input type="text" id="claim-qty" placeholder="e.g., 2 pcs, 1 kg" required>
       </div>
-      
-      <div>
-        <label for="claim-pickup" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; color: #475569;">Preferred Pickup Details <span class="required">*</span></label>
-        <textarea id="claim-pickup" placeholder="e.g., Tomorrow at 10 AM by the main gate" rows="3" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 4px; resize: none;" required></textarea>
+
+      <div class="field">
+        <label for="claim-pickup">Preferred pickup details <span class="required">*</span></label>
+        <textarea id="claim-pickup" placeholder="e.g., Tomorrow at 10 AM by the main gate" rows="3" required></textarea>
       </div>
-      
-      <div class="claim-modal-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
-        <button type="button" class="btn btn-ghost" id="cancel-claim-btn" style="border: 1px solid #cbd5e1;">Cancel</button>
-        <button type="submit" class="btn btn-accent">Send Request</button>
+
+      <div class="gardener-modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancel-claim-btn">Cancel</button>
+        <button type="submit" class="btn btn-accent">Send request</button>
       </div>
     </form>
   </div>
 </div>
 <script src="assets/app.js"></script>
-<script src="assets/exchange.js?v=2"></script>
+<script src="assets/exchange.js?v=3"></script>
 </body>
 </html>

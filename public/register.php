@@ -14,7 +14,7 @@ if ($user = currentUser()) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=25">
+<link rel="stylesheet" href="assets/style.css?v=29">
 </head>
 <body>
 <div class="login-shell">
@@ -126,6 +126,7 @@ if ($user = currentUser()) {
   </div>
 </div>
 
+<script src="assets/password-toggle.js?v=1"></script>
 <script src="assets/register.js?v=7"></script>
 </body>
 </html>

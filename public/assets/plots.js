@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadPlots() {
         const listEl = document.getElementById('plots-list');
         if (listEl) {
-            listEl.innerHTML = '<p class="empty-state">Loading your garden plots...</p>';
+            listEl.innerHTML = '<p class="crops-empty">Loading your garden log...</p>';
         }
 
         try {
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (data.plots.length === 0) {
-                listEl.innerHTML = '<p class="empty-state">You have not logged any crops yet.</p>';
+                listEl.innerHTML = '<p class="crops-empty">You have not logged any crops yet. Use <strong>Log a crop</strong> to add your first planting.</p>';
                 return;
             }
 
@@ -50,28 +50,26 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (filteredPlots.length === 0) {
-                listEl.innerHTML = '<p class="empty-state">No crops in this category yet.</p>';
+                listEl.innerHTML = '<p class="crops-empty">No crops in this category yet.</p>';
                 return;
             }
 
             listEl.innerHTML = filteredPlots.map(p => {
-                let badgeClass = 'badge-neutral';
-                if (p.Status === 'Harvested') badgeClass = 'badge-brown';
+                const badgeClass = { Planted: 'badge-green', Harvested: 'badge-brown' }[p.Status] || 'badge-neutral';
 
                 return `
-                <div class="plot-item" data-search="${escapeHtml(p.CropName).toLowerCase()}" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid #e2e8f0;">
-                    <div style="flex: 1; padding-right: 16px;">
-                        <div style="margin-bottom: 4px;">
-                            <strong style="font-size: 1.1rem;">${escapeHtml(p.CropName)}</strong>
-                            <span class="badge ${badgeClass}" style="margin-left: 8px; font-size: 0.75rem;">${escapeHtml(p.Status)}</span>
+                <div class="plot-item crop-row" data-search="${escapeHtml(p.CropName).toLowerCase()}">
+                    <div class="crop-row-main">
+                        <div class="crop-row-title">
+                            <strong>${escapeHtml(p.CropName)}</strong>
+                            <span class="badge ${badgeClass}">${escapeHtml(p.Status)}</span>
                         </div>
-                        <div style="font-size: 0.85rem; color: #475569; margin-bottom: 8px;">
-                            <strong>Planted:</strong> ${new Date(p.PlantedDate).toLocaleDateString()}
-                        </div>
-                        ${p.Notes ? `<p style="margin: 0; font-size: 0.85rem; color: #64748b; font-style: italic;">"${escapeHtml(p.Notes)}"</p>` : ''}
+                        <span class="crop-row-meta">Planted ${escapeHtml(formatShortDate(p.PlantedDate))}</span>
+                        ${p.Notes ? `<p class="crop-row-notes">${escapeHtml(p.Notes)}</p>` : ''}
                     </div>
-                    <div>
-                        <select class="status-dropdown" data-id="${p.PlotID}" style="padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;">
+                    <div class="crop-row-actions">
+                        <label class="sr-only" for="crop-status-${Number(p.PlotID)}">Status of ${escapeHtml(p.CropName)}</label>
+                        <select class="status-dropdown" id="crop-status-${Number(p.PlotID)}" data-id="${p.PlotID}">
                             <option value="Planted" ${p.Status === 'Planted' ? 'selected' : ''}>Planted</option>
                             <option value="Harvested" ${p.Status === 'Harvested' ? 'selected' : ''}>Harvested</option>
                             <option value="Failed" ${p.Status === 'Failed' ? 'selected' : ''}>Failed</option>
@@ -100,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (typeof loadCropLog === 'function') loadCropLog();
                             loadPlots(); 
                         } else {
-                            if (typeof showToast === 'function') showToast(result.error || 'Failed to update status.', 'error');
+                            if (typeof showToast === 'function') showToast(result.error || 'Failed to update status.', 'danger');
                         }
                     } catch (err) {
                         console.error('Error updating status:', err);
@@ -117,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (err) {
             console.error("Error loading plots:", err);
-            document.getElementById('plots-list').innerHTML = '<p class="empty-state" style="color: #d9534f;">Failed to load crops.</p>';
+            document.getElementById('plots-list').innerHTML = '<p class="crops-empty crops-error">Failed to load crops.</p>';
         }
     }
 
@@ -141,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!cropName || !plantedDate) {
                 if (typeof showToast === 'function') {
-                    showToast('Crop name and planted date are required.', 'error');
+                    showToast('Crop name and planted date are required.', 'danger');
                 }
                 return;
             }
@@ -151,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const listEl = document.getElementById('plots-list');
             if (listEl) {
-                listEl.innerHTML = '<p class="empty-state">Saving crop...</p>';
+                listEl.innerHTML = '<p class="crops-empty">Saving crop...</p>';
             }
 
             try {
@@ -172,11 +170,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     addForm.reset();
                     await loadPlots();
                 } else {
-                    if (typeof showToast === 'function') showToast(result.error || 'Failed to log crop.', 'error');
+                    if (typeof showToast === 'function') showToast(result.error || 'Failed to log crop.', 'danger');
                 }
             } catch (err) {
                 console.error("Error logging crop:", err);
-                if (typeof showToast === 'function') showToast('Network error while saving crop.', 'error');
+                if (typeof showToast === 'function') showToast('Network error while saving crop.', 'danger');
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Log Crop';
@@ -191,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const term = e.target.value.toLowerCase();
             document.querySelectorAll('.plot-item').forEach(item => {
                 const itemName = item.getAttribute('data-search');
-                item.style.display = itemName.includes(term) ? 'flex' : 'none';
+                item.hidden = !itemName.includes(term);
             });
         });
     }
@@ -253,8 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
             gridEl.innerHTML = '';
 
             if (!Array.isArray(data.plots) || data.plots.length === 0) {
-                gridEl.innerHTML = '<p class="text-muted" style="grid-column: span 4; text-align: center;">No community plots available right now.</p>';
-                if (assignedListEl) assignedListEl.innerHTML = '<p class="text-muted">You do not have any assigned plots.</p>';
+                gridEl.innerHTML = '<p class="plt-empty">No community plots available right now.</p>';
+                if (assignedListEl) assignedListEl.innerHTML = '<p class="plt-empty">You do not have a plot yet. Pick an available plot on the map to request one.</p>';
                 return;
             }
 
@@ -270,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${plot.UnassignmentPending ? 'Request pending' : 'Request unassignment'}
                         </button>
                     </article>
-                `).join('') : '<p class="text-muted">You do not have any assigned plots.</p>';
+                `).join('') : '<p class="plt-empty">You do not have a plot yet. Pick an available plot on the map to request one.</p>';
 
                 assignedListEl.querySelectorAll('.request-unassignment-btn:not(:disabled)').forEach(button => {
                     button.addEventListener('click', () => requestPlotUnassignment(button.dataset.plotId, button));
@@ -308,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Error loading map:", err);
             const gridEl = document.getElementById('garden-map-grid');
             if (gridEl) {
-                gridEl.innerHTML = '<p class="text-muted" style="grid-column: span 4; text-align: center;">Failed to load community map.</p>';
+                gridEl.innerHTML = '<p class="plt-empty">Failed to load community map.</p>';
             }
         }
     }
@@ -375,13 +373,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 plotModal.style.display = 'none';
                 loadMap(); // Refresh map to show it turn yellow (Pending)
             } else {
-                if (typeof showToast === 'function') showToast(result.error || 'Failed to request plot.', 'error');
+                if (typeof showToast === 'function') showToast(result.error || 'Failed to request plot.', 'danger');
             }
         } catch (err) {
             console.error("Error requesting plot:", err);
         } finally {
             btn.disabled = false;
-            btn.textContent = 'Send Request';
+            btn.textContent = 'Send request';
         }
     });
 

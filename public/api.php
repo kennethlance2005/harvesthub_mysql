@@ -20,6 +20,7 @@
  *    POST action=croplog_create       -> add a crop log entry
  *    GET  action=resources            -> resource catalogue + availability
  *    POST action=resource_request     -> request a resource
+ *    POST action=cancel_resource_request -> cancel a still-pending request
  *    GET  action=my_resource_requests -> the gardener's own requests
  *
  *  STAFF (requires staff session)
@@ -812,16 +813,21 @@ try {
         // ---------------- CUSTOMER: Resources ----------------
 
         case 'resources': {
-            requireJsonRole('customer');
-            $rows = $pdo->query("
+            $user = requireJsonRole('customer');
+            $stmt = $pdo->prepare("
                 SELECT R.ResourceID, R.Name, R.TotalQty,
                        GREATEST(0, R.TotalQty - COALESCE((
                            SELECT SUM(T.Qty) FROM RESOURCE_TXN T
                            WHERE T.ResourceID = R.ResourceID AND T.Status IN ('Approved', 'Return Requested')
-                       ), 0)) AS AvailableQty
+                       ), 0)) AS AvailableQty,
+                       COALESCE((
+                           SELECT SUM(T.Qty) FROM RESOURCE_TXN T
+                           WHERE T.ResourceID = R.ResourceID AND T.GardenerID = ? AND T.Status = 'Requested'
+                       ), 0) AS MyPendingQty
                 FROM RESOURCE R ORDER BY R.Name
-            ")->fetchAll(PDO::FETCH_ASSOC);
-            respond(['ok' => true, 'resources' => $rows]);
+            ");
+            $stmt->execute([$user['id']]);
+            respond(['ok' => true, 'resources' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         }
 
         case 'resource_request': {
@@ -848,20 +854,33 @@ try {
                 respond(['ok' => false, 'error' => 'Not enough of that resource available.'], 409);
             }
 
-            // If this gardener already has a pending request for the same resource,
-            // combine the new quantity into it instead of creating a second request.
+            // Only one pending request per resource: the gardener must cancel the
+            // existing one before asking for a different quantity.
             $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Requested' FOR UPDATE");
             $existing->execute([$user['id'], (int) $resourceId]);
-            $existingTxnId = $existing->fetchColumn();
-
-            if ($existingTxnId) {
-                $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = Qty + ? WHERE TxnID = ?")
-                    ->execute([(int) $qty, (int) $existingTxnId]);
-            } else {
-                $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, ResourceID, Qty, Status) VALUES (?, ?, ?, 'Requested')")
-                    ->execute([$user['id'], (int) $resourceId, (int) $qty]);
+            if ($existing->fetchColumn()) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'You already have a pending request for this item. Cancel it first if you need a different quantity.'], 409);
             }
+
+            $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, ResourceID, Qty, Status) VALUES (?, ?, ?, 'Requested')")
+                ->execute([$user['id'], (int) $resourceId, (int) $qty]);
             $pdo->commit();
+            respond(['ok' => true]);
+        }
+
+        case 'cancel_resource_request': {
+            $user = requireJsonRole('customer');
+            $txnId = $_POST['txn_id'] ?? '';
+            if (!ctype_digit((string) $txnId)) {
+                respond(['ok' => false, 'error' => 'Invalid request.'], 422);
+            }
+
+            $stmt = $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Cancelled' WHERE TxnID = ? AND GardenerID = ? AND Status = 'Requested'");
+            $stmt->execute([(int) $txnId, $user['id']]);
+            if ($stmt->rowCount() === 0) {
+                respond(['ok' => false, 'error' => 'This request can no longer be cancelled. It may have already been processed.'], 409);
+            }
             respond(['ok' => true]);
         }
 

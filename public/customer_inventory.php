@@ -12,7 +12,7 @@ $navTitle = 'Resource Inventory';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=24">
+<link rel="stylesheet" href="assets/style.css?v=29">
 </head>
 <body class="account-page">
 
@@ -23,78 +23,75 @@ $navTitle = 'Resource Inventory';
 
   <!-- Main Workspace -->
   <div class="main-content">
-    <main class="wrap customer-inventory-page" id="top" style="max-width: 1200px; padding-top: 32px;">
+    <main class="wrap gardener-page inv-page" id="top">
 
-      <div class="inventory-layout">
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Tools &amp; supplies</p>
+          <h1>Resource Inventory</h1>
+          <p class="text-muted">Borrow community tools and materials, and keep track of what you have.</p>
+        </div>
+      </header>
+
+      <div class="inv-layout">
         
-        <!-- WIDE LEFT COLUMN: Catalog & Inventory (flex: 3) -->
-        <div class="inventory-primary">
+        <!-- WIDE LEFT COLUMN: Catalog & Inventory -->
+        <div class="inv-primary">
           
-          <!-- Top Left: Resource Catalog -->
-          <div class="board-panel">
-            <!-- Padding comes from .inventory-head-aligned so the header controls line up with the list buttons -->
-            <div class="board-head inventory-head-aligned" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
+          <!-- Resource Catalog -->
+          <section class="panel inv-card">
+            <div class="inv-card-head">
               <div>
-                <h2 style="margin-bottom: 8px;">Resource Catalog</h2>
-                <p class="text-muted" style="margin: 0;">Request community tools or garden materials directly from this list.</p>
+                <h2 class="panel-title">Resource catalog</h2>
+                <p class="inv-card-sub">Request community tools or garden materials.</p>
               </div>
-              
-              <!-- Search Bar: Catalog (Automatically pushed right by space-between) -->
-              <input type="search" id="search-catalog" placeholder="Search catalog..." style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; width: 220px;">
+              <input type="search" id="search-catalog" class="inv-search" placeholder="Search catalog..." aria-label="Search catalog">
             </div>
 
-            <div class="panel" style="padding: 0 24px;">
-              <div id="inventory-list" class="scroll-y" aria-live="polite" style="max-height: 400px;">
-                  <p class="empty-state">Loading inventory data...</p>
-              </div>
+            <div id="inventory-list" class="inv-list" aria-live="polite">
+              <p class="inv-empty">Loading inventory data...</p>
             </div>
-          </div>
+          </section>
 
-          <!-- Bottom Left: My Inventory -->
-          <div class="board-panel">
-            <!-- Padding comes from .inventory-head-aligned so the header controls line up with the list buttons -->
-            <div class="board-head inventory-head-aligned" style="margin-bottom: 24px;">
-              <h2 style="margin-bottom: 16px;">My Inventory</h2>
-              
-              <!-- Toolbar Row: Search & Add Item -->
-              <div class="inventory-toolbar" style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
-                
-                <!-- Search Bar: Inventory -->
-                <input type="search" id="search-inventory" placeholder="Search my items..." style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; width: 220px;">
-                
-                <!-- Add Personal Item Form -->
-                <form id="add-personal-form" style="display: flex; gap: 8px; align-items: center;" novalidate>
-                  <input type="text" id="personal-item-name" aria-label="Item name" placeholder="E.g., Pruning Shears" style="padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 4px; width: 200px;" required>
-                  <span class="required" aria-hidden="true">*</span>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                      <input type="number" id="personal-item-qty" aria-label="Quantity" min="1" value="1" style="width: 55px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;" required>
-                      <span class="required" aria-hidden="true">*</span>
-                      <span style="font-weight: 600; color: #64748b; font-size: 0.9rem;">x</span>
-                  </div>
-                  <button type="submit" class="btn btn-accent btn-sm inventory-action-btn">Add Item</button>
-                </form>
-
+          <!-- My Inventory -->
+          <section class="panel inv-card">
+            <div class="inv-card-head">
+              <div>
+                <h2 class="panel-title">My inventory</h2>
+                <p class="inv-card-sub">Items you borrowed plus your own tools.</p>
               </div>
+              <input type="search" id="search-inventory" class="inv-search" placeholder="Search my items..." aria-label="Search my items">
             </div>
 
-            <div class="panel" style="padding: 0 24px;">
-              <div id="my-inventory-list" class="scroll-y" aria-live="polite" style="max-height: 300px;">
-                  <p class="empty-state">Loading your inventory...</p>
+            <!-- Add Personal Item Form -->
+            <form id="add-personal-form" class="inv-add-form" novalidate>
+              <div class="inv-add-field inv-add-name">
+                <label for="personal-item-name">Add your own item <span class="required">*</span></label>
+                <input type="text" id="personal-item-name" placeholder="E.g., Pruning Shears" maxlength="100" required>
               </div>
+              <div class="inv-add-field inv-add-qty">
+                <label for="personal-item-qty">Qty <span class="required">*</span></label>
+                <input type="number" id="personal-item-qty" min="1" value="1" required>
+              </div>
+              <button type="submit" class="btn btn-accent btn-sm inv-btn">Add item</button>
+            </form>
+
+            <div id="my-inventory-list" class="inv-list" aria-live="polite">
+              <p class="inv-empty">Loading your inventory...</p>
             </div>
-          </div>
+          </section>
 
         </div>
 
-        <!-- NARROW RIGHT COLUMN: My Requests (flex: 1) -->
-        <div class="post-panel inventory-requests">
-          <h2 style="font-size: 1.25rem; margin-bottom: 8px;">My Requests</h2>
-          <p class="panel-hint" style="margin-bottom: 16px;">Track your ongoing approvals.</p>
+        <!-- NARROW RIGHT COLUMN: My Requests -->
+        <aside class="panel inv-card inv-requests">
+          <h2 class="panel-title">My requests</h2>
+          <p class="inv-card-sub">Requests waiting for a coordinator.</p>
           
-          <div id="my-requests-list" class="scroll-y" style="max-height: 600px; padding-right: 8px;" aria-live="polite">
-            <p class="empty-state">Loading your requests...</p>
+          <div id="my-requests-list" aria-live="polite">
+            <p class="inv-empty">Loading your requests...</p>
           </div>
-        </div>
+        </aside>
 
       </div>
 
@@ -106,7 +103,6 @@ $navTitle = 'Resource Inventory';
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
 <script src="assets/app.js"></script>
-<!-- Bumped version number to guarantee the new layout scripts load -->
-<script src="assets/inventory.js?v=8"></script>
+<script src="assets/inventory.js?v=10"></script>
 </body>
 </html>

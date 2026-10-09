@@ -111,22 +111,26 @@ async function loadCropLog() {
   if (!el || !data.ok) return;
 
   if (data.logs.length === 0) {
-    el.innerHTML = '<p class="text-muted" style="font-size: 0.88rem;">No entries yet.</p>';
+    el.innerHTML = '<p class="crops-empty">No maintenance entries yet. Use <strong>Log maintenance</strong> to record care or a harvest.</p>';
     return;
   }
 
-  el.innerHTML = data.logs.map(log => `
+  el.innerHTML = data.logs.map(log => {
+    const details = [
+      log.Label ? escapeHtml(log.Label) : '',
+      log.GardenPlantedDate ? `Planted ${escapeHtml(formatShortDate(log.GardenPlantedDate))}` : '',
+    ].filter(Boolean).join(' · ');
+    return `
     <article class="maintenance-log-entry">
       <div class="maintenance-log-entry-head">
         <strong>${escapeHtml(log.CropName)}</strong>
-        <time class="text-muted">${escapeHtml(log.LoggedAt)}</time>
+        <time class="text-muted" datetime="${escapeHtml(log.LoggedAt)}">${escapeHtml(formatShortDateTime(log.LoggedAt))}</time>
       </div>
-      ${log.GardenPlantedDate ? `<p class="maintenance-log-plot">Planted ${new Date(`${log.GardenPlantedDate}T00:00:00`).toLocaleDateString()}</p>` : ''}
-      ${log.Label ? `<p class="maintenance-log-plot">${escapeHtml(log.Label)}</p>` : ''}
+      ${details ? `<p class="maintenance-log-plot">${details}</p>` : ''}
       ${log.MaintenanceNotes ? `<p class="maintenance-log-notes">${escapeHtml(log.MaintenanceNotes)}</p>` : ''}
       ${log.HarvestYield ? `<p class="maintenance-log-yield"><strong>Yield:</strong> ${escapeHtml(log.HarvestYield)}</p>` : ''}
-    </article>
-  `).join('');
+    </article>`;
+  }).join('');
 }
 
 const croplogForm = document.getElementById('croplog-form');
@@ -251,6 +255,22 @@ if (plotBtn) {
 
 // ---------- Customer Dashboard Overview Loader ----------
 
+// "2026-09-27 18:37:39" or "2026-09-27" -> "Sep 27, 2026"
+function formatShortDate(value) {
+  if (!value) return '';
+  const date = new Date(String(value).includes(' ') ? value.replace(' ', 'T') : `${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// "2026-09-27 18:37:39" -> "Sep 27, 2026 · 6:37 PM"
+function formatShortDateTime(value) {
+  if (!value) return '';
+  const date = new Date(String(value).replace(' ', 'T'));
+  if (Number.isNaN(date.getTime())) return value;
+  return `${formatShortDate(value)} · ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+}
+
 async function loadCustomerDashboard() {
   const kpiPlots = document.getElementById('kpi-plots');
   if (!kpiPlots) return; // Exit if not on customer_dashboard.php
@@ -276,16 +296,16 @@ async function loadCustomerDashboard() {
     const logsContainer = document.getElementById('recent-logs-list');
     if (logsContainer) {
       if (data.recent_logs.length === 0) {
-        logsContainer.innerHTML = '<p class="text-muted" style="font-size:0.85rem; padding:12px 0;">No maintenance logged yet.</p>';
+        logsContainer.innerHTML = '<p class="dash-empty">No maintenance logged yet. <a href="customer_crops.php">Log your first crop</a>.</p>';
       } else {
         logsContainer.innerHTML = data.recent_logs.map(log => `
-          <div style="border-bottom: 1px solid var(--line, #e2e8f0); padding: 8px 0;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+          <div class="dash-list-item">
+            <div class="dash-list-row">
               <strong>${escapeHtml(log.CropName)}</strong>
-              <span class="text-muted" style="font-size: 0.75rem;">${escapeHtml(log.LoggedAt.split(' ')[0])}</span>
+              <span class="dash-list-date">${escapeHtml(formatShortDate(log.LoggedAt))}</span>
             </div>
-            ${log.GardenPlantedDate ? `<div class="text-muted" style="font-size: 0.75rem;">Planted ${new Date(`${log.GardenPlantedDate}T00:00:00`).toLocaleDateString()}</div>` : ''}
-            ${log.MaintenanceNotes ? `<div class="text-muted" style="font-size: 0.8rem;">${escapeHtml(log.MaintenanceNotes)}</div>` : ''}
+            ${log.GardenPlantedDate ? `<div class="dash-list-meta">Planted ${escapeHtml(formatShortDate(log.GardenPlantedDate))}</div>` : ''}
+            ${log.MaintenanceNotes ? `<div class="dash-list-meta">${escapeHtml(log.MaintenanceNotes)}</div>` : ''}
           </div>
         `).join('');
       }
@@ -295,15 +315,15 @@ async function loadCustomerDashboard() {
     const exchangeContainer = document.getElementById('recent-exchange-list');
     if (exchangeContainer) {
       if (data.recent_exchange.length === 0) {
-        exchangeContainer.innerHTML = '<p class="text-muted" style="font-size:0.85rem; padding:12px 0;">No active exchange listings right now.</p>';
+        exchangeContainer.innerHTML = '<p class="dash-empty">No active exchange listings right now.</p>';
       } else {
         exchangeContainer.innerHTML = data.recent_exchange.map(item => `
-          <div style="border-bottom: 1px solid var(--line, #e2e8f0); padding: 8px 0;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+          <div class="dash-list-item">
+            <div class="dash-list-row">
               <strong>${escapeHtml(item.ProduceName)}</strong>
-              <span class="badge badge-neutral" style="font-size: 0.75rem;">${escapeHtml(item.Qty)}</span>
+              <span class="badge badge-neutral">${escapeHtml(item.Qty)}</span>
             </div>
-            ${item.Description ? `<div class="text-muted" style="font-size: 0.8rem;">${escapeHtml(item.Description)}</div>` : ''}
+            ${item.Description ? `<div class="dash-list-meta">${escapeHtml(item.Description)}</div>` : ''}
           </div>
         `).join('');
       }
@@ -358,7 +378,7 @@ async function loadCoordinatorApplication() {
       form.hidden = true;
     } else {
       if (data.application?.Status === 'Rejected') {
-        status.innerHTML = `<p class="form-alert" style="display:block;">Your previous application was declined. Reason: ${escapeHtml(data.application.RejectionReason || 'No reason was provided.')}</p><p>You may submit a new application below.</p>`;
+        status.innerHTML = `<p class="form-alert dash-status-alert" style="display:block;">Your previous application was declined. Reason: ${escapeHtml(data.application.RejectionReason || 'No reason was provided.')}</p><p>You may submit a new application below.</p>`;
       }
       form.hidden = false;
     }

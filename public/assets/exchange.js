@@ -1,5 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
 
+    // "2026-09-27 18:37:39" -> "Sep 27, 2026"
+    function formatExDate(value) {
+        const date = new Date(String(value || '').replace(' ', 'T'));
+        if (Number.isNaN(date.getTime())) return String(value || '');
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
     // 1. Load the Community Exchange Feed
     async function loadExchangeFeed() {
         try {
@@ -16,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentUserId = data.current_user_id; 
 
             if (data.posts.length === 0) {
-                feedEl.innerHTML = '<p class="empty-state">The exchange board is currently empty. Be the first to post!</p>';
+                feedEl.innerHTML = '<p class="ex-empty">Nothing on the board yet. Be the first to post your harvest!</p>';
                 return;
             }
 
@@ -25,25 +32,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isMine = p.GardenerID === currentUserId; 
 
                 return `
-                <div class="exchange-item" data-search="${escapeHtml(p.ProduceName).toLowerCase()}" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid #e2e8f0;">
-                    
-                    <!-- Left Side: Post Details -->
-                    <div style="flex: 1; padding-right: 16px;">
-                        <div style="margin-bottom: 4px;">
-                            <strong style="font-size: 1.1rem;">${escapeHtml(p.ProduceName)}</strong>
-                            <span class="badge badge-brown" style="margin-left: 8px; font-size: 0.75rem;">${escapeHtml(p.Qty)}</span>
+                <div class="exchange-item ex-row" data-search="${escapeHtml(p.ProduceName).toLowerCase()}">
+                    <div class="ex-row-main">
+                        <div class="ex-row-title">
+                            <strong>${escapeHtml(p.ProduceName)}</strong>
+                            <span class="badge badge-brown">${escapeHtml(p.Qty)}</span>
                         </div>
-                        ${p.Description ? `<p style="margin: 0 0 8px 0; font-size: 0.9rem; color: #475569;">${escapeHtml(p.Description)}</p>` : ''}
-                        <span class="text-muted" style="font-size: 0.8em;">Posted ${new Date(p.CreatedAt).toLocaleDateString()}</span>
+                        ${p.Description ? `<p class="ex-row-desc">${escapeHtml(p.Description)}</p>` : ''}
+                        <span class="ex-row-meta">Posted ${escapeHtml(formatExDate(p.CreatedAt))}</span>
                     </div>
-                    
-                    <!-- Right Side: Conditional Standalone Button or Badge -->
-                    ${isMine ? `
-                        <span class="badge badge-neutral" style="font-size: 0.75rem; padding: 6px 10px;">Your Listing</span>
-                    ` : `
-                        <!-- Removed inline input, kept uniform 85px button -->
-                        <button class="btn btn-accent btn-sm open-claim-modal-btn" data-id="${p.PostID}" style="width: 85px;">Claim</button>
-                    `}
+                    ${isMine
+                        ? '<span class="badge badge-neutral">Your listing</span>'
+                        : `<button class="btn btn-accent btn-sm ex-btn open-claim-modal-btn" data-id="${p.PostID}">Claim</button>`}
                 </div>
                 `;
             }).join('');
@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (err) {
             console.error("Error loading feed:", err);
-            document.getElementById('exchange-feed-list').innerHTML = '<p class="empty-state" style="color: #d9534f;">Failed to load feed.</p>';
+            document.getElementById('exchange-feed-list').innerHTML = '<p class="ex-empty ex-error">Failed to load feed.</p>';
         }
     }
 
@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (typeof showToast === 'function') showToast('Claim request sent to the gardener!', 'success');
                     claimModal.style.display = 'none';
                 } else {
-                    if (typeof showToast === 'function') showToast(result.error || 'Failed to send request.', 'error');
+                    if (typeof showToast === 'function') showToast(result.error || 'Failed to send request.', 'danger');
                 }
             } catch (err) {
                 console.error("Error sending claim:", err);
@@ -154,17 +154,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const myEl = document.getElementById('my-exchange-list');
 
             if (data.posts.length === 0) {
-                myEl.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">You have no active listings.</p>';
+                myEl.innerHTML = '<p class="ex-empty">You have no active listings.</p>';
                 return;
             }
 
             myEl.innerHTML = data.posts.map(p => `
-                <div style="display:flex; justify-content: space-between; align-items:center; border-bottom: 1px solid #e2e8f0; padding: 12px 0;">
-                    <div>
-                        <strong>${escapeHtml(p.ProduceName)}</strong> (${escapeHtml(p.Qty)})<br>
-                        <span class="text-muted" style="font-size: 0.8em;">Posted ${new Date(p.CreatedAt).toLocaleDateString()}</span>
+                <div class="ex-row">
+                    <div class="ex-row-main">
+                        <div class="ex-row-title">
+                            <strong>${escapeHtml(p.ProduceName)}</strong>
+                            <span class="badge badge-brown">${escapeHtml(p.Qty)}</span>
+                        </div>
+                        <span class="ex-row-meta">Posted ${escapeHtml(formatExDate(p.CreatedAt))}</span>
                     </div>
-                    <button class="btn btn-accent btn-sm close-post-btn" data-id="${p.PostID}">Close</button>
+                    <button class="btn btn-ghost btn-sm close-post-btn" data-id="${p.PostID}">Close</button>
                 </div>
             `).join('');
 
@@ -189,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             loadExchangeFeed(); 
                             loadMyListings(); 
                         } else {
-                            if (typeof showToast === 'function') showToast(result.error || 'Action failed.', 'error');
+                            if (typeof showToast === 'function') showToast(result.error || 'Action failed.', 'danger');
                             e.target.disabled = false;
                         }
                     } catch (err) {
@@ -200,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (err) {
             console.error("Error loading my listings:", err);
-            document.getElementById('my-exchange-list').innerHTML = '<p class="empty-state" style="color: #d9534f;">Failed to load listings.</p>';
+            document.getElementById('my-exchange-list').innerHTML = '<p class="ex-empty ex-error">Failed to load listings.</p>';
         }
     }
 
@@ -271,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     loadExchangeFeed();
                     loadMyListings();
                 } else {
-                    if (typeof showToast === 'function') showToast(result.error || 'Failed to create post.', 'error');
+                    if (typeof showToast === 'function') showToast(result.error || 'Failed to create post.', 'danger');
                 }
             } catch (err) {
                 console.error("Error creating post:", err);
@@ -288,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const term = e.target.value.toLowerCase();
             document.querySelectorAll('.exchange-item').forEach(item => {
                 const itemName = item.getAttribute('data-search');
-                item.style.display = itemName.includes(term) ? 'block' : 'none';
+                item.hidden = !itemName.includes(term);
             });
         });
     }
@@ -316,22 +319,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const pendingEl = document.getElementById('pending-claims-list');
 
             if (data.claims.length === 0) {
-                pendingEl.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">No pending requests.</p>';
+                pendingEl.innerHTML = '<p class="ex-empty">No one has asked for your items yet.</p>';
                 return;
             }
 
             pendingEl.innerHTML = data.claims.map(c => `
-                <div style="border-bottom: 1px solid #e2e8f0; padding: 12px 0;">
-                    <div style="margin-bottom: 8px;">
-                        <strong>Request for: ${escapeHtml(c.ProduceName)}</strong><br>
-                        <span class="badge badge-brown" style="font-size: 0.75rem; margin-top: 4px; display: inline-block;">Wants: ${escapeHtml(c.QtyWanted)}</span>
+                <div class="ex-claim">
+                    <div class="ex-row-title">
+                        <strong>${escapeHtml(c.ProduceName)}</strong>
+                        <span class="badge badge-brown">Wants ${escapeHtml(c.QtyWanted)}</span>
                     </div>
-                    <p style="margin: 0 0 12px 0; font-size: 0.85rem; color: #475569; line-height: 1.4;">
-                        <strong>Pickup:</strong> ${escapeHtml(c.PickupDetails)}
-                    </p>
-                    <div style="display: flex; gap: 8px; justify-content: space-between;">
-                        <button class="btn btn-sm btn-accent handle-claim-btn" data-id="${c.ClaimID}" data-status="Accepted" style="flex: 1;">Accept</button>
-                        <button class="btn btn-sm btn-ghost handle-claim-btn" data-id="${c.ClaimID}" data-status="Rejected" style="flex: 1; border: 1px solid #d9534f; color: #d9534f;">Reject</button>
+                    <p class="ex-claim-pickup"><strong>Pickup:</strong> ${escapeHtml(c.PickupDetails)}</p>
+                    <div class="ex-claim-actions">
+                        <button class="btn btn-sm btn-accent handle-claim-btn" data-id="${c.ClaimID}" data-status="Accepted">Accept</button>
+                        <button class="btn btn-sm btn-ghost ex-reject-btn handle-claim-btn" data-id="${c.ClaimID}" data-status="Rejected">Reject</button>
                     </div>
                 </div>
             `).join('');
@@ -355,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (typeof showToast === 'function') showToast(`Request ${status.toLowerCase()}!`, 'success');
                             loadPendingRequests(); 
                         } else {
-                            if (typeof showToast === 'function') showToast(result.error || 'Action failed.', 'error');
+                            if (typeof showToast === 'function') showToast(result.error || 'Action failed.', 'danger');
                             e.target.disabled = false;
                         }
                     } catch (err) {
@@ -366,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (err) {
             console.error("Error loading pending requests:", err);
-            document.getElementById('pending-claims-list').innerHTML = '<p class="empty-state" style="color: #d9534f;">Failed to load requests.</p>';
+            document.getElementById('pending-claims-list').innerHTML = '<p class="ex-empty ex-error">Failed to load requests.</p>';
         }
     }
 
