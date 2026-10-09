@@ -186,6 +186,13 @@ function recordPlotEvent(PDO $pdo, string $eventType, string $actorType, string 
     $stmt->execute([$appId, $plotId, $plotLabel, $eventType, $actorType, $actorName, $gardenerId, $gardenerName, $coordId]);
 }
 
+// Resource request limits (per gardener): how many may wait for a coordinator
+// at once, and how many may be sent (including ones later cancelled) in a
+// short window, so request/cancel loops can't flood the coordinator queue.
+const MAX_PENDING_RESOURCE_REQUESTS = 5;
+const RESOURCE_REQUEST_RATE_LIMIT = 10;
+const RESOURCE_REQUEST_RATE_WINDOW_MINUTES = 10;
+
 // Whitelisted sort options for the Exchange Board
 const SORT_OPTIONS = [
     'newest'   => 'L.CreatedAt DESC',
@@ -827,7 +834,14 @@ try {
                 FROM RESOURCE R ORDER BY R.Name
             ");
             $stmt->execute([$user['id']]);
-            respond(['ok' => true, 'resources' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+            $pending = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status = 'Requested'");
+            $pending->execute([$user['id']]);
+            respond([
+                'ok' => true,
+                'resources' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+                'my_pending_count' => (int) $pending->fetchColumn(),
+                'max_pending' => MAX_PENDING_RESOURCE_REQUESTS,
+            ]);
         }
 
         case 'resource_request': {
@@ -839,6 +853,25 @@ try {
             }
 
             $pdo->beginTransaction();
+
+            // Lock the gardener's row so two requests sent at the same moment
+            // are counted one after the other against the limits below.
+            $pdo->prepare('SELECT GardenerID FROM COMMUNITY_GARDENER WHERE GardenerID = ? FOR UPDATE')
+                ->execute([$user['id']]);
+
+            $pendingCount = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status = 'Requested'");
+            $pendingCount->execute([$user['id']]);
+            if ((int) $pendingCount->fetchColumn() >= MAX_PENDING_RESOURCE_REQUESTS) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'You already have ' . MAX_PENDING_RESOURCE_REQUESTS . ' pending requests. Cancel one or wait for a coordinator to review them before requesting more.'], 429);
+            }
+
+            $recentCount = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status IN ('Requested', 'Cancelled') AND RequestedAt >= NOW() - INTERVAL " . RESOURCE_REQUEST_RATE_WINDOW_MINUTES . " MINUTE");
+            $recentCount->execute([$user['id']]);
+            if ((int) $recentCount->fetchColumn() >= RESOURCE_REQUEST_RATE_LIMIT) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'You have sent a lot of requests in a short time. Please wait a few minutes and try again.'], 429);
+            }
 
             $res = $pdo->prepare("
                 SELECT GREATEST(0, R.TotalQty - COALESCE((
