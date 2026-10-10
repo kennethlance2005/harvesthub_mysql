@@ -2109,18 +2109,12 @@ table.data-table {
 }
 
 /* ---------- Gardener: My Crops ---------- */
-.crops-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  align-items: start;
-  gap: 24px;
-}
-.crops-main,
-.crops-side { min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+.crops-page-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .crops-card { min-width: 0; padding: 22px 24px; }
 .crops-card .panel-title { margin: 0; }
 .crops-card-sub { margin: 4px 0 16px; color: var(--ink-600); font-size: 0.85rem; }
-
+.crops-journal { margin-top: 4px; }
+.crops-journal-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .crops-log-controls { display: flex; gap: 10px; margin-bottom: 4px; }
 .crops-log-controls select,
 .crops-log-controls input {
@@ -2133,55 +2127,71 @@ table.data-table {
   font: inherit;
   font-size: 0.88rem;
 }
-.crops-log-controls select { flex: 0 0 170px; }
-.crops-log-controls input { flex: 1 1 auto; }
 .crops-log-controls select:focus,
 .crops-log-controls input:focus { outline: none; border-color: var(--brown-600); background: var(--white); }
-
-.crop-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
-.crop-row:last-child { border-bottom: none; }
-.crop-row-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.crop-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
-.crop-row-title strong { font-size: 0.98rem; overflow-wrap: anywhere; }
+.crops-log-controls select { flex: 0 0 155px; }
+.crops-log-controls input { width: min(260px, 35vw); }
+.crops-list { display: grid; gap: 12px; }
+.crop-accordion { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); transition: box-shadow 0.18s ease, border-color 0.18s ease; }
+.crop-accordion[data-open="true"] { border-color: rgba(168, 86, 46, 0.48); box-shadow: 0 8px 22px rgba(55, 36, 23, 0.07); }
+.crop-accordion-toggle { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 19px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.crop-accordion-toggle:hover { background: var(--cream-100); }
+.crop-accordion-toggle:focus-visible { outline: 2px solid var(--green-600); outline-offset: -3px; }
+.crop-accordion-info { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.crop-accordion-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.crop-accordion-title strong { color: var(--green-900); font-family: var(--font-display); font-size: 1.08rem; overflow-wrap: anywhere; }
 .crop-row-meta { color: var(--ink-600); font-size: 0.82rem; }
-.crop-row-notes { margin: 2px 0 0; color: var(--ink-600); font-size: 0.85rem; font-style: italic; overflow-wrap: anywhere; }
-.crop-row-actions { flex-shrink: 0; }
-.crop-row-actions select {
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--white);
-  color: var(--ink-900);
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.crops-page .maintenance-log-list { max-height: 520px; scrollbar-width: thin; }
-.crops-page .maintenance-log-entry:first-child { padding-top: 4px; }
-.crops-page .maintenance-form { gap: 14px; }
-.crops-page .maintenance-form-hint { display: block; margin-top: 6px; color: var(--ink-600); font-size: 0.78rem; }
+.crop-accordion-chevron { flex: 0 0 auto; color: var(--brown-700); font-size: 1.25rem; transition: transform 0.2s ease; }
+.crop-accordion[data-open="true"] .crop-accordion-chevron { transform: rotate(180deg); }
+.crop-accordion-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.24s ease; }
+.crop-accordion[data-open="true"] .crop-accordion-panel { grid-template-rows: 1fr; }
+.crop-accordion-panel-inner { min-height: 0; overflow: hidden; opacity: 0; transition: opacity 0.18s ease; }
+.crop-accordion[data-open="true"] .crop-accordion-panel-inner { opacity: 1; }
+.crop-expanded-content { padding: 0 19px 20px; border-top: 1px solid var(--line); }
+.crop-details-notes { margin: 14px 0 0; color: var(--ink-600); font-size: 0.86rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.crop-update-form { display: grid; grid-template-columns: minmax(130px, 0.75fr) minmax(140px, 0.8fr) minmax(180px, 1.5fr) minmax(120px, 0.7fr) auto; align-items: end; gap: 12px; padding: 16px 0 19px; }
+.crop-update-form .field { min-width: 0; margin: 0; }
+.crop-update-form label { display: block; margin-bottom: 6px; color: var(--ink-600); font-size: 0.8rem; font-weight: 600; }
+.crop-update-form input, .crop-update-form select, .crop-update-form textarea { width: 100%; min-width: 0; min-height: 42px; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--cream-100); color: var(--ink-900); font: inherit; font-size: 0.86rem; }
+.crop-update-form textarea { min-height: 42px; max-height: 100px; resize: vertical; }
+.crop-update-form input:focus, .crop-update-form select:focus, .crop-update-form textarea:focus { outline: 2px solid rgba(168, 86, 46, 0.3); border-color: var(--brown-600); background: var(--white); }
+.crop-update-form button { white-space: nowrap; }
+.crop-history-heading { margin: 1px 0 0; color: var(--ink-700); font-family: var(--font-display); font-size: 1rem; }
+.crop-history { position: relative; display: grid; gap: 0; margin-top: 12px; padding-left: 19px; }
+.crop-history::before { position: absolute; top: 7px; bottom: 7px; left: 5px; width: 2px; background: var(--line); content: ''; }
+.crop-history-entry { position: relative; padding: 0 0 16px 5px; }
+.crop-history-entry:last-child { padding-bottom: 0; }
+.crop-history-entry::before { position: absolute; top: 5px; left: -18px; width: 8px; height: 8px; border: 2px solid var(--white); border-radius: 50%; background: var(--brown-600); box-shadow: 0 0 0 1px var(--brown-600); content: ''; }
+.crop-history-entry-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.crop-history-entry time { color: var(--ink-600); font-size: 0.78rem; }
+.crop-history-entry p { margin: 5px 0 0; color: var(--ink-700); font-size: 0.86rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.crop-history-yield { font-weight: 600; }
+.crop-history-empty { margin: 9px 0 0; color: var(--ink-600); font-size: 0.84rem; }
 .crops-empty { margin: 0; padding: 20px 0; color: var(--ink-600); font-size: 0.88rem; }
 .crops-error { color: var(--danger); }
 
 @media (max-width: 900px) {
-  .crops-layout { grid-template-columns: minmax(0, 1fr); }
-  /* One column: each form sits right above the list it adds to */
-  .crops-layout { display: flex; flex-direction: column; }
-  .crops-main, .crops-side { display: contents; }
-  .crops-side > :nth-child(1) { order: 1; }
-  .crops-main > :nth-child(1) { order: 2; }
-  .crops-side > :nth-child(2) { order: 3; }
-  .crops-main > :nth-child(2) { order: 4; }
+  .crop-update-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .crop-update-notes { grid-column: 1 / -1; }
 }
 
 @media (max-width: 600px) {
+  .crops-page-head { align-items: flex-start; flex-direction: column; }
+  .crops-page-head > button { width: 100%; }
   .crops-card { padding: 18px 16px; }
-  .crops-log-controls { flex-direction: column; }
-  .crops-log-controls select { flex-basis: auto; }
-  .crop-row { flex-wrap: wrap; gap: 10px; }
-  .crop-row-actions { width: 100%; }
-  .crop-row-actions select { width: 100%; }
+  .crops-journal-heading { flex-direction: column; gap: 0; }
+  .crops-log-controls { width: 100%; flex-direction: column; }
+  .crops-log-controls select, .crops-log-controls input { width: 100%; flex: 1 1 auto; }
+  .crop-accordion-toggle { align-items: flex-start; padding: 15px; }
+  .crop-expanded-content { padding: 0 15px 17px; }
+  .crop-update-form { grid-template-columns: minmax(0, 1fr); }
+  .crop-update-notes { grid-column: auto; }
+  .crop-update-form button { width: 100%; }
+  .crop-history-entry-head { align-items: flex-start; flex-direction: column; gap: 3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crop-accordion, .crop-accordion-panel, .crop-accordion-panel-inner, .crop-accordion-chevron { transition: none; }
 }
 
 /* ---------- Gardener: Exchange Board ---------- */

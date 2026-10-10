@@ -681,6 +681,102 @@ try {
             respond(['ok' => true]);
         }
 
+        case 'garden_journal_update': {
+            $user = requireJsonRole('customer');
+            foreach (['plot_id', 'status', 'logged_date', 'notes', 'yield'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Journal fields must be submitted as text values.'], 422);
+                }
+            }
+
+            $plotId = $_POST['plot_id'] ?? '';
+            $status = trim($_POST['status'] ?? '');
+            $loggedDate = trim($_POST['logged_date'] ?? '');
+            $notes = trim($_POST['notes'] ?? '');
+            $yield = trim($_POST['yield'] ?? '');
+            $validStatuses = ['Planted', 'Growing', 'Harvested', 'Failed'];
+
+            if (!ctype_digit((string) $plotId) || (int) $plotId < 1) {
+                respond(['ok' => false, 'error' => 'Choose a valid crop from your garden journal.'], 422);
+            }
+            if (!in_array($status, $validStatuses, true)) {
+                respond(['ok' => false, 'error' => 'Choose a valid crop status.'], 422);
+            }
+            $parsedDate = DateTimeImmutable::createFromFormat('!Y-m-d', $loggedDate);
+            if (!$parsedDate || $parsedDate->format('Y-m-d') !== $loggedDate) {
+                respond(['ok' => false, 'error' => 'Choose a valid journal date.'], 422);
+            }
+            if (mb_strlen($notes) > 1000 || mb_strlen($yield) > 60) {
+                respond(['ok' => false, 'error' => 'Maintenance notes or yield exceed the allowed length.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $cropStmt = $pdo->prepare("
+                    SELECT PlotID, CropName, Status
+                    FROM GARDEN_PLOTS
+                    WHERE PlotID = ? AND GardenerID = ?
+                    FOR UPDATE
+                ");
+                $cropStmt->execute([(int) $plotId, $user['id']]);
+                $crop = $cropStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$crop) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Crop not found in your garden journal.'], 404);
+                }
+                if (mb_strlen($crop['CropName']) > 60) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'This crop name is too long to record in the journal.'], 422);
+                }
+
+                $statusChanged = $crop['Status'] !== $status;
+                if (!$statusChanged && $notes === '' && $yield === '') {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Add a maintenance note, yield, or status change before saving.'], 422);
+                }
+
+                if ($statusChanged) {
+                    $pdo->prepare("UPDATE GARDEN_PLOTS SET Status = ? WHERE PlotID = ? AND GardenerID = ?")
+                        ->execute([$status, (int) $plotId, $user['id']]);
+                }
+
+                $plotStmt = $pdo->prepare("
+                    SELECT PltID FROM PLOT
+                    WHERE GardenerID = ? AND Status = 'Occupied'
+                    ORDER BY PltID LIMIT 1
+                ");
+                $plotStmt->execute([$user['id']]);
+                $communityPlotId = $plotStmt->fetchColumn();
+                $communityPlotId = $communityPlotId === false ? null : (int) $communityPlotId;
+
+                $logNotes = $notes;
+                if ($statusChanged) {
+                    $statusNote = "Crop status changed from {$crop['Status']} to {$status}.";
+                    $logNotes = $logNotes === '' ? $statusNote : $statusNote . "\n" . $logNotes;
+                }
+
+                $pdo->prepare("
+                    INSERT INTO CROP_LOG
+                        (GardenerID, GardenPlotID, PltID, CropName, MaintenanceNotes, HarvestYield, LoggedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, CONCAT(?, ' ', TIME(CURRENT_TIMESTAMP)))
+                ")->execute([
+                    $user['id'],
+                    (int) $plotId,
+                    $communityPlotId,
+                    $crop['CropName'],
+                    $logNotes === '' ? null : $logNotes,
+                    $yield === '' ? null : $yield,
+                    $loggedDate,
+                ]);
+
+                $pdo->commit();
+                respond(['ok' => true, 'status' => $status, 'status_changed' => $statusChanged]);
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
+        }
+
         // ---------------------------------------------------------
         // Exchange Board Endpoints
         // ---------------------------------------------------------
@@ -1763,17 +1859,34 @@ try {
 
         case 'add_crop_log': {
             $user = requireJsonRole('customer');
+            foreach (['crop_name', 'planted_date', 'notes', 'est_harvest_date'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Crop details must be submitted as text values.'], 422);
+                }
+            }
             $crop = trim($_POST['crop_name'] ?? '');
-            $planted = $_POST['planted_date'] ?? '';
+            $planted = trim($_POST['planted_date'] ?? '');
             $notes = trim($_POST['notes'] ?? '');
             $harvest = $_POST['est_harvest_date'] ?? null;
+            $harvest = $harvest === null || trim($harvest) === '' ? null : trim($harvest);
+            $parsedPlantedDate = DateTimeImmutable::createFromFormat('!Y-m-d', $planted);
+            $parsedHarvestDate = $harvest === null ? null : DateTimeImmutable::createFromFormat('!Y-m-d', $harvest);
 
-            if (empty($crop) || empty($planted)) {
-                respond(['ok' => false, 'error' => 'Crop name and planted date are required.'], 422);
+            if ($crop === '' || mb_strlen($crop) > 60) {
+                respond(['ok' => false, 'error' => 'Crop name is required and must be 60 characters or fewer.'], 422);
+            }
+            if (!$parsedPlantedDate || $parsedPlantedDate->format('Y-m-d') !== $planted) {
+                respond(['ok' => false, 'error' => 'Choose a valid planted date.'], 422);
+            }
+            if ($harvest !== null && (!$parsedHarvestDate || $parsedHarvestDate->format('Y-m-d') !== $harvest)) {
+                respond(['ok' => false, 'error' => 'Choose a valid estimated harvest date.'], 422);
+            }
+            if (mb_strlen($notes) > 1000) {
+                respond(['ok' => false, 'error' => 'Initial notes must be 1,000 characters or fewer.'], 422);
             }
 
             $stmt = $pdo->prepare("INSERT INTO GARDEN_PLOTS (GardenerID, CropName, PlantedDate, EstHarvestDate, Notes) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$user['id'], $crop, $planted, $harvest === '' ? null : $harvest, $notes]);
+            $stmt->execute([$user['id'], $crop, $planted, $harvest, $notes]);
             respond(['ok' => true]);
         }
 
