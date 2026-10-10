@@ -2018,11 +2018,40 @@ try {
 
         case 'apply_coordinator': {
             $user = requireJsonRole('customer');
+            foreach (['shift', 'availability_days', 'motivation', 'gardening_experience', 'leadership_experience', 'agree_duties', 'agree_rules'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Application fields must be submitted as text values.'], 422);
+                }
+            }
             $shift = trim($_POST['shift'] ?? '');
+            $availabilityRaw = trim($_POST['availability_days'] ?? '');
+            $availabilityDays = $availabilityRaw === '' ? [] : explode(',', $availabilityRaw);
             $motivation = trim($_POST['motivation'] ?? '');
-            if (!in_array($shift, ['Morning', 'Afternoon', 'Evening'], true)
-                || mb_strlen($motivation) < 20 || mb_strlen($motivation) > 1000) {
-                respond(['ok' => false, 'error' => 'Choose a shift and explain your interest in 20–1,000 characters.'], 422);
+            $gardeningExperience = trim($_POST['gardening_experience'] ?? '');
+            $leadershipExperience = trim($_POST['leadership_experience'] ?? '');
+            $agreeDuties = ($_POST['agree_duties'] ?? '') === '1';
+            $agreeRules = ($_POST['agree_rules'] ?? '') === '1';
+            $validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            $validExperiences = ['Beginner', '1-2 years', '3+ years'];
+
+            if (!in_array($shift, ['Morning', 'Afternoon'], true)) {
+                respond(['ok' => false, 'error' => 'Choose a valid preferred shift.'], 422);
+            }
+            if (!$availabilityDays || count(array_unique($availabilityDays)) !== count($availabilityDays)
+                || array_diff($availabilityDays, $validDays)) {
+                respond(['ok' => false, 'error' => 'Select one or more valid days of availability.'], 422);
+            }
+            if (!in_array($gardeningExperience, $validExperiences, true)) {
+                respond(['ok' => false, 'error' => 'Choose a gardening experience level.'], 422);
+            }
+            if (mb_strlen($motivation) < 50 || mb_strlen($motivation) > 1000) {
+                respond(['ok' => false, 'error' => 'Explain why you want to coordinate in 50–1,000 characters.'], 422);
+            }
+            if (mb_strlen($leadershipExperience) > 1000) {
+                respond(['ok' => false, 'error' => 'Leadership or volunteer experience cannot exceed 1,000 characters.'], 422);
+            }
+            if (!$agreeDuties || !$agreeRules) {
+                respond(['ok' => false, 'error' => 'Agree to both coordinator duties and garden rules before submitting.'], 422);
             }
 
             $pdo->beginTransaction();
@@ -2039,8 +2068,18 @@ try {
                     $pdo->rollBack();
                     respond(['ok' => false, 'error' => 'Your coordinator application is already under review.'], 409);
                 }
-                $pdo->prepare("INSERT INTO COORDINATOR_APPLICATION (GardenerID, Shift, Motivation) VALUES (?, ?, ?)")
-                    ->execute([$user['id'], $shift, $motivation]);
+                $pdo->prepare("
+                    INSERT INTO COORDINATOR_APPLICATION
+                        (GardenerID, Shift, AvailabilityDays, Motivation, GardeningExperience, LeadershipExperience, AgreedToDuties, AgreedToRules)
+                    VALUES (?, ?, ?, ?, ?, ?, 1, 1)
+                ")->execute([
+                    $user['id'],
+                    $shift,
+                    implode(',', $availabilityDays),
+                    $motivation,
+                    $gardeningExperience,
+                    $leadershipExperience === '' ? null : $leadershipExperience,
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -2072,7 +2111,9 @@ try {
             }
 
             $stmt = $pdo->prepare("
-                SELECT A.ApplicationID, A.GardenerID, A.Shift, A.Motivation, A.Status, A.RequestedAt,
+                SELECT A.ApplicationID, A.GardenerID, A.Shift, A.AvailabilityDays, A.Motivation,
+                       A.GardeningExperience, A.LeadershipExperience, A.AgreedToDuties, A.AgreedToRules,
+                       A.Status, A.RequestedAt,
                        G.Name, G.Email, G.Age, COALESCE(NULLIF(G.Location, ''), 'Not provided') AS Location,
                        COALESCE(NULLIF(G.Status, ''), 'Active') AS AccountStatus
                 FROM COORDINATOR_APPLICATION A

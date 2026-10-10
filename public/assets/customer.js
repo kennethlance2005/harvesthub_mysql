@@ -367,26 +367,41 @@ async function loadCoordinatorApplication() {
   panel.hidden = false;
   if (form.dataset.bound !== 'true') {
     form.addEventListener('submit', async event => {
-    event.preventDefault();
-    const submit = form.querySelector('button[type="submit"]');
-    if (!form.reportValidity()) return;
-    submit.disabled = true;
-    try {
-      const result = await postAction('apply_coordinator', {
-        shift: document.getElementById('coordinator-shift').value,
-        motivation: document.getElementById('coordinator-motivation').value.trim(),
-      });
-      if (!result.ok) {
-        showToast(result.error || 'Could not submit your application.', 'danger');
-      } else {
-        showToast('Coordinator application submitted for review.', 'success');
-        await loadCoordinatorApplication();
+      event.preventDefault();
+      const submit = form.querySelector('button[type="submit"]');
+      const availabilityError = document.getElementById('coordinator-availability-error');
+      const availabilityDays = Array.from(form.querySelectorAll('[name="availability-day"]:checked'), input => input.value);
+      if (availabilityError) availabilityError.hidden = availabilityDays.length > 0;
+      if (!form.reportValidity()) return;
+      if (!availabilityDays.length) {
+        form.querySelector('[name="availability-day"]')?.focus();
+        return;
       }
-    } catch (error) {
-      showToast('Could not submit your application. Please try again.', 'danger');
-    } finally {
-      submit.disabled = false;
-    }
+
+      submit.disabled = true;
+      try {
+        const result = await postAction('apply_coordinator', {
+          shift: document.getElementById('coordinator-shift').value,
+          availability_days: availabilityDays.join(','),
+          motivation: document.getElementById('coordinator-motivation').value.trim(),
+          gardening_experience: document.getElementById('coordinator-experience').value,
+          leadership_experience: document.getElementById('coordinator-leadership').value.trim(),
+          agree_duties: document.getElementById('coordinator-agree-duties').checked ? '1' : '0',
+          agree_rules: document.getElementById('coordinator-agree-rules').checked ? '1' : '0',
+        });
+        if (!result.ok) {
+          showToast(result.error || 'Could not submit your application.', 'danger');
+        } else {
+          showToast('Coordinator application submitted for review.', 'success');
+          form.reset();
+          if (availabilityError) availabilityError.hidden = true;
+          await loadCoordinatorApplication();
+        }
+      } catch (error) {
+        showToast('Could not submit your application. Please try again.', 'danger');
+      } finally {
+        submit.disabled = false;
+      }
     });
     form.dataset.bound = 'true';
   }

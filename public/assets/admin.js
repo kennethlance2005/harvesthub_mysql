@@ -422,6 +422,8 @@ async function reviewCoordinatorApplication(applicationId, button) {
         ${reviewField('Location', app.Location)}
         ${reviewField('Age', app.Age ?? 'Not provided')}
         ${reviewField('Preferred shift', app.Shift)}
+        ${reviewField('Availability', app.AvailabilityDays ? app.AvailabilityDays.split(',').join(', ') : 'Not provided')}
+        ${reviewField('Gardening experience', app.GardeningExperience)}
         ${reviewField('Applied', `${formatAdminDate(app.RequestedAt)} (${timeAgo(app.RequestedAt)})`)}
         ${data.member_since ? reviewField('Member since', formatAdminDate(data.member_since)) : ''}
       </dl>
@@ -429,6 +431,17 @@ async function reviewCoordinatorApplication(applicationId, button) {
     <section class="review-section">
       <h4>Why they want to coordinate</h4>
       <p class="review-quote">${escapeHtml(app.Motivation)}</p>
+    </section>
+    <section class="review-section">
+      <h4>Leadership or volunteer experience</h4>
+      <p class="review-quote">${escapeHtml(app.LeadershipExperience || 'Not provided.')}</p>
+    </section>
+    <section class="review-section">
+      <h4>Agreements</h4>
+      <dl class="review-grid">
+        ${reviewField('Coordinator duties', Number(app.AgreedToDuties) === 1 ? 'Agreed' : 'Not recorded')}
+        ${reviewField('Garden rules and fair, impartial conduct', Number(app.AgreedToRules) === 1 ? 'Agreed' : 'Not recorded')}
+      </dl>
     </section>
     <section class="review-section">
       <h4>Garden activity</h4>

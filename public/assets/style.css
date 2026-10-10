@@ -1923,9 +1923,24 @@ table.data-table {
 .dash-coordinator-form .field select:focus,
 .dash-coordinator-form .field textarea:focus { outline: none; border-color: var(--brown-600); background: var(--white); }
 .dash-coordinator-form .field-hint { text-align: left; }
+.dash-coordinator-fieldset {
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.dash-coordinator-fieldset legend { padding: 0 5px; color: var(--ink-600); font-size: 0.86rem; font-weight: 600; }
+.coordinator-days { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 12px; }
+.coordinator-days label, .coordinator-agreement { display: flex; align-items: flex-start; gap: 8px; color: var(--ink-700); font-size: 0.86rem; line-height: 1.45; cursor: pointer; }
+.coordinator-days input, .coordinator-agreement input { flex: 0 0 auto; width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--green-700); }
+.coordinator-agreement + .coordinator-agreement { margin-top: 10px; }
+.dash-coordinator-fieldset .field-hint { margin: 0 0 10px; color: var(--ink-600); font-size: 0.8rem; }
+.dash-coordinator-fieldset #coordinator-availability-error { margin-top: 8px; color: var(--danger); }
 .dash-status-alert { margin: 0 0 12px; }
 
 @media (max-width: 900px) {
+  .coordinator-days { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dash-kpis { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .dash-kpi { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 12px; padding: 16px 18px; }
   .dash-kpi-label { flex: 1 1 auto; }

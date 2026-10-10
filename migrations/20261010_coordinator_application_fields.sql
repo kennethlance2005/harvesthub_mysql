@@ -1,0 +1,6 @@
+ALTER TABLE COORDINATOR_APPLICATION
+    ADD COLUMN AvailabilityDays VARCHAR(100) NOT NULL DEFAULT '' AFTER Shift,
+    ADD COLUMN GardeningExperience VARCHAR(30) NOT NULL DEFAULT 'Not provided' AFTER Motivation,
+    ADD COLUMN LeadershipExperience VARCHAR(1000) NULL AFTER GardeningExperience,
+    ADD COLUMN AgreedToDuties TINYINT(1) NOT NULL DEFAULT 0 AFTER LeadershipExperience,
+    ADD COLUMN AgreedToRules TINYINT(1) NOT NULL DEFAULT 0 AFTER AgreedToDuties;

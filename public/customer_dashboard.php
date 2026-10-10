@@ -13,7 +13,7 @@ $firstName = explode(' ', trim($user['name']))[0];
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=36">
+<link rel="stylesheet" href="assets/style.css?v=38">
 </head>
 <body class="account-page">
 
@@ -112,16 +112,54 @@ $firstName = explode(' ', trim($user['name']))[0];
             <div class="field">
               <label for="coordinator-shift">Preferred shift <span class="required">*</span></label>
               <select id="coordinator-shift" name="shift" required>
+                <option value="" selected disabled>Select a shift</option>
                 <option value="Morning">Morning</option>
                 <option value="Afternoon">Afternoon</option>
-                <option value="Evening">Evening</option>
+              </select>
+            </div>
+            <fieldset class="dash-coordinator-fieldset">
+              <legend>Availability <span class="required">*</span></legend>
+              <p class="field-hint">Select every day you are usually available.</p>
+              <div class="coordinator-days">
+                <label><input type="checkbox" name="availability-day" value="Monday"> Monday</label>
+                <label><input type="checkbox" name="availability-day" value="Tuesday"> Tuesday</label>
+                <label><input type="checkbox" name="availability-day" value="Wednesday"> Wednesday</label>
+                <label><input type="checkbox" name="availability-day" value="Thursday"> Thursday</label>
+                <label><input type="checkbox" name="availability-day" value="Friday"> Friday</label>
+                <label><input type="checkbox" name="availability-day" value="Saturday"> Saturday</label>
+                <label><input type="checkbox" name="availability-day" value="Sunday"> Sunday</label>
+              </div>
+              <p class="field-hint" id="coordinator-availability-error" role="alert" hidden>Select at least one day.</p>
+            </fieldset>
+            <div class="field">
+              <label for="coordinator-experience">Gardening experience <span class="required">*</span></label>
+              <select id="coordinator-experience" name="gardening_experience" required>
+                <option value="" selected disabled>Select your experience</option>
+                <option value="Beginner">Beginner</option>
+                <option value="1-2 years">1–2 years</option>
+                <option value="3+ years">3+ years</option>
               </select>
             </div>
             <div class="field">
               <label for="coordinator-motivation">Why would you like to coordinate? <span class="required">*</span></label>
-              <textarea id="coordinator-motivation" name="motivation" minlength="20" maxlength="1000" rows="4" required placeholder="Tell us about your gardening experience and how you'd like to help."></textarea>
-              <p class="field-hint">At least 20 characters.</p>
+              <textarea id="coordinator-motivation" name="motivation" minlength="50" maxlength="1000" rows="4" required placeholder="Tell us why you want to coordinate and how you would support the garden community."></textarea>
+              <p class="field-hint">At least 50 characters.</p>
             </div>
+            <div class="field">
+              <label for="coordinator-leadership">Leadership or volunteer experience <span class="field-optional">(optional)</span></label>
+              <textarea id="coordinator-leadership" name="leadership_experience" maxlength="1000" rows="3" placeholder="Describe any community, leadership, or volunteer experience."></textarea>
+            </div>
+            <fieldset class="dash-coordinator-fieldset">
+              <legend>Agreements <span class="required">*</span></legend>
+              <label class="coordinator-agreement">
+                <input type="checkbox" id="coordinator-agree-duties" required>
+                <span>I understand coordinator duties include reviewing plot and resource requests and managing inventory.</span>
+              </label>
+              <label class="coordinator-agreement">
+                <input type="checkbox" id="coordinator-agree-rules" required>
+                <span>I agree to follow garden rules and act fairly and impartially.</span>
+              </label>
+            </fieldset>
             <button class="btn btn-accent" type="submit">Submit application</button>
           </form>
         </div>
@@ -135,6 +173,6 @@ $firstName = explode(' ', trim($user['name']))[0];
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
-<script src="assets/customer.js?v=13"></script>
+<script src="assets/customer.js?v=15"></script>
 </body>
 </html>
