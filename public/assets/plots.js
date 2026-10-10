@@ -213,6 +213,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
         applications.forEach(application => {
             const appId = String(application.AppID);
+            if (application.RequestType === 'Unassign') {
+                const assignedListEl = document.getElementById('my-assigned-plots');
+                const dismissedKey = `harvesthub:plot-unassignment-rejection-dismissed:${appId}`;
+                if (!assignedListEl || assignedListEl.querySelector(`[data-rejection-id="${appId}"]`)) return;
+
+                try {
+                    if (localStorage.getItem(dismissedKey)) return;
+                } catch (error) {
+                    console.warn('Could not read plot rejection notification state:', error);
+                }
+
+                const notice = document.createElement('div');
+                notice.className = 'unassignment-rejection-notice';
+                notice.dataset.rejectionId = appId;
+                notice.setAttribute('role', 'alert');
+
+                const message = document.createElement('span');
+                message.textContent = `Your request to unassign ${application.PlotName} was rejected.${application.RejectionReason ? ` Reason: ${application.RejectionReason}` : ''}`;
+
+                const dismiss = document.createElement('button');
+                dismiss.type = 'button';
+                dismiss.className = 'unassignment-success-dismiss';
+                dismiss.setAttribute('aria-label', 'Dismiss rejection notice');
+                dismiss.textContent = '×';
+                dismiss.addEventListener('click', () => {
+                    try {
+                        localStorage.setItem(dismissedKey, '1');
+                    } catch (error) {
+                        console.warn('Could not save plot rejection notification state:', error);
+                    }
+                    notice.remove();
+                });
+
+                notice.append(message, dismiss);
+                assignedListEl.prepend(notice);
+                return;
+            }
+
             const storageKey = `harvesthub:plot-rejection:${appId}`;
             if (seenPlotRejections.has(appId)) return;
 
@@ -246,7 +284,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
 
             if (!data.ok) return;
-            notifyRejectedApplications(data.rejected_applications);
 
             gridEl.innerHTML = '';
 
@@ -258,6 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const assignedPlots = data.plots.filter(plot => Number(plot.IsMine) === 1);
             if (assignedListEl) {
+                const successNotices = Array.from(assignedListEl.querySelectorAll('.unassignment-success-notice'));
                 assignedListEl.innerHTML = assignedPlots.length ? assignedPlots.map(plot => `
                     <article class="assigned-plot-item">
                         <div class="assigned-plot-info">
@@ -269,11 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                     </article>
                 `).join('') : '<p class="plt-empty">You do not have a plot yet. Pick an available plot on the map to request one.</p>';
+                successNotices.forEach(notice => assignedListEl.prepend(notice));
 
                 assignedListEl.querySelectorAll('.request-unassignment-btn:not(:disabled)').forEach(button => {
                     button.addEventListener('click', () => requestPlotUnassignment(button.dataset.plotId, button));
                 });
             }
+            notifyRejectedApplications(data.rejected_applications);
 
             gridEl.innerHTML = data.plots.map(plot => {
                 const isMine = Number(plot.IsMine) === 1;
@@ -311,8 +351,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function showUnassignmentSuccess(plotLabel) {
+        const assignedListEl = document.getElementById('my-assigned-plots');
+        if (!assignedListEl) return;
+
+        assignedListEl.querySelector('.unassignment-success-notice')?.remove();
+        const notice = document.createElement('div');
+        notice.className = 'unassignment-success-notice';
+        notice.setAttribute('role', 'status');
+        notice.innerHTML = `
+            <span>Your unassignment request for <strong>${escapeHtml(plotLabel)}</strong> was sent successfully. The plot remains assigned to you until a coordinator approves it.</span>
+            <button type="button" class="unassignment-success-dismiss" aria-label="Dismiss notice">×</button>
+        `;
+        assignedListEl.prepend(notice);
+        notice.querySelector('.unassignment-success-dismiss').addEventListener('click', () => notice.remove());
+    }
+
     async function requestPlotUnassignment(plotId, button) {
-        if (!await hhConfirm({ title: 'Request unassignment?', message: 'The coordinator will review your request. The plot stays assigned to you until it is approved.', confirmText: 'Send request' })) return;
+        const plotLabel = button.closest('.assigned-plot-item')?.querySelector('.assigned-plot-info strong')?.textContent || 'this plot';
+        if (!await hhConfirm({
+            title: 'Request unassignment?',
+            message: `Are you sure? Please ensure you have no actively planted crops or unreturned resources/equipment tied to this plot before unassigning. The coordinator will review your request; the plot stays assigned to you until it is approved.`,
+            confirmText: 'Send request',
+            tone: 'danger',
+        })) return;
         button.disabled = true;
         button.textContent = 'Sending...';
 
@@ -324,8 +386,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const result = await res.json();
             if (result.ok) {
-                if (typeof showToast === 'function') showToast('Unassignment request sent to the coordinator.', 'success');
                 await loadMap();
+                showUnassignmentSuccess(plotLabel);
             } else {
                 if (typeof showToast === 'function') showToast(result.error || 'Could not request unassignment.', 'danger');
                 button.disabled = false;

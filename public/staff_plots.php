@@ -11,7 +11,7 @@ $user = requireRole('staff');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=36">
+<link rel="stylesheet" href="assets/style.css?v=37">
 </head>
 <body class="account-page">
 <div class="app-layout">
@@ -29,8 +29,18 @@ $user = requireRole('staff');
             <input id="applications-search" type="search" placeholder="Search gardener or plot">
           </form>
         </div>
-        <div class="pending-request-list coordinator-request-list" id="applications-list"></div>
-        <p class="text-muted" id="applications-empty" hidden>No pending applications.</p>
+        <div id="applications-list">
+          <section class="plot-request-group" aria-labelledby="assignment-requests-heading">
+            <h3 id="assignment-requests-heading">Assignment Requests</h3>
+            <div class="pending-request-list coordinator-request-list" id="assignment-applications-list"></div>
+            <p class="text-muted" id="assignment-applications-empty" hidden>No pending assignment requests.</p>
+          </section>
+          <section class="plot-request-group" aria-labelledby="unassignment-requests-heading">
+            <h3 id="unassignment-requests-heading">Unassignment Requests</h3>
+            <div class="pending-request-list coordinator-request-list" id="unassignment-applications-list"></div>
+            <p class="text-muted" id="unassignment-applications-empty" hidden>No pending unassignment requests.</p>
+          </section>
+        </div>
       </section>
 
       <section class="coordinator-section" aria-labelledby="plot-map-heading">
@@ -55,6 +65,6 @@ $user = requireRole('staff');
 </div>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=14"></script>
+<script src="assets/staff.js?v=15"></script>
 </body>
 </html>

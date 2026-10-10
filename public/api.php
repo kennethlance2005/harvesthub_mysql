@@ -1637,10 +1637,10 @@ try {
                         $plots = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         $rejectedStmt = $pdo->prepare("
-                            SELECT PA.AppID, P.Label AS PlotName, PA.RejectionReason
+                            SELECT PA.AppID, P.Label AS PlotName, PA.RequestType, PA.RejectionReason
                             FROM PLOT_APPLICATION PA
                             JOIN PLOT P ON P.PltID = PA.PltID
-                            WHERE PA.GardenerID = ? AND PA.Status = 'Rejected' AND PA.RequestType = 'Apply'
+                            WHERE PA.GardenerID = ? AND PA.Status = 'Rejected' AND PA.RequestType IN ('Apply', 'Unassign')
                             ORDER BY PA.AppID DESC
                         ");
                         $rejectedStmt->execute([$user['id']]);

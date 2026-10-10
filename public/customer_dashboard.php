@@ -135,6 +135,6 @@ $firstName = explode(' ', trim($user['name']))[0];
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
-<script src="assets/customer.js?v=11"></script>
+<script src="assets/customer.js?v=12"></script>
 </body>
 </html>

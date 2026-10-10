@@ -942,6 +942,11 @@ a { color: inherit; }
 .assigned-plot-info span { color: var(--ink-600); font-size: 0.82rem; }
 .request-unassignment-btn { width: 100%; border: 1px solid var(--brown-600); background: var(--white); color: var(--brown-700); }
 .request-unassignment-btn:hover:not(:disabled) { background: #f3e3d8; }
+.unassignment-success-notice { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #c9d6c1; border-radius: var(--radius); background: #e4ebe0; color: var(--green-800); font-size: 0.84rem; }
+.unassignment-rejection-notice { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #ecc3bb; border-radius: var(--radius); background: #f7e2de; color: var(--danger); font-size: 0.84rem; }
+.unassignment-success-dismiss { flex: 0 0 auto; border: 0; padding: 0 2px; background: transparent; color: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
+.plot-request-group + .plot-request-group { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
+.plot-request-group h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: 1.1rem; }
 
 .gardener-modal { position: fixed; inset: 0; z-index: 1000; justify-content: center; align-items: center; padding: 16px; background: rgba(22, 40, 28, 0.55); }
 .gardener-modal-box { width: 100%; max-width: 400px; padding: 26px; border-radius: 10px; background: var(--white); text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25); }
@@ -2319,6 +2324,7 @@ table.data-table {
   -webkit-overflow-scrolling: touch;
 }
 .coordinator-request-list .action-row-actions { flex-wrap: wrap; justify-content: flex-end; }
+.coordinator-request-list .approve-app { max-width: 190px; white-space: normal; }
 .qty-choice-input {
   width: 64px;
   min-height: 36px;

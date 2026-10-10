@@ -41,38 +41,51 @@ function bindLiveSearch(inputId, render) {
 }
 
 function renderApplications() {
-  const listEl = document.getElementById('applications-list');
-  const emptyEl = document.getElementById('applications-empty');
-  if (!listEl || !emptyEl) return;
-  const query = document.getElementById('applications-search').value.trim();
-  const filtered = applications.filter(app =>
+  const assignmentListEl = document.getElementById('assignment-applications-list');
+  const unassignmentListEl = document.getElementById('unassignment-applications-list');
+  const assignmentEmptyEl = document.getElementById('assignment-applications-empty');
+  const unassignmentEmptyEl = document.getElementById('unassignment-applications-empty');
+  if (!assignmentListEl || !unassignmentListEl || !assignmentEmptyEl || !unassignmentEmptyEl) return;
+  const query = document.getElementById('applications-search')?.value.trim() || '';
+  const assignmentRequests = applications.filter(app => app.RequestType !== 'Unassign');
+  const unassignmentRequests = applications.filter(app => app.RequestType === 'Unassign');
+  const filterRequests = requests => requests.filter(app =>
     matchesSearch(app.GardenerName, query) || matchesSearch(app.Label, query));
-
-  listEl.innerHTML = filtered.map(app => `
-    <div class="action-row">
-      <div class="action-row-details">
-        <div class="action-row-title">${escapeHtml(app.GardenerName)}</div>
-        <div class="action-row-sub">${app.RequestType === 'Unassign'
-          ? `Requesting for plot "${escapeHtml(app.Label)}" to be unassigned`
-          : `Requesting ${escapeHtml(app.Label)}`}
-          <span class="text-muted"> • ${escapeHtml(app.PlotStatus || 'Pending')}</span>
+  const renderRows = (requests, type) => requests.map(app => `
+      <div class="action-row">
+        <div class="action-row-details">
+          <div class="action-row-title">${escapeHtml(app.GardenerName)}</div>
+          <div class="action-row-sub">${type === 'unassignment'
+            ? `Requesting to give up plot "${escapeHtml(app.Label)}"`
+            : `Requesting ${escapeHtml(app.Label)}`}
+            <span class="text-muted"> • ${escapeHtml(app.PlotStatus || 'Pending')}</span>
+          </div>
+          <time class="action-row-time" datetime="${escapeHtml(String(app.AppliedAt || '').replace(' ', 'T'))}">Requested ${escapeHtml(formatRecordDate(app.AppliedAt))}</time>
         </div>
-        <time class="action-row-time" datetime="${escapeHtml(String(app.AppliedAt || '').replace(' ', 'T'))}">Requested ${escapeHtml(formatRecordDate(app.AppliedAt))}</time>
+        <div class="action-row-actions">
+          <button class="btn btn-accent btn-sm approve-app" data-id="${app.AppID}">${type === 'unassignment' ? 'Approve unassignment' : 'Approve assignment'}</button>
+          <button class="btn btn-ghost btn-sm reject-app" data-id="${app.AppID}">Reject</button>
+        </div>
       </div>
-      <div class="action-row-actions">
-        <button class="btn btn-accent btn-sm approve-app" data-id="${app.AppID}">Accept</button>
-        <button class="btn btn-ghost btn-sm reject-app" data-id="${app.AppID}">Reject</button>
-      </div>
-    </div>
-  `).join('');
-  emptyEl.textContent = applications.length && !filtered.length
-    ? 'No applications match your search.'
-    : 'No pending plot requests.';
-  emptyEl.hidden = filtered.length > 0;
+    `).join('');
 
-  listEl.querySelectorAll('.approve-app').forEach(btn =>
+  const filteredAssignments = filterRequests(assignmentRequests);
+  const filteredUnassignments = filterRequests(unassignmentRequests);
+  assignmentListEl.innerHTML = renderRows(filteredAssignments, 'assignment');
+  unassignmentListEl.innerHTML = renderRows(filteredUnassignments, 'unassignment');
+
+  assignmentEmptyEl.textContent = assignmentRequests.length && !filteredAssignments.length
+    ? 'No assignment requests match your search.'
+    : 'No pending assignment requests.';
+  assignmentEmptyEl.hidden = filteredAssignments.length > 0;
+  unassignmentEmptyEl.textContent = unassignmentRequests.length && !filteredUnassignments.length
+    ? 'No unassignment requests match your search.'
+    : 'No pending unassignment requests.';
+  unassignmentEmptyEl.hidden = filteredUnassignments.length > 0;
+
+  document.querySelectorAll('#assignment-applications-list .approve-app, #unassignment-applications-list .approve-app').forEach(btn =>
     btn.addEventListener('click', () => processApplication(btn.dataset.id, 'approve')));
-  listEl.querySelectorAll('.reject-app').forEach(btn =>
+  document.querySelectorAll('#assignment-applications-list .reject-app, #unassignment-applications-list .reject-app').forEach(btn =>
     btn.addEventListener('click', () => processApplication(btn.dataset.id, 'reject')));
 }
 

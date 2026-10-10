@@ -110,7 +110,7 @@ $navTitle = 'My Crops';
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
-<script src="assets/customer.js?v=11"></script>
-<script src="assets/plots.js?v=9"></script>
+<script src="assets/customer.js?v=12"></script>
+<script src="assets/plots.js?v=11"></script>
 </body>
 </html>
