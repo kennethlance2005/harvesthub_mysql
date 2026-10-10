@@ -16,6 +16,7 @@ function showToast(message, type = 'success') {
 
 let applications = [];
 let resourceTransactions = [];
+let cropCatalogRequests = [];
 let currentGardenerId = null;
 let plots = [];
 let resources = [];
@@ -143,6 +144,85 @@ function renderResourceTransactions() {
       const input = document.getElementById(`approve-qty-${btn.dataset.id}`);
       processResourceTxn(btn.dataset.id, 'reject', input ? input.value : undefined);
     }));
+}
+
+function renderCropCatalogRequests() {
+  const listEl = document.getElementById('crop-catalog-requests-list');
+  const emptyEl = document.getElementById('crop-catalog-requests-empty');
+  if (!listEl || !emptyEl) return;
+
+  listEl.innerHTML = cropCatalogRequests.map(request => {
+    const isSelfRequest = currentGardenerId !== null && String(request.GardenerID) === String(currentGardenerId);
+    return `
+      <article class="action-row crop-catalog-review-row">
+        <div class="action-row-details">
+          <div class="action-row-title">${escapeHtml(request.CropName)}</div>
+          <div class="action-row-sub">Requested by ${escapeHtml(request.GardenerName)}</div>
+          ${request.Notes ? `<p class="crop-catalog-review-notes">${escapeHtml(request.Notes)}</p>` : ''}
+          <time class="action-row-time" datetime="${escapeHtml(String(request.RequestedAt || '').replace(' ', 'T'))}">Requested ${escapeHtml(formatRecordDate(request.RequestedAt))}</time>
+        </div>
+        <div class="action-row-actions">
+          ${isSelfRequest
+            ? '<span class="badge badge-neutral" title="Coordinators cannot review their own requests.">Cannot self-review</span>'
+            : `<label class="crop-native-confirm"><input type="checkbox" class="confirm-native-crop" id="confirm-native-crop-${Number(request.RequestID)}"> I confirm this crop belongs in the catalog</label>
+              <button type="button" class="btn btn-accent btn-sm approve-crop-catalog" data-id="${Number(request.RequestID)}">Approve</button>
+              <button type="button" class="btn btn-ghost btn-sm reject-crop-catalog" data-id="${Number(request.RequestID)}">Reject</button>`}
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  emptyEl.textContent = cropCatalogRequests.length ? '' : 'No pending crop additions.';
+  emptyEl.hidden = cropCatalogRequests.length > 0;
+  listEl.querySelectorAll('.approve-crop-catalog').forEach(button =>
+    button.addEventListener('click', () => processCropCatalogRequest(button.dataset.id, 'approve')));
+  listEl.querySelectorAll('.reject-crop-catalog').forEach(button =>
+    button.addEventListener('click', () => processCropCatalogRequest(button.dataset.id, 'reject')));
+}
+
+async function loadCropCatalogRequests() {
+  const response = await fetch('api.php?action=pending_crop_catalog_requests');
+  const data = await response.json();
+  if (!data.ok) {
+    showToast(data.error || 'Could not load crop addition requests.', 'danger');
+    return;
+  }
+  cropCatalogRequests = data.requests;
+  currentGardenerId = data.current_gardener_id === null || data.current_gardener_id === undefined
+    ? null
+    : String(data.current_gardener_id);
+  renderCropCatalogRequests();
+}
+
+async function processCropCatalogRequest(requestId, decision) {
+  const request = cropCatalogRequests.find(row => String(row.RequestID) === String(requestId));
+  const params = { request_id: requestId, decision };
+  if (decision === 'approve') {
+    const confirmation = document.getElementById(`confirm-native-crop-${Number(requestId)}`);
+    if (!confirmation?.checked) {
+      showToast('Confirm that this crop belongs in the catalog before approving it.', 'danger');
+      return;
+    }
+    params.confirmed_crop = '1';
+  } else {
+    params.reason = await hhPrompt({
+      title: `Reject ${request?.CropName || 'this crop'}?`,
+      message: 'The gardener will see this reason.',
+      label: 'Reason for rejection',
+      placeholder: 'Explain why this crop cannot be added to the catalog.',
+      confirmText: 'Reject crop',
+      tone: 'danger',
+    });
+    if (!params.reason) return;
+  }
+
+  const data = await postAction('process_crop_catalog_request', params);
+  if (data.ok) {
+    showToast(decision === 'approve' ? 'Crop added to the crop catalog.' : 'Crop request rejected.', 'success');
+    await loadCropCatalogRequests();
+  } else {
+    showToast(data.error || 'Could not review crop request.', 'danger');
+  }
 }
 
 async function postAction(action, params) {
@@ -813,6 +893,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('records-plots-tab')?.addEventListener('click', () => switchRecordsTimeline('plots'));
   const isDashboard = Boolean(document.getElementById('coordinator-stats'));
   if (document.getElementById('applications-list')) loadApplications();
+  if (document.getElementById('crop-catalog-requests-list')) loadCropCatalogRequests();
   if (isDashboard || document.getElementById('resource-txns-list')) loadResourceTxns();
   if (isDashboard || document.getElementById('plot-map')) loadPlots();
   if (isDashboard || document.getElementById('resources-table')) loadResources();

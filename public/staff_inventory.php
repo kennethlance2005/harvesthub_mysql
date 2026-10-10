@@ -12,7 +12,7 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=40">
+<link rel="stylesheet" href="assets/style.css?v=41">
 </head>
 <body class="account-page" data-inventory-role="<?= $isCoordinator ? 'staff' : 'admin' ?>">
 <div class="app-layout">
@@ -28,6 +28,13 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
       </header>
 
       <?php if ($isCoordinator): ?>
+      <section class="coordinator-section" aria-labelledby="crop-catalog-requests-heading">
+        <div class="section-heading">
+          <div><p class="eyebrow">Needs review</p><h2 id="crop-catalog-requests-heading">Crop catalog additions</h2></div>
+        </div>
+        <div class="pending-request-list coordinator-request-list" id="crop-catalog-requests-list"></div>
+        <p class="text-muted" id="crop-catalog-requests-empty" hidden>No pending crop additions.</p>
+      </section>
       <section class="coordinator-section" aria-labelledby="resource-requests-heading">
         <div class="section-heading"><div><p class="eyebrow">Needs review</p><h2 id="resource-requests-heading">Resource requests</h2></div>
           <form class="table-search" id="resource-search-form">
@@ -84,6 +91,6 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
     </div>
   </form>
 </dialog>
-<script src="assets/staff.js?v=23"></script>
+<script src="assets/staff.js?v=25"></script>
 </body>
 </html>

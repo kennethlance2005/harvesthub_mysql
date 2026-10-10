@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let plots = [];
   let logs = [];
+  let cropCatalog = [];
   let expandedPlotId = null;
 
   const localDateValue = (date = new Date()) => {
@@ -153,22 +154,95 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function renderCropRequests(requests) {
+    const requestsEl = document.getElementById('my-crop-catalog-requests');
+    if (!requestsEl) return;
+    requestsEl.innerHTML = requests.length ? `
+      <h4>Your crop addition requests</h4>
+      ${requests.map(request => `
+        <article class="crop-catalog-request-status">
+          <div><strong>${escapeHtml(request.CropName)}</strong> <span class="badge ${request.Status === 'Approved' ? 'badge-green' : request.Status === 'Rejected' ? 'badge-neutral' : 'badge-brown'}">${escapeHtml(request.Status)}</span></div>
+          ${request.ReviewReason ? `<p>${escapeHtml(request.ReviewReason)}</p>` : ''}
+        </article>
+      `).join('')}
+    ` : '';
+  }
+
+  async function loadCropCatalog() {
+    const data = await post('get_native_crop_catalog');
+    cropCatalog = Array.isArray(data.crops) ? data.crops : [];
+    const options = document.getElementById('native-crop-options');
+    if (options) {
+      options.innerHTML = cropCatalog.map(crop => `
+        <option value="${escapeHtml(crop.Name)}"></option>
+      `).join('');
+    }
+    renderCropRequests(Array.isArray(data.requests) ? data.requests : []);
+  }
+
   document.getElementById('open-add-crop').addEventListener('click', () => {
     document.getElementById('plot-planted-date').value = localDateValue();
+    document.getElementById('crop-request-panel').hidden = true;
     addDialog.showModal();
     document.getElementById('plot-crop-name').focus();
   });
   document.getElementById('cancel-add-crop').addEventListener('click', () => addDialog.close());
+  document.getElementById('show-crop-request').addEventListener('click', () => {
+    const panel = document.getElementById('crop-request-panel');
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) {
+      const requestedName = document.getElementById('requested-crop-name');
+      requestedName.value = document.getElementById('plot-crop-name').value.trim();
+      requestedName.focus();
+    }
+  });
+  async function submitCropRequest(button) {
+    const cropName = document.getElementById('requested-crop-name').value.trim();
+    const notes = document.getElementById('requested-crop-notes').value.trim();
+    if (!cropName || cropName.length > 60) {
+      document.getElementById('requested-crop-name').focus();
+      if (typeof showToast === 'function') showToast('Enter a crop name up to 60 characters.', 'danger');
+      return;
+    }
+    button.disabled = true;
+    try {
+      await post('request_crop_catalog_addition', {
+        crop_name: cropName,
+        notes,
+      });
+      document.getElementById('requested-crop-name').value = '';
+      document.getElementById('requested-crop-notes').value = '';
+      if (typeof showToast === 'function') showToast('Crop addition request sent for coordinator review.', 'success');
+      await loadCropCatalog();
+    } catch (error) {
+      if (typeof showToast === 'function') showToast(error.message || 'Could not send the crop request.', 'danger');
+    } finally {
+      button.disabled = false;
+    }
+  }
+  document.getElementById('submit-crop-request').addEventListener('click', event => submitCropRequest(event.currentTarget));
+  document.getElementById('requested-crop-name').addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      document.getElementById('submit-crop-request').click();
+    }
+  });
 
   addForm.addEventListener('submit', async event => {
     event.preventDefault();
     if (!addForm.reportValidity()) return;
     const button = addForm.querySelector('[type="submit"]');
+    const cropName = document.getElementById('plot-crop-name').value.trim();
+    if (!cropCatalog.some(crop => crop.Name.toLowerCase() === cropName.toLowerCase())) {
+      if (typeof showToast === 'function') showToast('Choose an approved crop from the catalog, or request an addition.', 'danger');
+      document.getElementById('plot-crop-name').focus();
+      return;
+    }
     button.disabled = true;
     button.textContent = 'Planting...';
     try {
       await post('add_crop_log', {
-        crop_name: document.getElementById('plot-crop-name').value.trim(),
+        crop_name: cropName,
         planted_date: document.getElementById('plot-planted-date').value,
         notes: document.getElementById('plot-notes').value.trim(),
       });
@@ -222,5 +296,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('plots-category-filter').addEventListener('change', render);
   document.getElementById('search-plots').addEventListener('input', render);
 
+  loadCropCatalog().catch(error => {
+    console.error('Could not load native crop catalog:', error);
+    if (typeof showToast === 'function') showToast(error.message || 'Could not load the crop catalog.', 'danger');
+  });
   loadJournal();
 });

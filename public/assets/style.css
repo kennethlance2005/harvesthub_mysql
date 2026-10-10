@@ -2172,6 +2172,25 @@ table.data-table {
 .crop-history-empty { margin: 9px 0 0; color: var(--ink-600); font-size: 0.84rem; }
 .crops-empty { margin: 0; padding: 20px 0; color: var(--ink-600); font-size: 0.88rem; }
 .crops-error { color: var(--danger); }
+.crop-catalog-request-toggle { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 4px; }
+.crop-catalog-request-toggle p { margin: 0; color: var(--ink-600); font-size: 0.84rem; }
+.crop-catalog-request-panel { display: grid; gap: 10px; margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--cream-100); }
+.crop-catalog-request-panel[hidden] { display: none; }
+.crop-catalog-request-panel h4, .my-crop-catalog-requests h4 { margin: 0; color: var(--green-900); font-family: var(--font-display); }
+.crop-catalog-request-panel > p { margin: -5px 0 0; font-size: 0.82rem; }
+.crop-catalog-request-panel #crop-request-form { display: grid; gap: 10px; }
+.crop-catalog-request-panel .field { margin: 0; }
+.crop-catalog-request-panel input, .crop-catalog-request-panel textarea { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink-900); font: inherit; }
+.crop-catalog-request-panel textarea { resize: vertical; }
+.crop-catalog-request-panel button { justify-self: start; }
+.my-crop-catalog-requests { display: grid; gap: 8px; margin-top: 12px; }
+.crop-catalog-request-status { padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+.crop-catalog-request-status > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.crop-catalog-request-status p { margin: 6px 0 0; color: var(--ink-600); font-size: 0.82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.crop-catalog-review-row { align-items: flex-start; }
+.crop-catalog-review-notes { margin: 7px 0 0; color: var(--ink-600); font-size: 0.84rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.crop-native-confirm { display: flex; max-width: 250px; align-items: flex-start; gap: 7px; color: var(--ink-700); font-size: 0.78rem; line-height: 1.4; }
+.crop-native-confirm input { flex: 0 0 auto; margin: 2px 0 0; }
 
 @media (max-width: 900px) {
   .crop-update-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }

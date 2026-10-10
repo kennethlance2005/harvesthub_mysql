@@ -12,7 +12,7 @@ $navTitle = 'My Crops';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=38">
+<link rel="stylesheet" href="assets/style.css?v=39">
 </head>
 <body class="account-page">
 <div class="app-layout">
@@ -62,7 +62,9 @@ $navTitle = 'My Crops';
 		<p class="hh-dialog-message">Add a new planting to your garden journal.</p>
 		<div class="field hh-dialog-field">
 			<label for="plot-crop-name">Crop name <span class="required">*</span></label>
-			<input type="text" id="plot-crop-name" maxlength="60" placeholder="e.g., Cherry Tomatoes" required>
+			<input type="text" id="plot-crop-name" list="native-crop-options" maxlength="60" placeholder="Search the crop catalog..." autocomplete="off" required>
+			<datalist id="native-crop-options"></datalist>
+			<small class="text-muted">Choose from the crop catalog. Crops not listed can be requested for review.</small>
 		</div>
 		<div class="field hh-dialog-field">
 			<label for="plot-planted-date">Planted date <span class="required">*</span></label>
@@ -72,6 +74,26 @@ $navTitle = 'My Crops';
 			<label for="plot-notes">Initial notes <span class="field-optional">(optional)</span></label>
 			<textarea id="plot-notes" maxlength="1000" rows="3" placeholder="e.g., Used organic compost"></textarea>
 		</div>
+		<div class="crop-catalog-request-toggle">
+			<p>Can’t find your crop?</p>
+			<button type="button" class="btn btn-ghost btn-sm" id="show-crop-request">Request it for the catalog</button>
+		</div>
+		<section id="crop-request-panel" class="crop-catalog-request-panel" hidden aria-labelledby="crop-request-title">
+			<h4 id="crop-request-title">Request a crop addition</h4>
+			<p class="text-muted">A coordinator will review the requested crop before adding it to the catalog.</p>
+			<div id="crop-request-form">
+				<div class="field">
+					<label for="requested-crop-name">Common name <span class="required">*</span></label>
+					<input type="text" id="requested-crop-name" maxlength="60" required>
+				</div>
+				<div class="field">
+					<label for="requested-crop-notes">Notes or source <span class="field-optional">(optional)</span></label>
+					<textarea id="requested-crop-notes" maxlength="500" rows="2" placeholder="Share why this plant belongs in the crop catalog."></textarea>
+				</div>
+				<button type="button" class="btn btn-accent btn-sm" id="submit-crop-request">Send crop request</button>
+			</div>
+		</section>
+		<div id="my-crop-catalog-requests" class="my-crop-catalog-requests" aria-live="polite"></div>
 		<div class="hh-dialog-actions">
 			<button type="button" class="btn btn-ghost" id="cancel-add-crop">Cancel</button>
 			<button type="submit" class="btn btn-accent">Plant crop</button>
@@ -80,6 +102,6 @@ $navTitle = 'My Crops';
 </dialog>
 <script src="assets/app.js"></script>
 <script src="assets/customer.js?v=16"></script>
-<script src="assets/crops.js?v=1"></script>
+<script src="assets/crops.js?v=3"></script>
 </body>
 </html>

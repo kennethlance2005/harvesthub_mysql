@@ -18,6 +18,8 @@
  *    POST action=apply_plot           -> apply for an available plot
  *    GET  action=my_croplog           -> the gardener's crop log entries
  *    POST action=croplog_create       -> add a crop log entry
+ *    GET  action=get_native_crop_catalog -> native crop options + own requests
+ *    POST action=request_crop_catalog_addition -> request a catalog addition
  *    GET  action=resources            -> resource catalogue + availability
  *    POST action=resource_request     -> request a resource
  *    POST action=cancel_resource_request -> cancel a still-pending request
@@ -28,6 +30,8 @@
  *    POST action=process_application  { app_id, decision: approve|reject }
  *    GET  action=pending_resource_txns
  *    POST action=process_resource_txn { txn_id, decision: approve|reject }
+ *    GET  action=pending_crop_catalog_requests
+ *    POST action=process_crop_catalog_request { request_id, decision, confirmed_native }
  *    GET  action=all_plots
  *
  *  ADMIN (requires admin session)
@@ -1547,6 +1551,87 @@ try {
             ]);
         }
 
+        case 'pending_crop_catalog_requests': {
+            $user = requireJsonRole('staff');
+            $stmt = $pdo->query("
+                SELECT R.RequestID, R.GardenerID, R.CropName,
+                       R.Notes, R.RequestedAt, G.Name AS GardenerName
+                FROM CROP_CATALOG_REQUEST R
+                JOIN COMMUNITY_GARDENER G ON G.GardenerID = R.GardenerID
+                WHERE R.Status = 'Pending'
+                ORDER BY R.RequestedAt ASC, R.RequestID ASC
+            ");
+            respond([
+                'ok' => true,
+                'requests' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+                'current_gardener_id' => $user['ids']['customer'] ?? null,
+            ]);
+        }
+
+        case 'process_crop_catalog_request': {
+            $user = requireJsonRole('staff');
+            foreach (['request_id', 'decision', 'reason', 'confirmed_crop'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Crop catalog review fields must be text values.'], 422);
+                }
+            }
+            $requestId = $_POST['request_id'] ?? '';
+            $decision = $_POST['decision'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
+            if (!ctype_digit((string) $requestId) || (int) $requestId < 1 || !in_array($decision, ['approve', 'reject'], true)) {
+                respond(['ok' => false, 'error' => 'Invalid crop catalog review request.'], 422);
+            }
+            if ($decision === 'reject' && ($reason === '' || mb_strlen($reason) > 1000)) {
+                respond(['ok' => false, 'error' => 'Provide a rejection reason of no more than 1,000 characters.'], 422);
+            }
+            if ($decision === 'approve' && ($_POST['confirmed_crop'] ?? '') !== '1') {
+                respond(['ok' => false, 'error' => 'Confirm that the crop belongs in the catalog before approving it.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT RequestID, GardenerID, CropName, ScientificName, Status
+                    FROM CROP_CATALOG_REQUEST
+                    WHERE RequestID = ?
+                    FOR UPDATE
+                ");
+                $stmt->execute([(int) $requestId]);
+                $request = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$request || $request['Status'] !== 'Pending') {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'This crop request has already been reviewed.'], 409);
+                }
+                if (isset($user['ids']['customer']) && (int) $user['ids']['customer'] === (int) $request['GardenerID']) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'You cannot review your own crop request.'], 403);
+                }
+                if ($decision === 'approve') {
+                    $catalogCheck = $pdo->prepare('SELECT 1 FROM CROP_CATALOG WHERE Name = ?');
+                    $catalogCheck->execute([$request['CropName']]);
+                    if (!$catalogCheck->fetchColumn()) {
+                        $pdo->prepare('INSERT INTO CROP_CATALOG (Name, ScientificName) VALUES (?, ?)')
+                            ->execute([$request['CropName'], $request['ScientificName']]);
+                    }
+                }
+                $pdo->prepare("
+                    UPDATE CROP_CATALOG_REQUEST
+                    SET Status = ?, ReviewReason = ?, ReviewedBy = ?, ReviewedAt = NOW()
+                    WHERE RequestID = ?
+                ")->execute([
+                    $decision === 'approve' ? 'Approved' : 'Rejected',
+                    $decision === 'reject' ? $reason : null,
+                    (int) $user['id'],
+                    (int) $requestId,
+                ]);
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
+            respond(['ok' => true]);
+        }
+
         case 'add_resource': {
             $user = requireJsonRole('staff');
             $name = trim($_POST['name'] ?? '');
@@ -2058,6 +2143,78 @@ try {
             respond(['ok' => true, 'plots' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         }
 
+        case 'get_native_crop_catalog': {
+            $user = requireJsonRole('customer');
+            $catalog = $pdo->query('SELECT Name FROM CROP_CATALOG ORDER BY Name')
+                ->fetchAll(PDO::FETCH_ASSOC);
+            $requests = $pdo->prepare("
+                SELECT RequestID, CropName, Status, ReviewReason, RequestedAt
+                FROM CROP_CATALOG_REQUEST
+                WHERE GardenerID = ?
+                ORDER BY RequestedAt DESC, RequestID DESC
+                LIMIT 10
+            ");
+            $requests->execute([$user['id']]);
+            respond([
+                'ok' => true,
+                'crops' => $catalog,
+                'requests' => $requests->fetchAll(PDO::FETCH_ASSOC),
+            ]);
+        }
+
+        case 'request_crop_catalog_addition': {
+            $user = requireJsonRole('customer');
+            foreach (['crop_name', 'notes'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Crop request fields must be text values.'], 422);
+                }
+            }
+            $cropName = trim($_POST['crop_name'] ?? '');
+            $notes = trim($_POST['notes'] ?? '');
+            if ($cropName === '' || mb_strlen($cropName) > 60 || mb_strlen($notes) > 500) {
+                respond(['ok' => false, 'error' => 'Enter a crop name up to 60 characters and notes up to 500 characters.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $gardenerLock = $pdo->prepare('SELECT GardenerID FROM COMMUNITY_GARDENER WHERE GardenerID = ? FOR UPDATE');
+                $gardenerLock->execute([(int) $user['id']]);
+                if (!$gardenerLock->fetchColumn()) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Gardener account not found.'], 404);
+                }
+                $exists = $pdo->prepare('SELECT 1 FROM CROP_CATALOG WHERE Name = ?');
+                $exists->execute([$cropName]);
+                if ($exists->fetchColumn()) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'That crop is already in the native crop list.'], 409);
+                }
+                $pending = $pdo->prepare("
+                    SELECT 1 FROM CROP_CATALOG_REQUEST
+                    WHERE GardenerID = ? AND LOWER(CropName) = LOWER(?) AND Status = 'Pending'
+                    LIMIT 1
+                ");
+                $pending->execute([$user['id'], $cropName]);
+                if ($pending->fetchColumn()) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'You already have a pending request for that crop.'], 409);
+                }
+                $pdo->prepare("
+                    INSERT INTO CROP_CATALOG_REQUEST (GardenerID, CropName, Notes)
+                        VALUES (?, ?, ?)
+                    ")->execute([
+                        $user['id'],
+                        $cropName,
+                        $notes === '' ? null : $notes,
+                    ]);
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
+            respond(['ok' => true]);
+        }
+
         case 'add_crop_log': {
             $user = requireJsonRole('customer');
             foreach (['crop_name', 'planted_date', 'notes', 'est_harvest_date'] as $field) {
@@ -2076,6 +2233,12 @@ try {
             if ($crop === '' || mb_strlen($crop) > 60) {
                 respond(['ok' => false, 'error' => 'Crop name is required and must be 60 characters or fewer.'], 422);
             }
+            $catalogCrop = $pdo->prepare('SELECT Name FROM CROP_CATALOG WHERE Name = ?');
+            $catalogCrop->execute([$crop]);
+            $canonicalCropName = $catalogCrop->fetchColumn();
+            if ($canonicalCropName === false) {
+                respond(['ok' => false, 'error' => 'Choose a crop from the approved native Philippine crop list. Request an addition if it is missing.'], 422);
+            }
             if (!$parsedPlantedDate || $parsedPlantedDate->format('Y-m-d') !== $planted) {
                 respond(['ok' => false, 'error' => 'Choose a valid planted date.'], 422);
             }
@@ -2087,7 +2250,7 @@ try {
             }
 
             $stmt = $pdo->prepare("INSERT INTO GARDEN_PLOTS (GardenerID, CropName, PlantedDate, EstHarvestDate, Notes) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$user['id'], $crop, $planted, $harvest, $notes]);
+            $stmt->execute([$user['id'], $canonicalCropName, $planted, $harvest, $notes]);
             respond(['ok' => true]);
         }
 
