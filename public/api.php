@@ -113,6 +113,17 @@ function requireJsonRole(string $role): array {
     return $user;
 }
 
+function requireInventoryManager(): array {
+    $user = currentUser();
+    if (!$user || (!in_array('staff', $user['roles'], true) && !in_array('admin', $user['roles'], true))) {
+        respond(['ok' => false, 'error' => 'Not authorized.'], 403);
+    }
+    $role = in_array('staff', $user['roles'], true) ? 'staff' : 'admin';
+    $user['id'] = $user['ids'][$role] ?? $user['id'];
+    $user['role'] = $role;
+    return $user;
+}
+
 function syncLegacyCommunityPlots(PDO $pdo): void {
     $pdo->beginTransaction();
     try {
@@ -162,17 +173,17 @@ function mergeOrCreateApprovalRow(PDO $pdo, int $gardenerId, int $resourceId, in
 
 // Same idea for return requests: fold the requested-back quantity into the
 // gardener's existing "Return Requested" row for this resource, if any.
-function mergeOrCreateReturnRequestRow(PDO $pdo, int $gardenerId, int $resourceId, int $qty, int $coordId, ?int $pltId): void {
+function mergeOrCreateReturnRequestRow(PDO $pdo, int $gardenerId, int $resourceId, int $qty, int $coordId, ?int $pltId, string $reason): void {
     $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Return Requested' FOR UPDATE");
     $existing->execute([$gardenerId, $resourceId]);
     $existingId = $existing->fetchColumn();
 
     if ($existingId) {
-        $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = Qty + ?, ReturnRequestedAt = NOW(), CoordID = ? WHERE TxnID = ?")
-            ->execute([$qty, $coordId, (int) $existingId]);
+        $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = Qty + ?, ReturnRequestedAt = NOW(), CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
+            ->execute([$qty, $coordId, $reason, (int) $existingId]);
     } else {
-        $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, CoordID, ResourceID, PltID, Qty, Status, ApprovedAt, ReturnRequestedAt) VALUES (?, ?, ?, ?, ?, 'Return Requested', NOW(), NOW())")
-            ->execute([$gardenerId, $coordId, $resourceId, $pltId, $qty]);
+        $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, CoordID, ResourceID, PltID, Qty, Status, ApprovedAt, ReturnRequestedAt, RejectionReason) VALUES (?, ?, ?, ?, ?, 'Return Requested', NOW(), NOW(), ?)")
+            ->execute([$gardenerId, $coordId, $resourceId, $pltId, $qty, $reason]);
     }
 }
 
@@ -1257,6 +1268,10 @@ try {
                 $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'A rejection reason of no more than 1,000 characters is required.'], 422);
             }
+            if ($decision === 'approve' && $remainder > 0 && ($rejectionReason === '' || mb_strlen($rejectionReason) > 1000)) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'A reason for partial approval of no more than 1,000 characters is required.'], 422);
+            }
 
             if ($decision === 'approve') {
                 $res = $pdo->prepare('SELECT TotalQty FROM RESOURCE WHERE ResourceID = ? FOR UPDATE');
@@ -1286,9 +1301,10 @@ try {
                 recordResourceEvent($pdo, (int) $row['ResourceID'], 'Borrowed', $chosenQty, 'customer', $row['GardenerName'], (int) $row['GardenerID'], $row['GardenerName'], null, $plotId, $plotLabel);
 
                 if ($remainder > 0) {
-                    // Leave the rest of the request pending — don't reject it.
-                    $pdo->prepare('UPDATE RESOURCE_TXN SET Qty = ? WHERE TxnID = ?')
-                        ->execute([$remainder, (int) $txnId]);
+                    // The approved amount is recorded as borrowed; close the
+                    // remainder as rejected so it does not remain in the queue.
+                    $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = ?, Status = 'Rejected', CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
+                        ->execute([$remainder, $user['id'], $rejectionReason, (int) $txnId]);
                 } else {
                     // Nothing left over — the original "Requested" row has been
                     // fully folded into the approval above and is no longer needed.
@@ -1393,7 +1409,7 @@ try {
         }
 
         case 'all_resources': {
-            requireJsonRole('staff');
+            requireInventoryManager();
             $rows = $pdo->query("
                 SELECT R.ResourceID, R.Name, R.TotalQty, R.AvailableQty,
                        G.Name AS BorrowerName, T.TxnID, T.Qty AS BorrowedQty, T.Status AS BorrowerStatus,
@@ -1433,6 +1449,44 @@ try {
                 }
             }
             respond(['ok' => true, 'resources' => array_values($resources)]);
+        }
+
+        case 'update_resource_total': {
+            $user = requireInventoryManager();
+            $resourceId = $_POST['resource_id'] ?? '';
+            $totalQtyRaw = $_POST['total_qty'] ?? '';
+            if (!ctype_digit((string) $resourceId) || !ctype_digit((string) $totalQtyRaw) || (int) $totalQtyRaw > 100000) {
+                respond(['ok' => false, 'error' => 'Choose a resource and enter a total quantity from 0 to 100,000.'], 422);
+            }
+
+            $resourceId = (int) $resourceId;
+            $totalQty = (int) $totalQtyRaw;
+            $pdo->beginTransaction();
+            try {
+                $resourceStmt = $pdo->prepare('SELECT ResourceID FROM RESOURCE WHERE ResourceID = ? FOR UPDATE');
+                $resourceStmt->execute([$resourceId]);
+                if ($resourceStmt->fetchColumn() === false) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Resource not found.'], 404);
+                }
+
+                $borrowedStmt = $pdo->prepare("SELECT COALESCE(SUM(Qty), 0) FROM RESOURCE_TXN WHERE ResourceID = ? AND Status IN ('Approved', 'Return Requested')");
+                $borrowedStmt->execute([$resourceId]);
+                $borrowedQty = (int) $borrowedStmt->fetchColumn();
+                if ($totalQty < $borrowedQty) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => "Total quantity cannot be less than the {$borrowedQty} units currently assigned to gardeners."], 409);
+                }
+
+                $availableQty = $totalQty - $borrowedQty;
+                $pdo->prepare('UPDATE RESOURCE SET TotalQty = ?, AvailableQty = ? WHERE ResourceID = ?')
+                    ->execute([$totalQty, $availableQty, $resourceId]);
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
+            respond(['ok' => true]);
         }
 
         case 'resource_records': {
@@ -1485,8 +1539,12 @@ try {
         case 'request_resource_return': {
             $user = requireJsonRole('staff');
             $txnId = $_POST['txn_id'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
             if (!ctype_digit((string) $txnId)) {
                 respond(['ok' => false, 'error' => 'Invalid transaction.'], 422);
+            }
+            if ($reason === '' || mb_strlen($reason) > 1000) {
+                respond(['ok' => false, 'error' => 'A return-request reason of no more than 1,000 characters is required.'], 422);
             }
 
             $pdo->beginTransaction();
@@ -1513,7 +1571,7 @@ try {
             }
 
             $pltId = $row['PltID'] === null ? null : (int) $row['PltID'];
-            mergeOrCreateReturnRequestRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $returnQty, (int) $user['id'], $pltId);
+            mergeOrCreateReturnRequestRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $returnQty, (int) $user['id'], $pltId, $reason);
             recordResourceEvent($pdo, (int) $row['ResourceID'], 'Return Requested', $returnQty, 'staff', $user['name'], (int) $row['GardenerID'], $row['GardenerName'], (int) $user['id'], $pltId, $row['PlotLabel']);
 
             $remaining = $borrowedQty - $returnQty;

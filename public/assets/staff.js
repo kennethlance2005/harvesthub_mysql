@@ -176,14 +176,35 @@ async function loadResourceTxns() {
 
 async function processResourceTxn(txnId, decision, qty) {
   const params = { txn_id: txnId, decision };
+  const request = resourceTransactions.find(txn => String(txn.TxnID) === String(txnId));
+  if (qty !== undefined && (!/^\d+$/.test(String(qty)) || Number(qty) < 1 || Number(qty) > Number(request?.Qty))) {
+    showToast(request
+      ? `Choose a quantity between 1 and ${request.Qty}.`
+      : 'Enter a valid quantity.', 'danger');
+    return;
+  }
+  const chosenQty = Number(qty === undefined ? request?.Qty : qty);
+  if (decision === 'approve' && request && chosenQty < Number(request.Qty)) {
+    params.reason = await hhPrompt({
+      title: 'Reason for partial approval',
+      message: `You are approving ${chosenQty} of ${request.Qty} requested units. The remaining ${Number(request.Qty) - chosenQty} units will be marked rejected.`,
+      label: 'Reason for Partial Approval',
+      placeholder: 'Explain why the full quantity cannot be approved.',
+      confirmText: 'Approve quantity',
+      tone: 'default',
+    });
+    if (!params.reason) return;
+  }
   if (decision === 'reject') {
     params.reason = await hhPrompt({ title: 'Decline this resource request?', message: 'The gardener will see this reason.', label: 'Reason for declining', placeholder: 'e.g., Not enough stock this week.', confirmText: 'Decline request', tone: 'danger' });
     if (!params.reason) return;
   }
-  if (qty) params.qty = qty;
+  if (qty !== undefined) params.qty = qty;
   const data = await postAction('process_resource_txn', params);
   if (data.ok) {
-    showToast(`Request ${decision === 'approve' ? 'approved' : 'rejected'}.`, 'success');
+    showToast(decision === 'approve' && request && chosenQty < Number(request.Qty)
+      ? `Request partially approved. The remaining ${Number(request.Qty) - chosenQty} units were rejected.`
+      : `Request ${decision === 'approve' ? 'approved' : 'rejected'}.`, 'success');
     loadResourceTxns();
     loadResources();
   } else {
@@ -264,7 +285,7 @@ async function loadResources() {
     return true;
   } catch (error) {
     const tableEl = document.getElementById('resources-table');
-    if (tableEl) tableEl.innerHTML = '<tr><td colspan="4" class="text-muted">Could not load resource inventory.</td></tr>';
+    if (tableEl) tableEl.innerHTML = '<tr><td colspan="5" class="text-muted">Could not load resource inventory.</td></tr>';
     return false;
   }
 }
@@ -360,9 +381,19 @@ async function addResource(name, qty) {
   }
 }
 
-async function requestResourceReturn(txnId, qty) {
+async function requestResourceReturn(txnId, qty, resourceName, gardenerName) {
+  const reason = await hhPrompt({
+    title: 'Reason for return request',
+    message: `Explain why ${gardenerName} needs to return ${qty || 'all'} ${resourceName}.`,
+    label: 'Reason for Return Request',
+    placeholder: 'Enter the reason for requesting this return.',
+    confirmText: 'Send return request',
+  });
+  if (!reason) return;
+
   const params = { txn_id: txnId };
   if (qty) params.qty = qty;
+  params.reason = reason;
   const data = await postAction('request_resource_return', params);
   if (!data.ok) {
     showToast(data.error || 'Could not request this return.', 'danger');
@@ -389,7 +420,9 @@ function renderResources() {
 
   const rows = filtered.map(resource => `
     <tr class="resource-inventory-row">
-      <td data-label="Resource"><span class="resource-name-cell" title="${escapeHtml(resource.Name)}">${escapeHtml(resource.Name)}</span></td>
+      <td data-label="Resource">
+        <span class="resource-name-cell" title="${escapeHtml(resource.Name)}">${escapeHtml(resource.Name)}</span>
+      </td>
       <td data-label="Total">${escapeHtml(String(resource.TotalQty))}</td>
       <td data-label="Available">${escapeHtml(String(resource.AvailableQty))}</td>
       <td data-label="Borrower assignments"><div class="borrower-assignments">${resource.matchingBorrowers.length ? resource.matchingBorrowers.map(borrower => `
@@ -399,24 +432,54 @@ function renderResources() {
             <span class="borrower-assignment-meta" title="${escapeHtml(`${borrower.Qty}x · ${borrower.PlotLabel || 'No plot assigned'}`)}">${escapeHtml(String(borrower.Qty))}x · ${escapeHtml(borrower.PlotLabel || 'No plot assigned')}</span>
             ${borrower.Status === 'Return Requested' ? '<span class="borrower-return-status">Return requested</span>' : ''}
           </div>
-          ${borrower.Status === 'Approved'
+          ${document.body.dataset.inventoryRole !== 'admin' && borrower.Status === 'Approved'
             ? `<div class="return-request-control">
                 <label class="sr-only" for="return-qty-${borrower.TxnID}">Quantity to request back</label>
                 <input type="number" class="qty-choice-input" id="return-qty-${borrower.TxnID}" min="1" max="${borrower.Qty}" value="${borrower.Qty}" title="Quantity to request back">
-                <button class="btn btn-sm btn-return-request request-return-btn" type="button" data-id="${borrower.TxnID}">Request return</button>
+                <button class="btn btn-sm btn-return-request request-return-btn" type="button" data-id="${borrower.TxnID}" data-resource="${escapeHtml(resource.Name)}" data-gardener="${escapeHtml(borrower.Name)}">Request return</button>
               </div>`
             : ''}
         </div>
       `).join('') : resource.Borrowers.length ? '<span class="borrower-empty-state">No borrower assignments match this search.</span>' : '<span class="borrower-empty-state">No current borrowers</span>'}</div></td>
+      <td data-label="Actions"><button class="btn btn-ghost btn-sm edit-resource-btn" type="button" data-id="${resource.ResourceID}" data-name="${escapeHtml(resource.Name)}" data-total="${resource.TotalQty}">Edit</button></td>
     </tr>
   `).join('');
-  tableEl.innerHTML = rows || '<tr class="resource-empty-row"><td colspan="4" class="text-muted">No resources match your search.</td></tr>';
+  tableEl.innerHTML = rows || '<tr class="resource-empty-row"><td colspan="5" class="text-muted">No resources match your search.</td></tr>';
   tableEl.querySelectorAll('.request-return-btn').forEach(button => {
     button.addEventListener('click', () => {
       const input = document.getElementById(`return-qty-${button.dataset.id}`);
-      requestResourceReturn(button.dataset.id, input ? input.value : undefined);
+      requestResourceReturn(button.dataset.id, input ? input.value : undefined, button.dataset.resource, button.dataset.gardener);
     });
   });
+  tableEl.querySelectorAll('.edit-resource-btn').forEach(button => {
+    button.addEventListener('click', () => openResourceEdit(button.dataset.id, button.dataset.name, button.dataset.total));
+  });
+}
+
+function openResourceEdit(resourceId, resourceName, totalQty) {
+  const dialog = document.getElementById('resource-edit-dialog');
+  const nameEl = document.getElementById('resource-edit-name');
+  const idEl = document.getElementById('resource-edit-id');
+  const qtyEl = document.getElementById('resource-edit-total');
+  if (!dialog || !nameEl || !idEl || !qtyEl) return;
+  nameEl.textContent = resourceName;
+  idEl.value = resourceId;
+  qtyEl.value = totalQty;
+  qtyEl.dispatchEvent(new Event('input', { bubbles: true }));
+  dialog.showModal();
+  qtyEl.focus();
+  qtyEl.select();
+}
+
+async function updateResourceTotal(resourceId, totalQty) {
+  const res = await postAction('update_resource_total', { resource_id: resourceId, total_qty: totalQty });
+  if (!res.ok) {
+    showToast(res.error || 'Could not update resource quantity.', 'danger');
+    return;
+  }
+  document.getElementById('resource-edit-dialog')?.close();
+  const loaded = await loadResources();
+  showToast(loaded ? 'Resource quantity updated.' : 'Quantity updated, but inventory could not be refreshed.', loaded ? 'success' : 'danger');
 }
 
 function renderTimelineRecords(listId, records, renderRecord, emptyMessage) {
@@ -598,6 +661,16 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('resource-name').value.trim(),
       document.getElementById('resource-qty').value
     );
+  });
+  document.getElementById('resource-edit-form')?.addEventListener('submit', event => {
+    event.preventDefault();
+    updateResourceTotal(
+      document.getElementById('resource-edit-id').value,
+      document.getElementById('resource-edit-total').value
+    );
+  });
+  document.getElementById('resource-edit-cancel')?.addEventListener('click', () => {
+    document.getElementById('resource-edit-dialog')?.close();
   });
   document.getElementById('plot-status-filter')?.addEventListener('change', event => {
     renderPlots(event.target.value);

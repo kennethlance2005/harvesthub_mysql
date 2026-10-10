@@ -228,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span>${dateLabel}</span>
                         </div>
                         ${r.Status === 'Rejected' && r.RejectionReason ? `<p class="inv-req-reason">Reason: ${escapeHtml(r.RejectionReason)}</p>` : ''}
+                        ${r.Status === 'Return Requested' && r.RejectionReason ? `<p class="inv-req-reason">Return requested by the coordinator: ${escapeHtml(r.RejectionReason)}</p>` : ''}
                     </div>
                     ${r.Status === 'Requested' ? `<button type="button" class="btn btn-ghost btn-sm cancel-request-btn" data-txn="${r.TxnID}" data-name="${escapeHtml(r.Name)}">Cancel</button>` : ''}
                 </div>`;

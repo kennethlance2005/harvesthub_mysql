@@ -20,6 +20,9 @@ $isManageActive = in_array($currentPage, $managePages);
     <a href="admin_dashboard.php" class="sidebar-link <?= $currentPage === 'admin_dashboard.php' ? 'active' : '' ?>">
       Dashboard
     </a>
+    <a href="staff_inventory.php" class="sidebar-link <?= $currentPage === 'staff_inventory.php' ? 'active' : '' ?>">
+      Resource Inventory
+    </a>
     
     <!-- Collapsible Dropdown -->
     <div class="sidebar-dropdown">
