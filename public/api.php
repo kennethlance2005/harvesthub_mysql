@@ -1074,12 +1074,14 @@ try {
         case 'add_personal_item': {
             $user = requireJsonRole('customer');
             $name = trim($_POST['item_name'] ?? '');
-            $qty = (int)($_POST['qty'] ?? 1);
+            $qtyRaw = $_POST['qty'] ?? '';
 
-            if (empty($name) || $qty < 1) respond(['ok' => false, 'error' => 'Invalid item data.'], 422);
+            if ($name === '' || mb_strlen($name) > 100 || !ctype_digit((string) $qtyRaw) || (int) $qtyRaw < 1 || (int) $qtyRaw > 100000) {
+                respond(['ok' => false, 'error' => 'Enter an item name and a quantity from 1 to 100,000.'], 422);
+            }
 
             $stmt = $pdo->prepare("INSERT INTO PERSONAL_INVENTORY (GardenerID, ItemName, Qty) VALUES (?, ?, ?)");
-            $stmt->execute([$user['id'], $name, $qty]);
+            $stmt->execute([$user['id'], $name, (int) $qtyRaw]);
             respond(['ok' => true]);
         }
 
@@ -2102,16 +2104,53 @@ try {
             ");
             $previous->execute([$gardenerId, (int) $applicationId]);
 
+            $activityStmt = $pdo->prepare("
+                SELECT ActivityType, OccurredAt, Action, Subject, Details, PlotLabel
+                FROM (
+                    SELECT
+                        'Crop' AS ActivityType,
+                        L.LogID AS ActivityID,
+                        L.LoggedAt AS OccurredAt,
+                        'Maintenance logged' AS Action,
+                        L.CropName AS Subject,
+                        CONCAT_WS(' · ',
+                            NULLIF(L.MaintenanceNotes, ''),
+                            CASE WHEN L.HarvestYield IS NOT NULL AND L.HarvestYield <> '' THEN CONCAT('Yield: ', L.HarvestYield) END
+                        ) AS Details,
+                        P.Label AS PlotLabel
+                    FROM CROP_LOG L
+                    LEFT JOIN PLOT P ON P.PltID = L.PltID
+                    WHERE L.GardenerID = ?
+
+                    UNION ALL
+
+                    SELECT
+                        'Resource' AS ActivityType,
+                        E.EventID AS ActivityID,
+                        E.OccurredAt AS OccurredAt,
+                        E.EventType AS Action,
+                        R.Name AS Subject,
+                        CONCAT(E.Qty, ' unit(s) · ', E.ActorName) AS Details,
+                        E.PlotLabel AS PlotLabel
+                    FROM RESOURCE_EVENT E
+                    JOIN RESOURCE R ON R.ResourceID = E.ResourceID
+                    WHERE E.GardenerID = ?
+                ) AS GardenerActivity
+                ORDER BY OccurredAt DESC, ActivityType, ActivityID DESC
+            ");
+            $activityStmt->execute([$gardenerId, $gardenerId]);
+
             respond([
                 'ok' => true,
                 'application' => $application,
                 'member_since' => $memberSince->fetchColumn() ?: null,
                 'activity' => [
                     'plots' => $plots->fetchAll(PDO::FETCH_COLUMN),
-                    'crops_logged' => $count('SELECT COUNT(*) FROM GARDEN_PLOTS WHERE GardenerID = ?'),
+                    'crops_logged' => $count('SELECT COUNT(DISTINCT CropName) FROM CROP_LOG WHERE GardenerID = ?'),
                     'maintenance_entries' => $count('SELECT COUNT(*) FROM CROP_LOG WHERE GardenerID = ?'),
                     'items_borrowed' => $count("SELECT COALESCE(SUM(Qty), 0) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status IN ('Approved', 'Return Requested')"),
                     'active_listings' => $count("SELECT COUNT(*) FROM EXCHANGE_BOARD WHERE GardenerID = ? AND Status = 'Active'"),
+                    'history' => $activityStmt->fetchAll(PDO::FETCH_ASSOC),
                 ],
                 'previous_applications' => $previous->fetchAll(PDO::FETCH_ASSOC),
             ]);

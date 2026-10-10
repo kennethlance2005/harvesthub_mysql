@@ -538,6 +538,15 @@ a { color: inherit; }
 .review-history li { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.86rem; }
 .review-history li:last-child { border-bottom: none; }
 .review-history .review-reason { display: block; margin-top: 3px; color: var(--ink-600); }
+.review-activity { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.review-activity summary { color: var(--brown-700); font-size: 0.86rem; font-weight: 700; cursor: pointer; }
+.review-activity-list { max-height: 320px; margin: 8px 0 0; padding: 0; overflow-y: auto; list-style: none; }
+.review-activity-item { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.review-activity-item:last-child { border-bottom: 0; }
+.review-activity-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.review-activity-head strong { min-width: 0; overflow-wrap: anywhere; }
+.review-activity-time, .review-activity-detail { color: var(--ink-600); font-size: 0.8rem; }
+.review-activity-detail { margin: 0; overflow-wrap: anywhere; }
 .review-muted { margin: 0; color: var(--ink-600); font-size: 0.86rem; }
 
 @media (max-width: 480px) {

@@ -84,6 +84,6 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
     </div>
   </form>
 </dialog>
-<script src="assets/staff.js?v=20"></script>
+<script src="assets/staff.js?v=21"></script>
 </body>
 </html>

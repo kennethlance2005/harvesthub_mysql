@@ -271,6 +271,13 @@ function formatAdminDate(value) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatAdminDateTime(value) {
+  if (!value) return '';
+  const date = new Date(String(value).replace(' ', 'T'));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 // "2026-10-07 12:30:35" -> "3 days ago"
 function timeAgo(value) {
   const date = new Date(String(value || '').replace(' ', 'T'));
@@ -292,6 +299,20 @@ function reviewHistory(items, describe) {
       <strong>${escapeHtml(item.Status)}</strong> · requested ${escapeHtml(formatAdminDate(item.RequestedAt))}${describe ? escapeHtml(describe(item)) : ''}
       ${item.RejectionReason ? `<span class="review-reason">Reason: ${escapeHtml(item.RejectionReason)}</span>` : ''}
     </li>`).join('')}</ul>`;
+}
+
+function renderGardenerActivity(items) {
+  if (!items.length) return '<p class="review-muted">No crop or resource activity has been recorded.</p>';
+  return `<ol class="review-activity-list">${items.map(item => `
+    <li class="review-activity-item">
+      <div class="review-activity-head">
+        <strong>${escapeHtml(item.Subject)}</strong>
+        <span class="badge ${item.ActivityType === 'Crop' ? 'badge-green' : 'badge-brown'}">${escapeHtml(item.Action)}</span>
+      </div>
+      <time class="review-activity-time" datetime="${escapeHtml(String(item.OccurredAt).replace(' ', 'T'))}">${escapeHtml(formatAdminDateTime(item.OccurredAt))}</time>
+      ${item.PlotLabel ? `<span class="review-activity-detail">${escapeHtml(item.PlotLabel)}</span>` : ''}
+      ${item.Details ? `<p class="review-activity-detail">${escapeHtml(item.Details)}</p>` : ''}
+    </li>`).join('')}</ol>`;
 }
 
 // Shows the review dialog; a cancelled rejection reason returns to the review.
@@ -418,6 +439,10 @@ async function reviewCoordinatorApplication(applicationId, button) {
         ${reviewField('Items borrowed now', a.items_borrowed)}
         ${reviewField('Active exchange listings', a.active_listings)}
       </dl>
+      <details class="review-activity">
+        <summary>View activity log (${a.history.length} entries)</summary>
+        ${renderGardenerActivity(a.history)}
+      </details>
     </section>
     <section class="review-section">
       <h4>Earlier coordinator applications</h4>
@@ -964,32 +989,39 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const submitBtn = createAdminForm.querySelector('button[type="submit"]');
+      if (!createAdminForm.reportValidity()) return;
       submitBtn.disabled = true;
 
-      const res = await fetch('api.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          action: 'create_admin',
-          first_name: document.getElementById('new-admin-first-name').value,
-          last_name: document.getElementById('new-admin-last-name').value,
-          email: document.getElementById('new-admin-email').value,
-          age: document.getElementById('new-admin-age').value,
-          location: document.getElementById('new-admin-location').value,
-          password: password
-        })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast('Administrator account created successfully!', 'success');
-        createAdminForm.reset();
-        updateAdminPasswordRequirements();
-        if (adminPasswordReqs) adminPasswordReqs.classList.remove('active');
-        loadAccounts();
-      } else {
-        showToast(data.error || 'Failed to create account.', 'danger');
+      try {
+        const res = await fetch('api.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            action: 'create_admin',
+            first_name: document.getElementById('new-admin-first-name').value,
+            last_name: document.getElementById('new-admin-last-name').value,
+            email: document.getElementById('new-admin-email').value,
+            age: document.getElementById('new-admin-age').value,
+            location: document.getElementById('new-admin-location').value,
+            password: password
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('Administrator account created successfully!', 'success');
+          createAdminForm.reset();
+          updateAdminPasswordRequirements();
+          if (adminPasswordReqs) adminPasswordReqs.classList.remove('active');
+          loadAccounts();
+        } else {
+          showToast(data.error || 'Failed to create account.', 'danger');
+        }
+      } catch (error) {
+        console.error('Error creating administrator:', error);
+        showToast('Network error. Please try again.', 'danger');
+      } finally {
+        submitBtn.disabled = false;
       }
-      submitBtn.disabled = false;
     });
   }
 

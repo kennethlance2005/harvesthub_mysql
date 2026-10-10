@@ -133,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = addForm.querySelector('button[type="submit"]');
+            if (!addForm.reportValidity()) return;
             const cropName = document.getElementById('plot-crop-name').value.trim();
             const plantedDate = document.getElementById('plot-planted-date').value;
             const notes = document.getElementById('plot-notes').value.trim();

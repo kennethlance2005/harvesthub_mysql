@@ -63,7 +63,7 @@ $navTitle = 'My Crops';
 					<section class="panel crops-card" aria-labelledby="add-crop-title">
 						<h2 class="panel-title" id="add-crop-title">Log a crop</h2>
 						<p class="crops-card-sub">Add a new planting to your garden log.</p>
-						<form id="add-plot-form" class="maintenance-form" novalidate>
+						<form id="add-plot-form" class="maintenance-form">
 							<div class="field">
 								<label for="plot-crop-name">Crop name <span class="required">*</span></label>
 								<input type="text" id="plot-crop-name" placeholder="e.g., Cherry Tomatoes" pattern="[A-Za-z\s]+" title="Letters and spaces only." required>
@@ -110,7 +110,7 @@ $navTitle = 'My Crops';
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
-<script src="assets/customer.js?v=12"></script>
-<script src="assets/plots.js?v=11"></script>
+<script src="assets/customer.js?v=13"></script>
+<script src="assets/plots.js?v=12"></script>
 </body>
 </html>

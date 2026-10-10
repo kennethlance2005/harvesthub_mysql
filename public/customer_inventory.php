@@ -67,14 +67,14 @@ $navTitle = 'Resource Inventory';
             <button type="button" class="btn btn-ghost btn-sm inv-donate-open" id="open-donation-form">Donate an item</button>
 
             <!-- Add Personal Item Form -->
-            <form id="add-personal-form" class="inv-add-form" novalidate>
+            <form id="add-personal-form" class="inv-add-form">
               <div class="inv-add-field inv-add-name">
                 <label for="personal-item-name">Add your own item <span class="required">*</span></label>
                 <input type="text" id="personal-item-name" placeholder="E.g., Pruning Shears" maxlength="100" required>
               </div>
               <div class="inv-add-field inv-add-qty">
                 <label for="personal-item-qty">Qty <span class="required">*</span></label>
-                <input type="number" id="personal-item-qty" min="1" value="1" required>
+                <input type="number" id="personal-item-qty" min="1" max="100000" value="1" required>
               </div>
               <button type="submit" class="btn btn-accent btn-sm inv-btn">Add item</button>
             </form>
@@ -128,6 +128,6 @@ $navTitle = 'Resource Inventory';
   </form>
 </dialog>
 <script src="assets/app.js"></script>
-<script src="assets/inventory.js?v=14"></script>
+<script src="assets/inventory.js?v=15"></script>
 </body>
 </html>

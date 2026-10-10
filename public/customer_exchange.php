@@ -56,7 +56,7 @@ $navTitle = 'Exchange Board';
             <h2 class="panel-title" id="post-item-title">Post an item</h2>
             <p class="ex-card-sub">Have extra harvest? List it here.</p>
 
-            <form id="add-exchange-form" class="ex-form" novalidate>
+            <form id="add-exchange-form" class="ex-form">
               <div class="field">
                 <label for="exchange-item">Harvested crop <span class="required">*</span></label>
                 <select id="exchange-item" required>
@@ -119,18 +119,18 @@ $navTitle = 'Exchange Board';
   <div class="gardener-modal-box gardener-modal-form">
     <h3 id="claim-modal-title">Request to claim</h3>
 
-    <form id="submit-claim-form" class="ex-form" novalidate>
+    <form id="submit-claim-form" class="ex-form">
       <!-- Hidden input to remember which post is being claimed -->
       <input type="hidden" id="claim-post-id">
 
       <div class="field">
         <label for="claim-qty">Quantity wanted <span class="required">*</span></label>
-        <input type="text" id="claim-qty" placeholder="e.g., 2 pcs, 1 kg" required>
+        <input type="text" id="claim-qty" maxlength="50" placeholder="e.g., 2 pcs, 1 kg" required>
       </div>
 
       <div class="field">
         <label for="claim-pickup">Preferred pickup details <span class="required">*</span></label>
-        <textarea id="claim-pickup" placeholder="e.g., Tomorrow at 10 AM by the main gate" rows="3" required></textarea>
+        <textarea id="claim-pickup" maxlength="500" placeholder="e.g., Tomorrow at 10 AM by the main gate" rows="3" required></textarea>
       </div>
 
       <div class="gardener-modal-actions">
@@ -141,6 +141,6 @@ $navTitle = 'Exchange Board';
   </div>
 </div>
 <script src="assets/app.js"></script>
-<script src="assets/exchange.js?v=3"></script>
+<script src="assets/exchange.js?v=4"></script>
 </body>
 </html>

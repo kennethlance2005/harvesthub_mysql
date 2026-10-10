@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Attach listeners to open the Claim popup
             document.querySelectorAll('.open-claim-modal-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    const postId = e.target.getAttribute('data-id');
+                    const postId = e.currentTarget.getAttribute('data-id');
                     
                     // Reset and open the modal
                     document.getElementById('claim-post-id').value = postId;
@@ -88,27 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (submitClaimForm) {
         submitClaimForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const btn = submitClaimForm.querySelector('button[type="submit"]');
-            btn.disabled = true;
-
-            const postId = document.getElementById('claim-post-id').value;
-            const qty = document.getElementById('claim-qty').value;
-            const pickup = document.getElementById('claim-pickup').value;
-
-            // Note: Eventually we will send this data to a new 'send_claim_request' endpoint in api.php
-            console.log(`Sending claim request for Post ${postId}. Qty: ${qty}, Pickup: ${pickup}`);
-
-            if (typeof showToast === 'function') {
-                showToast('Claim request sent to the gardener!', 'success');
-            }
-
-            // Close the modal and re-enable the button
-            claimModal.style.display = 'none';
-            btn.disabled = false;
-        });
-    }if (submitClaimForm) {
-        submitClaimForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
+            if (!submitClaimForm.reportValidity()) return;
             const btn = submitClaimForm.querySelector('button[type="submit"]');
             btn.disabled = true;
 
@@ -133,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 console.error("Error sending claim:", err);
+                if (typeof showToast === 'function') showToast('Network error while sending your request. Please try again.', 'danger');
             } finally {
                 btn.disabled = false;
             }
@@ -185,10 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const result = await res.json();
                         
                        if (result.ok) {
-                            if (typeof showToast === 'function') showToast(`Request ${status.toLowerCase()}!`, 'success');
-                            loadPendingRequests(); 
-                            
-                            // Add these two lines to refresh the feeds with the new quantities
+                            if (typeof showToast === 'function') showToast('Listing closed.', 'success');
                             loadExchangeFeed(); 
                             loadMyListings(); 
                         } else {
@@ -196,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             e.target.disabled = false;
                         }
                     } catch (err) {
+                        if (typeof showToast === 'function') showToast('Network error while closing the listing.', 'danger');
                         btn.disabled = false;
                     }
                 });
@@ -250,6 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = addForm.querySelector('button[type="submit"]');
+            if (!addForm.reportValidity()) return;
             btn.disabled = true;
 
             const gardenPlotId = document.getElementById('exchange-item').value;
@@ -278,6 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 console.error("Error creating post:", err);
+                if (typeof showToast === 'function') showToast('Network error while posting the item. Please try again.', 'danger');
             } finally {
                 btn.disabled = false;
             }
@@ -340,9 +321,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Attach listeners to Accept/Reject buttons
             document.querySelectorAll('.handle-claim-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
-                    const claimId = e.target.getAttribute('data-id');
-                    const status = e.target.getAttribute('data-status');
-                    e.target.disabled = true;
+                    const claimId = btn.dataset.id;
+                    const status = btn.dataset.status;
+                    btn.disabled = true;
 
                     try {
                         const res = await fetch('api.php', {
@@ -357,10 +338,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             loadPendingRequests(); 
                         } else {
                             if (typeof showToast === 'function') showToast(result.error || 'Action failed.', 'danger');
-                            e.target.disabled = false;
+                            btn.disabled = false;
                         }
                     } catch (err) {
-                        e.target.disabled = false;
+                        if (typeof showToast === 'function') showToast('Network error while processing the request.', 'danger');
+                        btn.disabled = false;
                     }
                 });
             });

@@ -15,12 +15,17 @@ function showToast(message, type = 'success') {
 }
 
 async function postAction(action, params) {
-  const res = await fetch('api.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ action, ...params }),
-  });
-  return res.json();
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ action, ...params }),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error(`Request failed (${action}):`, error);
+    return { ok: false, error: 'Network error. Please try again.' };
+  }
 }
 
 // ---------- Plot ----------
@@ -56,12 +61,14 @@ async function loadPlot() {
           confirmText: 'Send request',
           tone: 'danger',
         })) return;
+        button.disabled = true;
         const result = await postAction('request_plot_unassignment', { plt_id: button.dataset.id });
         if (result.ok) {
           showToast('Unassignment request submitted.', 'success');
           loadPlot();
         } else {
           showToast(result.error || 'Could not submit unassignment request.', 'danger');
+          button.disabled = false;
         }
       });
     });
@@ -95,6 +102,7 @@ async function loadPlot() {
   const applyPlotBtn = document.getElementById('apply-plot-btn');
   if (applyPlotBtn) {
     applyPlotBtn.addEventListener('click', async () => {
+      applyPlotBtn.disabled = true;
       const pltId = document.getElementById('plot-select').value;
       const result = await postAction('apply_plot', { plt_id: pltId });
       if (result.ok) {
@@ -102,6 +110,7 @@ async function loadPlot() {
         loadPlot();
       } else {
         showToast(result.error || 'Could not submit application.', 'danger');
+        applyPlotBtn.disabled = false;
       }
     });
   }
@@ -144,34 +153,46 @@ if (croplogForm) {
     e.preventDefault();
     const alertEl = document.getElementById('croplog-alert');
     alertEl.hidden = true;
+    const submitButton = croplogForm.querySelector('button[type="submit"]');
 
     const cropSelection = document.getElementById('crop-name').value.trim();
     if (cropSelection === '') {
       alertEl.textContent = 'Select a crop from your garden log.';
       alertEl.hidden = false;
+      document.getElementById('crop-name').focus();
       return;
     }
 
     const cropOptions = document.getElementById('maintenance-crop-options');
     const selectedCrop = cropOptions && Array.from(cropOptions.options).find(option => option.value.toLowerCase() === cropSelection.toLowerCase());
-    if (cropOptions && !selectedCrop) {
+    if (!selectedCrop) {
       alertEl.textContent = 'Choose a crop and planted date from your garden log.';
       alertEl.hidden = false;
+      document.getElementById('crop-name').focus();
       return;
     }
 
-    const result = await postAction('croplog_create', {
-      garden_plot_id: selectedCrop.dataset.plotId,
-      notes: document.getElementById('crop-notes').value.trim(),
-      yield: document.getElementById('crop-yield').value.trim(),
-    });
+    submitButton.disabled = true;
+    try {
+      const result = await postAction('croplog_create', {
+        garden_plot_id: selectedCrop.dataset.plotId,
+        notes: document.getElementById('crop-notes').value.trim(),
+        yield: document.getElementById('crop-yield').value.trim(),
+      });
 
-    if (result.ok) {
-      e.target.reset();
-      loadCropLog();
-    } else {
-      alertEl.textContent = result.error || 'Could not save entry.';
+      if (result.ok) {
+        if (typeof showToast === 'function') showToast('Maintenance entry saved.', 'success');
+        e.target.reset();
+        await loadCropLog();
+      } else {
+        alertEl.textContent = result.error || 'Could not save entry.';
+        alertEl.hidden = false;
+      }
+    } catch (error) {
+      alertEl.textContent = 'Network error. Please try again.';
       alertEl.hidden = false;
+    } finally {
+      submitButton.disabled = false;
     }
   });
 }
@@ -348,6 +369,7 @@ async function loadCoordinatorApplication() {
     form.addEventListener('submit', async event => {
     event.preventDefault();
     const submit = form.querySelector('button[type="submit"]');
+    if (!form.reportValidity()) return;
     submit.disabled = true;
     try {
       const result = await postAction('apply_coordinator', {

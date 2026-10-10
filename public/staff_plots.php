@@ -65,6 +65,6 @@ $user = requireRole('staff');
 </div>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=16"></script>
+<script src="assets/staff.js?v=17"></script>
 </body>
 </html>

@@ -413,6 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             btn.disabled = false;
                         }
                     } catch (err) {
+                        if (typeof showToast === 'function') showToast('Network error while returning the item.', 'danger');
                         btn.disabled = false;
                     } finally {
                         busyCount--;
@@ -441,6 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             btn.disabled = false;
                         }
                     } catch (err) {
+                        if (typeof showToast === 'function') showToast('Network error while removing the item.', 'danger');
                         btn.disabled = false;
                     } finally {
                         busyCount--;
@@ -463,6 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addPersonalForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = addPersonalForm.querySelector('button[type="submit"]');
+            if (!addPersonalForm.reportValidity()) return;
             btn.disabled = true;
 
             const itemName = document.getElementById('personal-item-name').value;
@@ -486,6 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 console.error("Error adding personal item:", err);
+                if (typeof showToast === 'function') showToast('Network error while adding your item. Please try again.', 'danger');
             } finally {
                 btn.disabled = false;
                 busyCount--;

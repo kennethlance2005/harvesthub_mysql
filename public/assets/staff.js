@@ -141,12 +141,17 @@ function renderResourceTransactions() {
 }
 
 async function postAction(action, params) {
-  const res = await fetch('api.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ action, ...params }),
-  });
-  return res.json();
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ action, ...params }),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error(`Request failed (${action}):`, error);
+    return { ok: false, error: 'Network error. Please try again.' };
+  }
 }
 
 async function loadApplications() {
@@ -663,6 +668,8 @@ function renderCoordinatorOverview() {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('create-plot-form')?.addEventListener('submit', event => {
     event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     createPlot(document.getElementById('new-plot-label').value.trim());
   });
   [
@@ -679,6 +686,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('add-resource-form')?.addEventListener('submit', event => {
     event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     addResource(
       document.getElementById('resource-name').value.trim(),
       document.getElementById('resource-qty').value
@@ -686,6 +695,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('resource-edit-form')?.addEventListener('submit', event => {
     event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     updateResourceTotal(
       document.getElementById('resource-edit-id').value,
       document.getElementById('resource-edit-total').value
