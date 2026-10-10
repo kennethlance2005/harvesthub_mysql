@@ -4,8 +4,8 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 
 // Links grouped into dropdowns. Each link only shows when the person's roles
 // allow them to open that page (see PAGE_PERMISSIONS in auth.php).
-$gardenPages = ['staff_plots.php' => 'Plots', 'staff_inventory.php' => 'Resource Inventory', 'staff_records.php' => 'Records'];
-$managePages = ['admin_manage_gardeners.php' => 'Gardeners', 'admin_manage_coordinators.php' => 'Coordinators', 'admin_manage_admins.php' => 'Administrators'];
+$gardenPages = ['admin_overview.php' => 'Overview', 'staff_plots.php' => 'Plots', 'staff_inventory.php' => 'Resource Inventory', 'staff_records.php' => 'Records'];
+$managePages = ['admin_manage_gardeners.php' => 'Gardeners', 'admin_manage_coordinators.php' => 'Coordinators', 'admin_manage_admins.php' => 'Administrators', 'admin_activity.php' => 'User Activity'];
 $visible = static fn (array $pages) => array_filter($pages, 'canOpen', ARRAY_FILTER_USE_KEY);
 $gardenLinks = $visible($gardenPages);
 $manageLinks = $visible($managePages);

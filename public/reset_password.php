@@ -13,7 +13,7 @@ if (!$email || !$token) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Set New Password</title>
-<link rel="stylesheet" href="assets/style.css?v=48">
+<link rel="stylesheet" href="assets/style.css?v=50">
 </head>
 <body>
 <div class="login-shell">

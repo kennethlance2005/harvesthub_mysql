@@ -10,7 +10,7 @@ $navTitle = 'System Dashboard';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Admin Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=48">
+<link rel="stylesheet" href="assets/style.css?v=50">
 <!-- Load Chart.js for the graph -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -71,6 +71,6 @@ $navTitle = 'System Dashboard';
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=20"></script>
+<script src="assets/admin.js?v=22"></script>
 </body>
 </html>

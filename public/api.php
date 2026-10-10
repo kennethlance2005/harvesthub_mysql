@@ -46,6 +46,7 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/audit.php';
 require_once __DIR__ . '/roles.php';
+require_once __DIR__ . '/activity.php';
 require_once __DIR__ . '/email.php';
 
 function sendResetEmail(string $toEmail, string $resetLink): bool {
@@ -3912,6 +3913,57 @@ try {
             }
             $pdo->commit();
             respond(['ok' => true, 'changes' => $changes]);
+        }
+
+        // ---------- User activity and Garden Overview (sections 3 and 4) ----------
+
+        // Everyone with their last sign-in, sign-in count and failed attempts.
+        case 'user_activity': {
+            requireJsonPermission('accounts.view');
+            respond(['ok' => true, 'people' => activityPeople($pdo), 'tracking_since' => auditTrackingSince($pdo)]);
+        }
+
+        // One person's profile: details, roles, activity summary, crops, requests and timeline.
+        case 'user_profile': {
+            requireJsonPermission('accounts.view');
+            $type = (string) ($_GET['type'] ?? '');
+            $id = (int) ($_GET['id'] ?? 0);
+            $person = isset(ROLE_ACCOUNT_TABLES[$type]) && $id > 0 ? findActivityPerson($pdo, $type, $id) : null;
+            if (!$person) respond(['ok' => false, 'error' => 'This account could not be found.'], 404);
+            respond(['ok' => true] + userProfile($pdo, $person));
+        }
+
+        // Garden Overview tabs. Each tab also needs the matching permission.
+        case 'overview': {
+            requireJsonPermission('overview.view');
+            switch ($_GET['section'] ?? '') {
+                case 'plots':
+                    requirePermissionFor('plots.view');
+                    respond(['ok' => true, 'plots' => overviewPlots($pdo)]);
+                case 'resources':
+                    requirePermissionFor('resources.view');
+                    respond(['ok' => true] + overviewResources($pdo));
+                case 'requests':
+                    $kinds = array_keys(array_filter([
+                        'plot' => can('plots.view'),
+                        'resource' => can('resources.view'),
+                        'coordinator' => can('coordinator_applications.review'),
+                        'crop' => can('crops.review_catalog'),
+                    ]));
+                    respond(['ok' => true, 'kinds' => $kinds, 'requests' => overviewRequests($pdo, $kinds)]);
+                case 'exchange':
+                    respond(['ok' => true, 'listings' => overviewExchange($pdo)]);
+                case 'registrations':
+                    requirePermissionFor('registrations.review');
+                    respond(['ok' => true, 'registrations' => overviewRegistrations($pdo)]);
+            }
+            respond(['ok' => false, 'error' => 'Unknown section.'], 422);
+        }
+
+        case 'overview_plot_history': {
+            requireJsonPermission('overview.view');
+            requirePermissionFor('plots.view');
+            respond(['ok' => true] + overviewPlotHistory($pdo, (int) ($_GET['plot_id'] ?? 0)));
         }
 
         case 'dashboard_charts': {

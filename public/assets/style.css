@@ -2899,3 +2899,65 @@ input[type="image"]:disabled,
 .no-access-box { width: min(100%, 480px); text-align: center; }
 .no-access-box h1 { margin: 4px 0 10px; font-family: var(--font-display); font-size: 1.5rem; }
 .no-access-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
+
+/* ---------- Admin: User Activity, profiles, Garden Overview ---------- */
+.activity-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.activity-stats:empty { display: none; }
+.stat-hint { margin-top: 4px; color: var(--ink-600); font-size: 0.78rem; line-height: 1.35; overflow-wrap: anywhere; }
+.activity-filter-grid { grid-template-columns: minmax(200px, 2fr) repeat(3, minmax(140px, 1fr)); }
+.activity-note { margin: 0 0 10px; font-size: 0.82rem; }
+.activity-role { margin: 0 4px 4px 0; }
+.profile-link { color: var(--green-800); font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.profile-link:hover { color: var(--brown-700); text-decoration-color: currentColor; }
+.activity-table .audit-ago,
+.requests-table .audit-ago,
+.overview-panel .audit-ago { overflow-wrap: anywhere; }
+
+.profile-back { display: inline-block; margin-bottom: 14px; color: var(--ink-600); font-size: 0.88rem; text-decoration: none; }
+.profile-back:hover { color: var(--brown-700); }
+.profile-head #profile-subtitle { margin-top: 8px; }
+.profile-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.profile-panel { margin-bottom: 20px; padding: 20px 22px; }
+.profile-subheading { margin: 18px 0 8px; color: var(--ink-600); font-family: var(--font-body); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.profile-subheading:first-child { margin-top: 0; }
+.profile-role-list { margin: 0 0 12px; }
+.profile-select { padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--cream-100); font: inherit; font-size: 0.88rem; }
+.request-reason { color: var(--danger); font-weight: 600; }
+.profile-timeline { margin: 0; padding: 0; list-style: none; }
+.profile-timeline-item { display: grid; grid-template-columns: 170px auto minmax(0, 1fr); align-items: baseline; gap: 4px 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
+.profile-timeline-item:last-child { border-bottom: 0; }
+.profile-timeline-item time { color: var(--ink-600); font-size: 0.82rem; }
+.profile-timeline-item p { margin: 0; line-height: 1.45; overflow-wrap: anywhere; }
+
+.overview-tabs { margin-bottom: 16px; flex-wrap: wrap; }
+.overview-panel { padding: 20px 22px; }
+.overview-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 14px; }
+.overview-toolbar > .text-muted { flex: 1 1 260px; margin: 0; font-size: 0.88rem; }
+.overview-toolbar select,
+.overview-search { padding: 8px 11px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--cream-100); color: var(--ink-900); font: inherit; font-size: 0.88rem; }
+.overview-search { flex: 0 1 280px; min-width: 0; }
+.overview-toolbar select:focus,
+.overview-search:focus { outline: none; border-color: var(--brown-600); background: var(--white); }
+.overview-check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.88rem; white-space: nowrap; }
+.overview-check input { accent-color: var(--brown-600); }
+.overview-count { margin: -4px 0 8px; font-size: 0.84rem; }
+.overview-overdue td { background: #fbefd5; }
+.overview-claims { margin: 0; padding: 0; list-style: none; }
+.overview-claims li { padding: 4px 0; }
+.overview-claims li + li { border-top: 1px dashed var(--line); }
+
+@media (max-width: 1000px) {
+  .activity-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .profile-columns { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .profile-timeline-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .profile-timeline-item p { grid-column: 1 / -1; }
+  .overview-search { flex: 1 1 100%; }
+  .overview-toolbar select { flex: 1 1 45%; }
+}
+@media (max-width: 520px) {
+  .activity-filter-grid { grid-template-columns: minmax(0, 1fr); }
+  .activity-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.paged-more { margin-top: 12px; }

@@ -130,7 +130,7 @@ async function loadAccounts() {
   if (gardenersTable) {
     gardenersTable.innerHTML = data.gardeners.map(g => `
       <tr data-name="${escapeHtml(g.Name)}" data-location="${escapeHtml(g.Location || '')}" data-status="${escapeHtml(g.Status)}">
-        <td data-label="Name">${escapeHtml(g.Name)}${customRoleBadges(g.custom_roles)}</td>
+        <td data-label="Name">${profileLink('gardener', g.id, g.Name)}${customRoleBadges(g.custom_roles)}</td>
         <td data-label="Email">${escapeHtml(g.Email)}</td>
         <td data-label="Location">${escapeHtml(g.Location || 'Not provided')}</td>
         <td data-label="Status">${accountStatusBadge(g.Status)}</td>
@@ -148,7 +148,7 @@ async function loadAccounts() {
   if (coordsTable) {
     coordsTable.innerHTML = data.coordinators.map(c => `
       <tr data-name="${escapeHtml(c.Name)}" data-location="${escapeHtml(c.Location || '')}" data-status="${escapeHtml(c.Status)}">
-        <td data-label="Name">${escapeHtml(c.Name)}${c.GardenerID ? ' <span class="badge badge-neutral admin-you-badge" title="This person also has a gardener account, which they keep if the coordinator role is removed.">Also a gardener</span>' : ''}${customRoleBadges(c.custom_roles)}</td>
+        <td data-label="Name">${profileLink('coordinator', c.id, c.Name)}${c.GardenerID ? ' <span class="badge badge-neutral admin-you-badge" title="This person also has a gardener account, which they keep if the coordinator role is removed.">Also a gardener</span>' : ''}${customRoleBadges(c.custom_roles)}</td>
         <td data-label="Email">${escapeHtml(c.Email)}</td>
         <td data-label="Shift">${escapeHtml(c.Shift)}</td>
         <td data-label="Location">${escapeHtml(c.Location || 'Not provided')}</td>
@@ -168,7 +168,7 @@ async function loadAccounts() {
   if (adminsTable) {
     adminsTable.innerHTML = data.admins.map(a => `
       <tr data-name="${escapeHtml(a.Name)}" data-location="${escapeHtml(a.Location || '')}" data-status="${escapeHtml(a.Status)}">
-        <td data-label="Name">${escapeHtml(a.Name)}${a.id === data.current_user_id ? ' <span class="badge badge-neutral admin-you-badge">You</span>' : ''}</td>
+        <td data-label="Name">${profileLink('admin', a.id, a.Name)}${a.id === data.current_user_id ? ' <span class="badge badge-neutral admin-you-badge">You</span>' : ''}</td>
         <td data-label="Email">${escapeHtml(a.Email)}</td>
         <td data-label="Location">${escapeHtml(a.Location || 'Not provided')}</td>
         <td data-label="Status">${accountStatusBadge(a.Status)}</td>
@@ -475,6 +475,55 @@ function timeAgo(value) {
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   return `${days} days ago`;
+}
+
+// ---------- Shared by User Activity, profiles and the Garden Overview ----------
+
+// A name that opens the person's profile (plain text if this viewer can't open profiles)
+function profileLink(type, id, name) {
+  if (!id || !adminCan('accounts.view')) return escapeHtml(name || 'Unknown');
+  return `<a class="profile-link" href="admin_user.php?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}">${escapeHtml(name || 'Unknown')}</a>`;
+}
+
+const REQUEST_KIND_LABELS = { plot: 'Plot', resource: 'Resource', coordinator: 'Coordinator', crop: 'Crop catalog' };
+
+function outcomeBadge(outcome, status) {
+  const tone = { Pending: 'badge-brown', Approved: 'badge-green', Rejected: 'badge-danger', Cancelled: 'badge-neutral' }[outcome] || 'badge-neutral';
+  // Show the finer status underneath when it says more, e.g. Approved, then "Returned"
+  const detail = status && status !== outcome && !(outcome === 'Pending' && status === 'Requested') ? status : '';
+  return `<span class="badge ${tone}">${escapeHtml(outcome)}</span>${detail ? `<span class="audit-ago">${escapeHtml(detail)}</span>` : ''}`;
+}
+
+// Shows the first `step` rows of a long list, with a "Show more" button under the table.
+// render(rows) draws the rows; call the returned function again whenever the list changes.
+function pagedRows(tableWrap, step, render) {
+  let limit = step;
+  let current = [];
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn-ghost btn-sm paged-more';
+  button.addEventListener('click', () => { limit += step; draw(); });
+  tableWrap.after(button);
+  function draw() {
+    render(current.slice(0, limit));
+    const left = current.length - limit;
+    button.hidden = left <= 0;
+    button.textContent = `Show ${Math.min(step, left)} more (${left} not shown)`;
+  }
+  return rows => { current = rows; limit = step; draw(); };
+}
+
+// Table rows for requests from api.php (overviewRequests). withWho adds the gardener column.
+function requestRows(requests, withWho) {
+  return requests.map(r => `
+    <tr>
+      <td data-label="Requested"><span class="audit-when">${escapeHtml(formatAdminDate(r.RequestedAt))}</span><span class="audit-ago">${escapeHtml(timeAgo(r.RequestedAt))}</span></td>
+      ${withWho ? `<td data-label="Gardener">${profileLink('gardener', r.GardenerID, r.Who)}</td>` : ''}
+      <td data-label="Request"><span class="audit-action-label">${escapeHtml(REQUEST_KIND_LABELS[r.Kind] || r.Kind)}</span>${escapeHtml(r.What || '')}</td>
+      <td data-label="Outcome">${outcomeBadge(r.Outcome, r.Status)}${r.DecidedAt ? `<span class="audit-ago">on ${escapeHtml(formatAdminDate(r.DecidedAt))}</span>` : ''}</td>
+      <td data-label="Decided by">${escapeHtml(r.DecidedBy || (r.Outcome === 'Pending' || r.Outcome === 'Cancelled' ? '—' : 'Not recorded'))}</td>
+      <td data-label="Reason or notes">${r.Reason ? `<strong class="request-reason">Reason:</strong> ${escapeHtml(r.Reason)}` : ''}${r.Reason && r.Notes ? '<br>' : ''}${r.Notes ? `<span class="text-muted">${escapeHtml(r.Notes)}</span>` : ''}${!r.Reason && !r.Notes ? '<span class="text-muted">—</span>' : ''}</td>
+    </tr>`).join('');
 }
 
 function reviewField(label, value) {

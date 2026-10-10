@@ -81,6 +81,9 @@ const PAGE_PERMISSIONS = [
     'admin_archived_accounts.php' => ['accounts.view'],
     'admin_audit_log.php' => ['audit.view'],
     'admin_roles.php' => ['roles.manage'],
+    'admin_overview.php' => ['overview.view'],
+    'admin_activity.php' => ['accounts.view'],
+    'admin_user.php' => ['accounts.view'],
 ];
 
 /** Permission codes the logged-in person has, read fresh from the database once per request. */
@@ -96,7 +99,12 @@ function currentPermissions(): array {
         require_once __DIR__ . '/../db.php';
         $pdo = getDb();
         if (in_array('admin', $user['roles'], true)) {
-            $codes = $pdo->query('SELECT Code FROM PERMISSION')->fetchAll(PDO::FETCH_COLUMN);
+            // Everything in the database, plus every permission a page needs,
+            // so a not-yet-run migration never locks administrators out.
+            $codes = array_values(array_unique(array_merge(
+                $pdo->query('SELECT Code FROM PERMISSION')->fetchAll(PDO::FETCH_COLUMN),
+                ...array_values(PAGE_PERMISSIONS)
+            )));
         } else {
             $builtIn = array_values(array_intersect_key(SESSION_ROLE_CODES, array_flip($user['roles'])));
             $placeholders = implode(',', array_fill(0, count($builtIn), '?')) ?: "''";
@@ -165,7 +173,7 @@ function showNoAccessPage(array $user): void {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — No access</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=48">
+<link rel="stylesheet" href="assets/style.css?v=50">
 </head>
 <body class="account-page no-access-page">
   <main class="panel no-access-box">

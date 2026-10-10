@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HarvestHub — Registration Status</title>
-  <link rel="stylesheet" href="assets/style.css?v=48">
+  <link rel="stylesheet" href="assets/style.css?v=50">
 </head>
 <body class="account-page">
   <main class="wrap" style="max-width: 640px; padding-top: 48px;">
