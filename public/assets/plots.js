@@ -301,17 +301,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     <article class="assigned-plot-item">
                         <div class="assigned-plot-info">
                             <strong>${escapeHtml(plot.PlotName ?? 'Plot')}</strong>
-                            <span>${plot.UnassignmentPending ? 'Unassignment request pending' : 'Assigned to you'}</span>
+                            <span>${plot.ReturnRequestAppID ? 'Coordinator requested this plot back' : plot.UnassignmentPending ? 'Unassignment request pending' : 'Assigned to you'}</span>
+                            <small>${escapeHtml(plot.Location || 'Location not set')} · ${plot.AreaSqM ? `${escapeHtml(String(plot.AreaSqM))} m²` : 'Area not set'}</small>
+                            ${plot.ReturnRequestAppID ? `<span class="plot-return-reason"><strong>Coordinator message:</strong> ${escapeHtml(plot.ReturnRequestReason || '')}</span>` : ''}
                         </div>
-                        <button type="button" class="btn btn-sm request-unassignment-btn" data-plot-id="${Number(plot.PlotID)}" ${plot.UnassignmentPending ? 'disabled' : ''}>
+                        ${plot.ReturnRequestAppID ? `
+                          <div class="plot-return-actions">
+                            <button type="button" class="btn btn-accent btn-sm respond-plot-return" data-app-id="${Number(plot.ReturnRequestAppID)}" data-decision="return" data-label="${escapeHtml(plot.PlotName ?? 'Plot')}">Return plot</button>
+                            <button type="button" class="btn btn-ghost btn-sm respond-plot-return" data-app-id="${Number(plot.ReturnRequestAppID)}" data-decision="decline" data-label="${escapeHtml(plot.PlotName ?? 'Plot')}">Decline</button>
+                          </div>
+                        ` : `<button type="button" class="btn btn-sm request-unassignment-btn" data-plot-id="${Number(plot.PlotID)}" ${plot.UnassignmentPending ? 'disabled' : ''}>
                             ${plot.UnassignmentPending ? 'Request pending' : 'Request unassignment'}
-                        </button>
+                        </button>`}
                     </article>
                 `).join('') : '<p class="plt-empty">You do not have a plot yet. Pick an available plot on the map to request one.</p>';
                 successNotices.forEach(notice => assignedListEl.prepend(notice));
 
                 assignedListEl.querySelectorAll('.request-unassignment-btn:not(:disabled)').forEach(button => {
                     button.addEventListener('click', () => requestPlotUnassignment(button.dataset.plotId, button));
+                });
+                assignedListEl.querySelectorAll('.respond-plot-return').forEach(button => {
+                    button.addEventListener('click', () => respondToPlotReturn(button));
                 });
             }
             notifyRejectedApplications(data.rejected_applications);
@@ -328,11 +338,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         : canRequest
                             ? 'available to request'
                             : plot.Status;
-                const accessibleName = `${plot.PlotName ?? 'Plot'}, ${accessibleStatus}`;
+                const plotDetails = `${plot.Location || 'location not set'}, ${plot.AreaSqM ? `${plot.AreaSqM} square meters` : 'area not set'}`;
+                const accessibleName = `${plot.PlotName ?? 'Plot'}, ${plotDetails}, ${accessibleStatus}`;
 
                 return `
-                    <button type="button" class="garden-map-plot ${statusClass}" aria-label="${escapeHtml(accessibleName)}" data-plot-id="${Number(plot.PlotID)}" data-plot-name="${escapeHtml(plot.PlotName ?? 'Plot')}" ${canRequest ? '' : 'disabled'}>
+                    <button type="button" class="garden-map-plot ${statusClass}" aria-label="${escapeHtml(accessibleName)}" data-plot-id="${Number(plot.PlotID)}" data-plot-name="${escapeHtml(plot.PlotName ?? 'Plot')}" data-location="${escapeHtml(plot.Location || '')}" data-area="${escapeHtml(String(plot.AreaSqM || ''))}" ${canRequest ? '' : 'disabled'}>
                         <span>${escapeHtml(plot.PlotName ?? 'Plot')}</span>
+                        <small>${escapeHtml(plot.Location || 'Location not set')}</small>
+                        <small>${plot.AreaSqM ? `${escapeHtml(String(plot.AreaSqM))} m²` : 'Area not set'}</small>
                         ${isMine ? '<small>Yours</small>' : ''}
                         ${hasRequested ? '<small>Your request pending</small>' : ''}
                     </button>
@@ -340,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join('');
 
             gridEl.querySelectorAll('.garden-map-plot.available:not(:disabled), .garden-map-plot.pending:not(:disabled)').forEach(button => {
-                button.addEventListener('click', () => window.openPlotModal(button.dataset.plotId, button.dataset.plotName));
+                button.addEventListener('click', () => window.openPlotModal(button.dataset.plotId, button.dataset.plotName, button.dataset.location, button.dataset.area));
             });
 
         } catch (err) {
@@ -349,6 +362,52 @@ document.addEventListener('DOMContentLoaded', () => {
             if (gridEl) {
                 gridEl.innerHTML = '<p class="plt-empty">Failed to load community map.</p>';
             }
+        }
+    }
+
+    async function respondToPlotReturn(button) {
+        const decision = button.dataset.decision;
+        let reason = '';
+        if (decision === 'return') {
+            if (!await hhConfirm({
+                title: `Return ${button.dataset.label}?`,
+                message: 'Please ensure you have no actively planted crops or unreturned resources/equipment tied to this plot before returning it.',
+                confirmText: 'Return plot',
+                tone: 'danger',
+            })) return;
+        } else {
+            reason = await hhPrompt({
+                title: `Decline the request for ${button.dataset.label}?`,
+                message: 'The coordinator will see your reason.',
+                label: 'Reason for declining',
+                placeholder: 'Explain why you need to keep this plot.',
+                maxLength: 1000,
+                confirmText: 'Decline request',
+                tone: 'danger',
+            });
+            if (!reason) return;
+        }
+
+        const actionButtons = button.closest('.plot-return-actions').querySelectorAll('button');
+        actionButtons.forEach(actionButton => { actionButton.disabled = true; });
+        try {
+            const response = await fetch('api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    action: 'respond_plot_return',
+                    app_id: button.dataset.appId,
+                    decision,
+                    reason,
+                }),
+            });
+            const result = await response.json();
+            if (!result.ok) throw new Error(result.error || 'Could not respond to the return request.');
+            showToast(decision === 'return' ? 'Plot returned to the garden.' : 'You declined the plot return request.', 'success');
+            await loadMap();
+        } catch (error) {
+            showToast(error.message || 'Could not respond to the return request.', 'danger');
+            actionButtons.forEach(actionButton => { actionButton.disabled = false; });
         }
     }
 
@@ -406,9 +465,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const plotModal = document.getElementById('plot-modal');
     
     // Attach function to window so the inline onclick="" can find it
-    window.openPlotModal = function(id, name) {
+    window.openPlotModal = function(id, name, location = '', area = '') {
         document.getElementById('modal-plot-id').value = id;
         document.getElementById('modal-plot-name').textContent = name;
+        document.getElementById('modal-plot-details').textContent =
+            `${location || 'Location not set'} · ${area ? `${area} m²` : 'Area not set'}`;
         plotModal.style.display = 'flex';
     };
 

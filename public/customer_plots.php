@@ -12,7 +12,7 @@ $navTitle = 'My Plots';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=38">
+<link rel="stylesheet" href="assets/style.css?v=39">
 </head>
 <body class="account-page">
 
@@ -34,7 +34,7 @@ $navTitle = 'My Plots';
         <!-- WIDE LEFT COLUMN: the community map -->
         <section class="panel plt-card" aria-labelledby="garden-map-title">
           <h2 class="panel-title" id="garden-map-title">Community garden map</h2>
-          <p class="plt-card-sub">Select an available plot to request it from the coordinator.</p>
+          <p class="plt-card-sub">Review each plot's city and area before requesting it from the coordinator.</p>
           <div id="garden-map-grid" class="customer-garden-map" aria-live="polite">
             <p class="plt-empty">Loading map...</p>
           </div>
@@ -66,6 +66,7 @@ $navTitle = 'My Plots';
   <div class="gardener-modal-box">
     <h3 id="plot-modal-title">Request plot</h3>
     <p class="text-muted">Send a request to the coordinator to claim <strong id="modal-plot-name">--</strong>?</p>
+    <p class="plot-request-details" id="modal-plot-details"></p>
 
     <input type="hidden" id="modal-plot-id">
 
@@ -76,6 +77,6 @@ $navTitle = 'My Plots';
   </div>
 </div>
 <script src="assets/app.js"></script>
-<script src="assets/plots.js?v=11"></script>
+<script src="assets/plots.js?v=14"></script>
 </body>
 </html>

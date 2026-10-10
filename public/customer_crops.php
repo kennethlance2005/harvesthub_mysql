@@ -79,7 +79,7 @@ $navTitle = 'My Crops';
 	</form>
 </dialog>
 <script src="assets/app.js"></script>
-<script src="assets/customer.js?v=13"></script>
+<script src="assets/customer.js?v=16"></script>
 <script src="assets/crops.js?v=1"></script>
 </body>
 </html>

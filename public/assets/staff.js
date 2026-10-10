@@ -51,7 +51,8 @@ function renderApplications() {
   const assignmentRequests = applications.filter(app => app.RequestType !== 'Unassign');
   const unassignmentRequests = applications.filter(app => app.RequestType === 'Unassign');
   const filterRequests = requests => requests.filter(app =>
-    matchesSearch(app.GardenerName, query) || matchesSearch(app.Label, query));
+    matchesSearch(app.GardenerName, query) || matchesSearch(app.Label, query)
+      || matchesSearch(app.GardenerLocation, query) || matchesSearch(app.PlotLocation, query));
   const renderRows = (requests, type) => requests.map(app => {
     const isSelfRequest = currentGardenerId !== null && String(app.GardenerID) === String(currentGardenerId);
     return `
@@ -62,6 +63,10 @@ function renderApplications() {
             ? `Requesting to give up plot "${escapeHtml(app.Label)}"`
             : `Requesting ${escapeHtml(app.Label)}`}
             <span class="text-muted"> • ${escapeHtml(app.PlotStatus || 'Pending')}</span>
+          </div>
+          <div class="action-row-sub plot-application-location">
+            Gardener: ${escapeHtml(app.GardenerLocation || 'Location not provided')}
+            <span class="text-muted"> • Plot: ${escapeHtml(app.PlotLocation || 'Location not set')} · ${app.AreaSqM ? `${escapeHtml(String(app.AreaSqM))} m²` : 'Area not set'}</span>
           </div>
           <time class="action-row-time" datetime="${escapeHtml(String(app.AppliedAt || '').replace(' ', 'T'))}">Requested ${escapeHtml(formatRecordDate(app.AppliedAt))}</time>
         </div>
@@ -244,6 +249,7 @@ async function loadPlots() {
   const data = await res.json();
   if (!data.ok) return;
 
+  if (data.current_gardener_id !== undefined) currentGardenerId = data.current_gardener_id === null ? null : Number(data.current_gardener_id);
   plots = data.plots;
   renderPlots();
   renderCoordinatorOverview();
@@ -265,7 +271,17 @@ function renderPlots(selectedFilter) {
     return `
       <article class="plot-tile ${available ? 'plot-tile-available' : 'plot-tile-occupied'}">
         <div class="plot-tile-top"><span class="plot-tile-label">${escapeHtml(plot.Label)}</span><span class="plot-status">${escapeHtml(plot.Status)}</span></div>
+        <p class="plot-tile-location">${escapeHtml(plot.Location || 'Location not set')} · ${plot.AreaSqM ? `${escapeHtml(String(plot.AreaSqM))} m²` : 'Area not set'}</p>
         <p class="plot-tile-gardener">${plot.GardenerName ? escapeHtml(plot.GardenerName) : 'Unassigned'}</p>
+        ${plot.LatestReturnStatus === 'Rejected' && plot.ReturnDeclineReason
+          ? `<p class="plot-return-decline-reason"><strong>Gardener declined:</strong> ${escapeHtml(plot.ReturnDeclineReason)}</p>`
+          : ''}
+        ${plot.ReturnRequestPending
+          ? '<span class="badge badge-brown">Return request pending</span>'
+          : plot.GardenerName && String(plot.GardenerID) !== String(currentGardenerId)
+            ? `<button class="btn btn-ghost btn-sm request-plot-return" data-id="${plot.PltID}" data-label="${escapeHtml(plot.Label)}" data-gardener="${escapeHtml(plot.GardenerName)}" type="button">Ask gardener to return</button>`
+            : ''}
+        <button class="btn btn-ghost btn-sm edit-plot" data-id="${plot.PltID}" data-label="${escapeHtml(plot.Label)}" data-location="${escapeHtml(plot.Location || '')}" data-area="${escapeHtml(String(plot.AreaSqM || ''))}" type="button">Edit details</button>
         ${available && !plot.GardenerName
           ? `<button class="btn btn-ghost btn-sm delete-plot" data-id="${plot.PltID}" data-label="${escapeHtml(plot.Label)}" type="button">Delete plot</button>`
           : ''}
@@ -276,16 +292,71 @@ function renderPlots(selectedFilter) {
   mapEl.querySelectorAll('.delete-plot').forEach(button => {
     button.addEventListener('click', () => deletePlot(button.dataset.id, button.dataset.label));
   });
+  mapEl.querySelectorAll('.edit-plot').forEach(button => {
+    button.addEventListener('click', () => openPlotDetailsDialog(button.dataset.id, button.dataset.label, button.dataset.location, button.dataset.area));
+  });
+  mapEl.querySelectorAll('.request-plot-return').forEach(button => {
+    button.addEventListener('click', () => requestPlotReturn(button));
+  });
 }
 
-async function createPlot(label) {
-  const data = await postAction('create_plot', { label });
+async function requestPlotReturn(button) {
+  const reason = await hhPrompt({
+    title: `Ask ${button.dataset.gardener} to return ${button.dataset.label}?`,
+    message: 'Explain why this plot is needed. The gardener will be able to return the plot or decline your request with a reason.',
+    label: 'Message to gardener',
+    placeholder: 'For example, this area is needed for a scheduled garden project.',
+    maxLength: 1000,
+    confirmText: 'Send request',
+  });
+  if (!reason) return;
+  button.disabled = true;
+  try {
+    const data = await postAction('request_plot_return', { plot_id: button.dataset.id, reason });
+    if (!data.ok) {
+      showToast(data.error || 'Could not send the plot return request.', 'danger');
+      button.disabled = false;
+      return;
+    }
+    showToast('Return request sent to the gardener.', 'success');
+    loadPlots();
+  } catch (error) {
+    showToast('Could not send the plot return request.', 'danger');
+    button.disabled = false;
+  }
+}
+
+async function createPlot(label, location, areaSqM) {
+  const data = await postAction('create_plot', { label, location, area_sqm: areaSqM });
   if (data.ok) {
     showToast('Plot added.', 'success');
     document.getElementById('new-plot-label').value = '';
+    document.getElementById('new-plot-location').value = '';
+    document.getElementById('new-plot-area').value = '';
     loadPlots();
   } else {
     showToast(data.error || 'Could not add plot.', 'danger');
+  }
+}
+
+function openPlotDetailsDialog(plotId, label, location, areaSqM) {
+  const dialog = document.getElementById('edit-plot-dialog');
+  if (!dialog) return;
+  document.getElementById('edit-plot-id').value = plotId;
+  document.getElementById('edit-plot-label').textContent = label;
+  document.getElementById('edit-plot-location').value = location;
+  document.getElementById('edit-plot-area').value = areaSqM;
+  dialog.showModal();
+}
+
+async function updatePlotDetails(plotId, location, areaSqM) {
+  const data = await postAction('update_plot_details', { plot_id: plotId, location, area_sqm: areaSqM });
+  if (data.ok) {
+    showToast('Plot details updated.', 'success');
+    document.getElementById('edit-plot-dialog').close();
+    loadPlots();
+  } else {
+    showToast(data.error || 'Could not update plot details.', 'danger');
   }
 }
 
@@ -594,8 +665,10 @@ function renderPlotRecord(record) {
       entryClass = 'record-plot-pending';
       break;
     case 'Request Unassign':
-      details = `${gardenerName} requested unassignment of ${plotLabel}`;
-      badgeLabel = 'Pending';
+      details = record.ActorType === 'staff'
+        ? `${actorName} asked ${gardenerName} to return ${plotLabel}`
+        : `${gardenerName} requested unassignment of ${plotLabel}`;
+      badgeLabel = record.ActorType === 'staff' ? 'Return requested' : 'Pending';
       badgeClass = 'badge-brown';
       entryClass = 'record-plot-pending';
       break;
@@ -606,13 +679,17 @@ function renderPlotRecord(record) {
       entryClass = 'record-plot-accepted';
       break;
     case 'Plot Unassigned':
-      details = `${actorName} unassigned ${gardenerName} from ${plotLabel}`;
+      details = record.ActorType === 'customer'
+        ? `${gardenerName} returned ${plotLabel}`
+        : `${actorName} unassigned ${gardenerName} from ${plotLabel}`;
       badgeLabel = 'Unassigned';
       badgeClass = 'badge-neutral';
       entryClass = 'record-plot-unassigned';
       break;
     default:
-      details = `${actorName} rejected ${gardenerName}'s request for ${plotLabel}`;
+      details = record.ActorType === 'customer'
+        ? `${gardenerName} declined the request to return ${plotLabel}`
+        : `${actorName} rejected ${gardenerName}'s request for ${plotLabel}`;
       badgeLabel = 'Rejected';
       badgeClass = 'badge-neutral';
       entryClass = 'record-plot-rejected';
@@ -670,7 +747,22 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
-    createPlot(document.getElementById('new-plot-label').value.trim());
+    createPlot(
+      document.getElementById('new-plot-label').value.trim(),
+      document.getElementById('new-plot-location').value,
+      document.getElementById('new-plot-area').value
+    );
+  });
+  document.getElementById('cancel-edit-plot')?.addEventListener('click', () => document.getElementById('edit-plot-dialog').close());
+  document.getElementById('edit-plot-form')?.addEventListener('submit', event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    updatePlotDetails(
+      document.getElementById('edit-plot-id').value,
+      document.getElementById('edit-plot-location').value,
+      document.getElementById('edit-plot-area').value
+    );
   });
   [
     ['applications-search-form', 'applications-search', renderApplications],

@@ -455,6 +455,137 @@ try {
             respond(['ok' => true]);
         }
 
+        case 'request_plot_return': {
+            $user = requireJsonRole('staff');
+            foreach (['plot_id', 'reason'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Plot return request details must be text values.'], 422);
+                }
+            }
+            $plotId = $_POST['plot_id'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
+            if (!ctype_digit((string) $plotId) || (int) $plotId < 1) {
+                respond(['ok' => false, 'error' => 'Choose a valid plot.'], 422);
+            }
+            if ($reason === '' || mb_strlen($reason) > 1000) {
+                respond(['ok' => false, 'error' => 'Provide a return request message of no more than 1,000 characters.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $plotStmt = $pdo->prepare("
+                    SELECT P.PltID, P.Label, P.GardenerID, P.Status, G.Name AS GardenerName
+                    FROM PLOT P
+                    JOIN COMMUNITY_GARDENER G ON G.GardenerID = P.GardenerID
+                    WHERE P.PltID = ? FOR UPDATE
+                ");
+                $plotStmt->execute([(int) $plotId]);
+                $plot = $plotStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$plot || $plot['GardenerID'] === null || $plot['Status'] !== 'Occupied') {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Only an occupied plot can be requested for return.'], 409);
+                }
+                if (isset($user['ids']['customer']) && (int) $user['ids']['customer'] === (int) $plot['GardenerID']) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'You cannot request a plot return from yourself.'], 403);
+                }
+
+                $pending = $pdo->prepare("
+                    SELECT 1 FROM PLOT_APPLICATION
+                    WHERE PltID = ? AND Status = 'Pending'
+                    FOR UPDATE
+                ");
+                $pending->execute([(int) $plotId]);
+                if ($pending->fetchColumn()) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'There is already a pending request for this plot.'], 409);
+                }
+
+                $insert = $pdo->prepare("
+                    INSERT INTO PLOT_APPLICATION
+                        (GardenerID, CoordID, PltID, Status, RequestType, RequestReason)
+                    VALUES (?, ?, ?, 'Pending', 'Return', ?)
+                ");
+                $insert->execute([(int) $plot['GardenerID'], (int) $user['id'], (int) $plotId, $reason]);
+                recordPlotEvent($pdo, 'Request Unassign', 'staff', $user['name'], $plot['Label'], (int) $plotId, (int) $plot['GardenerID'], $plot['GardenerName'], (int) $user['id'], (int) $pdo->lastInsertId());
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
+            respond(['ok' => true]);
+        }
+
+        case 'respond_plot_return': {
+            $user = requireJsonRole('customer');
+            foreach (['app_id', 'decision', 'reason'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Plot return response fields must be text values.'], 422);
+                }
+            }
+            $appId = $_POST['app_id'] ?? '';
+            $decision = $_POST['decision'] ?? '';
+            $responseReason = trim($_POST['reason'] ?? '');
+            if (!ctype_digit((string) $appId) || (int) $appId < 1 || !in_array($decision, ['return', 'decline'], true)) {
+                respond(['ok' => false, 'error' => 'Invalid plot return response.'], 422);
+            }
+            if ($decision === 'decline' && ($responseReason === '' || mb_strlen($responseReason) > 1000)) {
+                respond(['ok' => false, 'error' => 'Provide a reason for declining, up to 1,000 characters.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $appStmt = $pdo->prepare("
+                    SELECT PA.AppID, PA.GardenerID, PA.PltID, PA.Status, PA.RequestType,
+                           P.Label, P.GardenerID AS CurrentGardenerID
+                    FROM PLOT_APPLICATION PA
+                    JOIN PLOT P ON P.PltID = PA.PltID
+                    WHERE PA.AppID = ? AND PA.GardenerID = ? AND PA.RequestType = 'Return'
+                    FOR UPDATE
+                ");
+                $appStmt->execute([(int) $appId, (int) $user['id']]);
+                $request = $appStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$request || $request['Status'] !== 'Pending') {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'This return request is no longer pending.'], 409);
+                }
+                if ((int) $request['CurrentGardenerID'] !== (int) $user['id']) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'This plot is no longer assigned to you.'], 409);
+                }
+
+                if ($decision === 'return') {
+                    $pdo->prepare("
+                        UPDATE PLOT SET GardenerID = NULL, Status = 'Available'
+                        WHERE PltID = ? AND GardenerID = ?
+                    ")->execute([(int) $request['PltID'], (int) $user['id']]);
+                    $pdo->prepare("
+                        UPDATE community_plots SET Status = 'Available', OccupantID = NULL
+                        WHERE PlotName = ?
+                    ")->execute([$request['Label']]);
+                    $pdo->prepare("
+                        UPDATE PLOT_APPLICATION
+                        SET Status = 'Approved', ProcessedAt = NOW(), RejectionReason = NULL
+                        WHERE AppID = ?
+                    ")->execute([(int) $appId]);
+                    recordPlotEvent($pdo, 'Plot Unassigned', 'customer', $user['name'], $request['Label'], (int) $request['PltID'], (int) $user['id'], $user['name'], null, (int) $appId);
+                } else {
+                    $pdo->prepare("
+                        UPDATE PLOT_APPLICATION
+                        SET Status = 'Rejected', ProcessedAt = NOW(), RejectionReason = ?
+                        WHERE AppID = ?
+                    ")->execute([$responseReason, (int) $appId]);
+                    recordPlotEvent($pdo, 'Request Rejected', 'customer', $user['name'], $request['Label'], (int) $request['PltID'], (int) $user['id'], $user['name'], null, (int) $appId);
+                }
+
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
+            respond(['ok' => true, 'returned' => $decision === 'return']);
+        }
+
         case 'reset_password': {
             $email = trim($_POST['email'] ?? '');
             $token = $_POST['token'] ?? '';
@@ -556,7 +687,7 @@ try {
 
         case 'my_plot': {
             $user = requireJsonRole('customer');
-            $plot = $pdo->prepare("SELECT PltID, Label, Status FROM PLOT WHERE GardenerID = ? ORDER BY Label");
+            $plot = $pdo->prepare("SELECT PltID, Label, Location, AreaSqM, Status FROM PLOT WHERE GardenerID = ? ORDER BY Label");
             $plot->execute([$user['id']]);
             $plots = $plot->fetchAll(PDO::FETCH_ASSOC);
 
@@ -567,7 +698,7 @@ try {
             ");
             $pending->execute([$user['id']]);
 
-            $available = $pdo->query("SELECT PltID, Label FROM PLOT WHERE Status = 'Available'")->fetchAll(PDO::FETCH_ASSOC);
+            $available = $pdo->query("SELECT PltID, Label, Location, AreaSqM FROM PLOT WHERE Status = 'Available'")->fetchAll(PDO::FETCH_ASSOC);
 
             respond([
                 'ok' => true,
@@ -1283,17 +1414,22 @@ try {
                 SELECT PA.AppID, PA.GardenerID,
                        G.Name AS GardenerName,
                       P.Label,
+                      P.Location AS PlotLocation,
+                      P.AreaSqM,
+                      G.Location AS GardenerLocation,
                       CASE
                         WHEN PA.RequestType = 'Apply' THEN 'Pending Approval'
                         WHEN P.Status = 'Occupied' OR P.GardenerID IS NOT NULL THEN 'Occupied'
                         ELSE 'Available'
                       END AS PlotStatus,
                        PA.AppliedAt,
-                       PA.RequestType
+                       PA.RequestType,
+                       PA.RequestReason
                 FROM PLOT_APPLICATION PA
                 JOIN COMMUNITY_GARDENER G ON G.GardenerID = PA.GardenerID
                 JOIN PLOT P ON P.PltID = PA.PltID
-                WHERE PA.Status = 'Pending' ORDER BY PA.AppliedAt ASC
+                WHERE PA.Status = 'Pending' AND PA.RequestType IN ('Apply', 'Unassign')
+                ORDER BY PA.AppliedAt ASC
             ")->fetchAll(PDO::FETCH_ASSOC);
             respond([
                 'ok' => true,
@@ -1338,6 +1474,10 @@ try {
                 if (!$row || $row['Status'] !== 'Pending') {
                     $pdo->rollBack();
                     respond(['ok' => false, 'error' => 'Application already processed.'], 409);
+                }
+                if (!in_array($row['RequestType'], ['Apply', 'Unassign'], true)) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'This request must be answered by the gardener.'], 403);
                 }
                 if (isset($user['ids']['customer']) && (int) $user['ids']['customer'] === (int) $row['GardenerID']) {
                     $pdo->rollBack();
@@ -1594,12 +1734,25 @@ try {
 
         case 'create_plot': {
             $user = requireJsonRole('staff');
+            foreach (['label', 'location', 'area_sqm'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Plot details must be submitted as text values.'], 422);
+                }
+            }
             $label = trim($_POST['label'] ?? '');
+            $location = trim($_POST['location'] ?? '');
+            $areaSqM = trim($_POST['area_sqm'] ?? '');
             if ($label === '' || strlen($label) > 80) {
                 respond(['ok' => false, 'error' => 'Enter a plot name up to 80 characters.'], 422);
             }
             if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._-]*$/', $label)) {
                 respond(['ok' => false, 'error' => 'Plot names may use letters, numbers, spaces, dots, hyphens, and underscores.'], 422);
+            }
+            if (!in_array($location, NCR_CITIES, true)) {
+                respond(['ok' => false, 'error' => 'Select a city in Metro Manila for this plot.'], 422);
+            }
+            if (!preg_match('/^\d{1,6}(?:\.\d{1,2})?$/', $areaSqM) || (float) $areaSqM <= 0 || (float) $areaSqM > 100000) {
+                respond(['ok' => false, 'error' => 'Enter a plot area greater than 0 and no more than 100,000 m².'], 422);
             }
 
             $pdo->beginTransaction();
@@ -1611,13 +1764,42 @@ try {
                     respond(['ok' => false, 'error' => 'A plot with that name already exists.'], 409);
                 }
 
-                $pdo->prepare("INSERT INTO PLOT (Label, GardenerID, Status) VALUES (?, NULL, 'Available')")
-                    ->execute([$label]);
+                $pdo->prepare("INSERT INTO PLOT (Label, Location, AreaSqM, GardenerID, Status) VALUES (?, ?, ?, NULL, 'Available')")
+                    ->execute([$label, $location, $areaSqM]);
                 recordPlotEvent($pdo, 'Plot Added', 'staff', $user['name'], $label, (int) $pdo->lastInsertId(), null, null, (int) $user['id']);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 throw $error;
+            }
+            respond(['ok' => true]);
+        }
+
+        case 'update_plot_details': {
+            requireJsonRole('staff');
+            foreach (['plot_id', 'location', 'area_sqm'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Plot details must be submitted as text values.'], 422);
+                }
+            }
+            $plotId = $_POST['plot_id'] ?? '';
+            $location = trim($_POST['location'] ?? '');
+            $areaSqM = trim($_POST['area_sqm'] ?? '');
+            if (!ctype_digit((string) $plotId) || (int) $plotId < 1) {
+                respond(['ok' => false, 'error' => 'Choose a valid plot.'], 422);
+            }
+            if (!in_array($location, NCR_CITIES, true)) {
+                respond(['ok' => false, 'error' => 'Select a city in Metro Manila for this plot.'], 422);
+            }
+            if (!preg_match('/^\d{1,6}(?:\.\d{1,2})?$/', $areaSqM) || (float) $areaSqM <= 0 || (float) $areaSqM > 100000) {
+                respond(['ok' => false, 'error' => 'Enter a plot area greater than 0 and no more than 100,000 m².'], 422);
+            }
+            $update = $pdo->prepare('UPDATE PLOT SET Location = ?, AreaSqM = ? WHERE PltID = ?');
+            $update->execute([$location, $areaSqM, (int) $plotId]);
+            if ($update->rowCount() === 0) {
+                $exists = $pdo->prepare('SELECT 1 FROM PLOT WHERE PltID = ?');
+                $exists->execute([(int) $plotId]);
+                if (!$exists->fetchColumn()) respond(['ok' => false, 'error' => 'Plot not found.'], 404);
             }
             respond(['ok' => true]);
         }
@@ -1648,11 +1830,20 @@ try {
         }
 
         case 'all_plots': {
-            requireJsonRole('staff');
+            $user = requireJsonRole('staff');
             syncLegacyCommunityPlots($pdo);
             $rows = $pdo->query("
                 SELECT P.PltID,
                        P.Label,
+                       P.Location,
+                       P.AreaSqM,
+                       P.GardenerID AS GardenerID,
+                       LatestReturn.Status AS LatestReturnStatus,
+                       LatestReturn.RejectionReason AS ReturnDeclineReason,
+                       EXISTS (
+                         SELECT 1 FROM PLOT_APPLICATION PA
+                         WHERE PA.PltID = P.PltID AND PA.Status = 'Pending' AND PA.RequestType = 'Return'
+                       ) AS ReturnRequestPending,
                        CASE
                          WHEN P.Status = 'Occupied' OR P.GardenerID IS NOT NULL THEN 'Occupied'
                          WHEN P.Status = 'Pending Approval' OR EXISTS (
@@ -1664,9 +1855,19 @@ try {
                        G.Name AS GardenerName
                 FROM PLOT P
                 LEFT JOIN COMMUNITY_GARDENER G ON G.GardenerID = P.GardenerID
+                LEFT JOIN PLOT_APPLICATION LatestReturn
+                  ON LatestReturn.AppID = (
+                    SELECT MAX(PA.AppID) FROM PLOT_APPLICATION PA
+                    WHERE PA.PltID = P.PltID AND PA.GardenerID = P.GardenerID
+                      AND PA.RequestType = 'Return'
+                  )
                 ORDER BY P.Label
             ")->fetchAll(PDO::FETCH_ASSOC);
-            respond(['ok' => true, 'plots' => $rows]);
+            respond([
+                'ok' => true,
+                'plots' => $rows,
+                'current_gardener_id' => $user['ids']['customer'] ?? null,
+            ]);
         }
 
         case 'all_resources': {
@@ -1944,6 +2145,10 @@ try {
                         $stmt = $pdo->prepare("
                                 SELECT P.PltID AS PlotID,
                                              P.Label AS PlotName,
+                                             P.Location,
+                                             P.AreaSqM,
+                                             ReturnRequest.AppID AS ReturnRequestAppID,
+                                             ReturnRequest.RequestReason AS ReturnRequestReason,
                                              CASE
                                                  WHEN P.Status = 'Occupied' OR P.GardenerID IS NOT NULL THEN 'Occupied'
                                                  WHEN P.Status = 'Pending Approval' OR EXISTS (
@@ -1967,13 +2172,18 @@ try {
                                              ) AS ApplicationPending
                                 FROM PLOT P
                                 LEFT JOIN COMMUNITY_GARDENER G ON G.GardenerID = P.GardenerID
+                                LEFT JOIN PLOT_APPLICATION ReturnRequest
+                                  ON ReturnRequest.PltID = P.PltID
+                                  AND ReturnRequest.GardenerID = P.GardenerID
+                                  AND ReturnRequest.Status = 'Pending'
+                                  AND ReturnRequest.RequestType = 'Return'
                                 ORDER BY P.Label ASC
                         ");
                         $stmt->execute([$user['id'], $user['id'], $user['id']]);
                         $plots = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         $rejectedStmt = $pdo->prepare("
-                            SELECT PA.AppID, P.Label AS PlotName, PA.RequestType, PA.RejectionReason
+                            SELECT PA.AppID, P.Label AS PlotName, P.Location, P.AreaSqM, PA.RequestType, PA.RejectionReason
                             FROM PLOT_APPLICATION PA
                             JOIN PLOT P ON P.PltID = PA.PltID
                             WHERE PA.GardenerID = ? AND PA.Status = 'Rejected' AND PA.RequestType IN ('Apply', 'Unassign')

@@ -11,7 +11,7 @@ $user = requireRole('staff');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=37">
+<link rel="stylesheet" href="assets/style.css?v=39">
 </head>
 <body class="account-page">
 <div class="app-layout">
@@ -49,7 +49,17 @@ $user = requireRole('staff');
             <form class="plot-management-form" id="create-plot-form">
               <label class="sr-only" for="new-plot-label">New plot name <span class="required">*</span></label>
               <input id="new-plot-label" type="text" maxlength="80" placeholder="New plot name" required>
-              <span class="required" aria-hidden="true">*</span>
+              <label class="sr-only" for="new-plot-location">Plot city <span class="required">*</span></label>
+              <select id="new-plot-location" required>
+                <option value="" selected disabled>Select city</option>
+                <option>Caloocan</option><option>Las Piñas</option><option>Makati</option><option>Malabon</option>
+                <option>Mandaluyong</option><option>Manila</option><option>Marikina</option><option>Muntinlupa</option>
+                <option>Navotas</option><option>Parañaque</option><option>Pasay</option><option>Pasig</option>
+                <option>Pateros</option><option>Quezon City</option><option>San Juan</option><option>Taguig</option>
+                <option>Valenzuela</option>
+              </select>
+              <label class="sr-only" for="new-plot-area">Plot area in square meters</label>
+              <input id="new-plot-area" type="number" min="0.01" max="100000" step="0.01" placeholder="Area (m²)" required>
               <button class="btn btn-accent btn-sm" type="submit">Add plot</button>
             </form>
             <label class="sr-only" for="plot-status-filter">Filter plots by status</label>
@@ -65,6 +75,32 @@ $user = requireRole('staff');
 </div>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=17"></script>
+<dialog class="hh-dialog" id="edit-plot-dialog" aria-labelledby="edit-plot-title">
+  <form class="hh-dialog-box" id="edit-plot-form">
+    <h3 id="edit-plot-title">Edit plot details</h3>
+    <p class="hh-dialog-message" id="edit-plot-label"></p>
+    <input type="hidden" id="edit-plot-id">
+    <div class="field hh-dialog-field">
+      <label for="edit-plot-location">City <span class="required">*</span></label>
+      <select id="edit-plot-location" required>
+        <option value="" disabled>Select city</option>
+        <option>Caloocan</option><option>Las Piñas</option><option>Makati</option><option>Malabon</option>
+        <option>Mandaluyong</option><option>Manila</option><option>Marikina</option><option>Muntinlupa</option>
+        <option>Navotas</option><option>Parañaque</option><option>Pasay</option><option>Pasig</option>
+        <option>Pateros</option><option>Quezon City</option><option>San Juan</option><option>Taguig</option>
+        <option>Valenzuela</option>
+      </select>
+    </div>
+    <div class="field hh-dialog-field">
+      <label for="edit-plot-area">Area (m²) <span class="required">*</span></label>
+      <input id="edit-plot-area" type="number" min="0.01" max="100000" step="0.01" required>
+    </div>
+    <div class="hh-dialog-actions">
+      <button type="button" class="btn btn-ghost" id="cancel-edit-plot">Cancel</button>
+      <button type="submit" class="btn btn-accent">Save details</button>
+    </div>
+  </form>
+</dialog>
+<script src="assets/staff.js?v=20"></script>
 </body>
 </html>

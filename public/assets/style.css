@@ -919,7 +919,7 @@ a { color: inherit; }
    green = available, amber = your request pending, brown = yours, neutral = taken */
 .customer-garden-map { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; min-width: 0; padding: 16px; border: 1px dashed var(--line); border-radius: var(--radius); background: var(--cream-100); }
 .customer-garden-map > p { grid-column: 1 / -1; text-align: center; }
-.garden-map-plot { display: flex; min-width: 0; min-height: 88px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px; border: 2px solid; border-radius: var(--radius); font: inherit; font-weight: 700; overflow-wrap: anywhere; transition: background-color 0.15s ease, transform 0.15s ease; }
+.garden-map-plot { display: flex; min-width: 0; min-height: 112px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px; border: 2px solid; border-radius: var(--radius); font: inherit; font-weight: 700; overflow-wrap: anywhere; transition: background-color 0.15s ease, transform 0.15s ease; }
 .garden-map-plot small { font-size: 0.72rem; font-weight: 600; }
 .garden-map-plot.available { border-color: #8fae7f; background: #e4ebe0; color: var(--green-800); cursor: pointer; }
 .garden-map-plot.available:hover { background: #d3e0cc; transform: translateY(-1px); }
@@ -949,6 +949,9 @@ a { color: inherit; }
 .assigned-plot-info { display: grid; min-width: 0; gap: 2px; }
 .assigned-plot-info strong { color: var(--brown-700); font-size: 1rem; }
 .assigned-plot-info span { color: var(--ink-600); font-size: 0.82rem; }
+.assigned-plot-info .plot-return-reason { margin-top: 6px; padding: 9px 10px; border-radius: var(--radius); background: var(--white); color: var(--ink-700); font-size: 0.84rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.plot-return-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.plot-return-actions .btn { flex: 1 1 auto; }
 .request-unassignment-btn { width: 100%; border: 1px solid var(--brown-600); background: var(--white); color: var(--brown-700); }
 .request-unassignment-btn:hover:not(:disabled) { background: #f3e3d8; }
 .unassignment-success-notice { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #c9d6c1; border-radius: var(--radius); background: #e4ebe0; color: var(--green-800); font-size: 0.84rem; }
@@ -967,7 +970,7 @@ a { color: inherit; }
 
 @media (max-width: 768px) {
   .customer-garden-map { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
-  .garden-map-plot { min-height: 72px; font-size: 0.95rem; }
+  .garden-map-plot { min-height: 104px; font-size: 0.95rem; }
   .plt-layout { grid-template-columns: minmax(0, 1fr); }
   .plt-mine { position: static; order: -1; }
   .maintenance-log-entry-head { align-items: flex-start; flex-direction: column; gap: 4px; }
@@ -2400,20 +2403,36 @@ table.data-table {
 .plot-map-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .plot-map-controls .plot-management-form { margin: 0; }
 .plot-map-controls select { min-height: 38px; padding: 8px 32px 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--cream-100); color: var(--ink-900); font: inherit; }
+.plot-map-controls .plot-management-form { display: grid; grid-template-columns: minmax(130px, 1.1fr) minmax(125px, 1fr) minmax(105px, 0.8fr) auto; gap: 8px; }
+.plot-management-form input, .plot-management-form select { min-width: 0; min-height: 38px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink-900); font: inherit; font-size: 0.84rem; }
+.plot-management-form input:focus, .plot-management-form select:focus { outline: 2px solid rgba(168, 86, 46, 0.3); border-color: var(--brown-600); }
 .plot-map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 14px; }
-.plot-tile { display: flex; min-height: 142px; flex-direction: column; justify-content: space-between; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); }
+.plot-tile { display: flex; min-height: 180px; flex-direction: column; justify-content: space-between; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); }
 .plot-tile-available { background: #e8efe5; border-color: #bdcdb8; }
 .plot-tile-occupied { background: #f3e9df; border-color: #ddc4ae; }
 .plot-tile-top { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
 .plot-tile-label { overflow-wrap: anywhere; font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; color: var(--green-900); }
 .plot-status { flex-shrink: 0; font-size: 0.72rem; font-weight: 700; }
+.plot-tile-location { margin: 0; color: var(--ink-700); font-size: 0.84rem; }
 .plot-tile-gardener { margin: auto 0 0; color: var(--ink-600); font-size: 0.88rem; overflow-wrap: anywhere; }
+.plot-return-decline-reason { margin: 0; padding: 9px 10px; border-radius: var(--radius); background: rgba(255, 255, 255, 0.65); color: var(--ink-700); font-size: 0.82rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .plot-tile .btn { align-self: start; }
+.plot-request-details { margin: 12px 0 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--cream-100); color: var(--ink-700); font-size: 0.88rem; font-weight: 600; }
+.plot-application-location { font-size: 0.82rem; }
+.request-plot-return { align-self: flex-start; }
 .plot-map-empty { grid-column: 1 / -1; }
 .inventory-add-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 18px; padding: 14px 16px; background: var(--cream-100); border: 1px solid var(--line); }
 .inventory-add-form label { color: var(--ink-600); font-size: 0.82rem; font-weight: 600; }
 .inventory-add-form input { min-height: 38px; width: min(100%, 250px); padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink-900); font: inherit; }
 .inventory-add-form input[type="number"] { width: 100px; }
+@media (max-width: 900px) {
+  .plot-map-controls { align-items: stretch; }
+  .plot-map-controls .plot-management-form { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+}
+@media (max-width: 520px) {
+  .plot-map-controls .plot-management-form { grid-template-columns: minmax(0, 1fr); }
+  .plot-map-controls .plot-management-form button { width: 100%; }
+}
 .coordinator-section .resource-inventory-table { width: 100%; min-width: 1100px; table-layout: fixed; }
 .resource-inventory-table th,
 .resource-inventory-table td { overflow: hidden; }

@@ -124,6 +124,8 @@ INSERT INTO COMMUNITY_PLOTS (PlotName) VALUES
 CREATE TABLE PLOT (
     PltID      INT AUTO_INCREMENT PRIMARY KEY,
     Label      VARCHAR(80)  NOT NULL,
+    Location   VARCHAR(40)  NULL,
+    AreaSqM    DECIMAL(10,2) NULL,
     GardenerID INT          NULL,
     Status     VARCHAR(20)  NOT NULL DEFAULT 'Available',
     FOREIGN KEY (GardenerID) REFERENCES COMMUNITY_GARDENER(GardenerID)
@@ -136,6 +138,7 @@ CREATE TABLE PLOT_APPLICATION (
     PltID       INT          NOT NULL,
     Status      VARCHAR(20)  NOT NULL DEFAULT 'Pending',
     RequestType VARCHAR(20)  NOT NULL DEFAULT 'Apply',
+    RequestReason VARCHAR(1000) NULL,
     RejectionReason VARCHAR(1000) NULL,
     AppliedAt   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ProcessedAt DATETIME     NULL,
@@ -326,15 +329,15 @@ INSERT INTO COMMUNITY_GARDENER (Name, Email, PasswordHash, Age, Location) VALUES
 ('Liza Ramos', 'liza@harvesthub.test', '$2y$10$kgUYrIbjaGh4VRY0mgupxeixHwMcnP/tsKVm2ODRX8nFf8oB/K5m2', 41, 'Pasig');
 
 -- Plots (some assigned, some available)
-INSERT INTO PLOT (Label, GardenerID, Status) VALUES
-('Plot A1', 1, 'Occupied'),
-('Plot A2', 2, 'Occupied'),
-('Plot A3', NULL, 'Available'),
-('Plot A4', NULL, 'Available'),
-('Plot B1', NULL, 'Available'),
-('Plot B2', NULL, 'Available'),
-('Plot B3', NULL, 'Available'),
-('Plot B4', NULL, 'Available');
+INSERT INTO PLOT (Label, Location, AreaSqM, GardenerID, Status) VALUES
+('Plot A1', 'Manila', 12.00, 1, 'Occupied'),
+('Plot A2', 'Quezon City', 10.50, 2, 'Occupied'),
+('Plot A3', 'Makati', 8.00, NULL, 'Available'),
+('Plot A4', 'Pasig', 9.50, NULL, 'Available'),
+('Plot B1', 'Marikina', 11.00, NULL, 'Available'),
+('Plot B2', 'Taguig', 8.50, NULL, 'Available'),
+('Plot B3', 'Pasay', 10.00, NULL, 'Available'),
+('Plot B4', 'Mandaluyong', 9.00, NULL, 'Available');
 
 -- A pending application, so the Staff dashboard has something to act on
 INSERT INTO PLOT_APPLICATION (GardenerID, PltID, Status, RequestType) VALUES

@@ -93,7 +93,7 @@ async function loadPlot() {
     <p class="text-muted" style="font-size: 0.9rem;">You don't have a plot yet. Apply for one below:</p>
     <div class="inline-form">
       <select id="plot-select" style="flex: 1;">
-        ${data.available_plots.map(p => `<option value="${p.PltID}">${escapeHtml(p.Label)}</option>`).join('')}
+        ${data.available_plots.map(p => `<option value="${p.PltID}">${escapeHtml(p.Label)} · ${escapeHtml(p.Location || 'Location not set')} · ${p.AreaSqM ? `${escapeHtml(String(p.AreaSqM))} m²` : 'Area not set'}</option>`).join('')}
       </select>
       <button class="btn btn-accent btn-sm" id="apply-plot-btn">Apply</button>
     </div>
@@ -213,7 +213,7 @@ function renderAvailablePlots(plots) {
     <p class="text-muted" style="font-size: 0.85rem; margin: 0 0 8px;">Choose an available plot to request:</p>
     <div class="inline-form">
       <select id="more-plot-select" class="field-select" style="flex: 1;">
-        ${plots.map(plot => `<option value="${plot.PltID}">${escapeHtml(plot.Label)}</option>`).join('')}
+        ${plots.map(plot => `<option value="${plot.PltID}">${escapeHtml(plot.Label)} · ${escapeHtml(plot.Location || 'Location not set')} · ${plot.AreaSqM ? `${escapeHtml(String(plot.AreaSqM))} m²` : 'Area not set'}</option>`).join('')}
       </select>
       <button type="button" class="btn btn-accent btn-sm" id="more-plot-apply">Request</button>
     </div>
