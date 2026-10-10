@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
-$user = requireRole('staff');
+$user = requirePageAccess();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -11,11 +11,11 @@ $user = requireRole('staff');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=44">
+<link rel="stylesheet" href="assets/style.css?v=48">
 </head>
 <body class="account-page">
 <div class="app-layout">
-  <?php include __DIR__ . '/coordinator_sidebar.php'; ?>
+  <?php include __DIR__ . (hasRole('admin') ? '/admin_sidebar.php' : '/coordinator_sidebar.php'); ?>
   <div class="main-content coordinator-main">
     <main class="coordinator-page" id="top">
       <header class="coordinator-page-head">
@@ -46,6 +46,7 @@ $user = requireRole('staff');
       <section class="coordinator-section" aria-labelledby="plot-map-heading">
         <div class="section-heading"><div><p class="eyebrow">Plot handling</p><h2 id="plot-map-heading">Plot map</h2></div>
           <div class="plot-map-controls">
+            <?php if (can('plots.add')): ?>
             <form class="plot-management-form" id="create-plot-form">
               <label class="sr-only" for="new-plot-label">New plot name <span class="required">*</span></label>
               <input id="new-plot-label" type="text" maxlength="80" placeholder="New plot name" required>
@@ -62,6 +63,7 @@ $user = requireRole('staff');
               <input id="new-plot-area" type="number" min="0.01" max="100000" step="0.01" placeholder="Area (m²)" required>
               <button class="btn btn-accent btn-sm" type="submit">Add plot</button>
             </form>
+            <?php endif; ?>
             <label class="sr-only" for="plot-status-filter">Filter plots by status</label>
             <select id="plot-status-filter" aria-label="Filter plots by status">
               <option value="all">All plots</option><option value="available">Available</option><option value="unavailable">Occupied</option>
@@ -101,6 +103,6 @@ $user = requireRole('staff');
     </div>
   </form>
 </dialog>
-<script src="assets/staff.js?v=20"></script>
+<script src="assets/staff.js?v=26"></script>
 </body>
 </html>

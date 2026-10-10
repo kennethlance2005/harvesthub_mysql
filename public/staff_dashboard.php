@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
-$user = requireRole('staff');
+$user = requirePageAccess();
 $navTitle = 'Coordinator Dashboard';
 ?>
 <!DOCTYPE html>
@@ -12,11 +12,11 @@ $navTitle = 'Coordinator Dashboard';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=44">
+<link rel="stylesheet" href="assets/style.css?v=48">
 </head>
 <body class="account-page">
 <div class="app-layout">
-  <?php include __DIR__ . '/coordinator_sidebar.php'; ?>
+  <?php include __DIR__ . (hasRole('admin') ? '/admin_sidebar.php' : '/coordinator_sidebar.php'); ?>
   <div class="main-content coordinator-main">
     <main class="coordinator-page" id="top">
       <header class="coordinator-page-head">
@@ -35,22 +35,26 @@ $navTitle = 'Coordinator Dashboard';
       </section>
 
       <section class="coordinator-shortcuts" aria-label="Coordinator work areas">
+        <?php if (canOpen('staff_plots.php')): ?>
         <a class="coordinator-shortcut" href="staff_plots.php">
           <span class="shortcut-index">01</span>
           <span><strong>Plots</strong><small>Review applications and manage the plot map</small></span>
           <span class="shortcut-arrow" aria-hidden="true">→</span>
         </a>
+        <?php endif; ?>
+        <?php if (canOpen('staff_inventory.php')): ?>
         <a class="coordinator-shortcut" href="staff_inventory.php">
           <span class="shortcut-index">02</span>
           <span><strong>Inventory</strong><small>Approve resource requests and check stock</small></span>
           <span class="shortcut-arrow" aria-hidden="true">→</span>
         </a>
+        <?php endif; ?>
       </section>
     </main>
   </div>
 </div>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=19"></script>
+<script src="assets/staff.js?v=26"></script>
 </body>
 </html>

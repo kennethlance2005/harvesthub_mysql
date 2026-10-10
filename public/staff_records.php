@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
-$user = requireRole('staff');
+$user = requirePageAccess();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -11,11 +11,11 @@ $user = requireRole('staff');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=44">
+<link rel="stylesheet" href="assets/style.css?v=48">
 </head>
 <body class="account-page">
 <div class="app-layout">
-  <?php include __DIR__ . '/coordinator_sidebar.php'; ?>
+  <?php include __DIR__ . (hasRole('admin') ? '/admin_sidebar.php' : '/coordinator_sidebar.php'); ?>
   <div class="main-content coordinator-main">
     <main class="coordinator-page" id="top">
       <header class="coordinator-page-head">
@@ -24,8 +24,8 @@ $user = requireRole('staff');
       <section class="coordinator-section records-section" aria-labelledby="records-heading">
         <div class="section-heading"><div><p class="eyebrow">Transaction history</p><h2 id="records-heading">Inventory Timeline</h2></div></div>
         <div class="records-tabs" role="tablist" aria-label="Record type">
-          <button class="records-tab is-active" id="records-inventory-tab" type="button" role="tab" aria-selected="true" aria-controls="resource-records-panel">Inventory Timeline</button>
-          <button class="records-tab" id="records-plots-tab" type="button" role="tab" aria-selected="false" aria-controls="plot-records-panel">Plots Timeline</button>
+          <button class="records-tab is-active" id="records-inventory-tab" type="button"<?= can('resources.view') ? '' : ' hidden' ?> role="tab" aria-selected="true" aria-controls="resource-records-panel">Inventory Timeline</button>
+          <button class="records-tab" id="records-plots-tab" type="button"<?= can('plots.view') ? '' : ' hidden' ?> role="tab" aria-selected="false" aria-controls="plot-records-panel">Plots Timeline</button>
         </div>
         <div class="records-date-filter" role="group" aria-label="Filter timeline by date">
           <button class="btn btn-ghost records-day-button" id="records-previous-day" type="button">Previous Day</button>
@@ -34,7 +34,7 @@ $user = requireRole('staff');
           </label>
           <button class="btn btn-ghost records-day-button" id="records-next-day" type="button">Next Day</button>
         </div>
-        <div id="resource-records-panel" role="tabpanel" aria-labelledby="records-inventory-tab">
+        <div id="resource-records-panel" role="tabpanel" aria-labelledby="records-inventory-tab"<?= can('resources.view') ? '' : ' hidden' ?>>
           <div id="resource-records-list" class="records-timeline" aria-live="polite">
             <p class="text-muted">Loading records...</p>
           </div>
@@ -50,6 +50,6 @@ $user = requireRole('staff');
 </div>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/staff.js?v=19"></script>
+<script src="assets/staff.js?v=26"></script>
 </body>
 </html>

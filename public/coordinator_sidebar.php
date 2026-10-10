@@ -7,10 +7,10 @@
     </button>
     <div class="sidebar-user" id="coordinatorSidebarUser"><?= htmlspecialchars($user['name'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
     <nav class="sidebar-nav" id="coordinatorSidebarNav" aria-label="Coordinator navigation">
-      <a href="staff_dashboard.php" class="sidebar-link <?= $currentPage === 'staff_dashboard.php' ? 'active' : '' ?>">Dashboard</a>
-      <a href="staff_plots.php" class="sidebar-link <?= $currentPage === 'staff_plots.php' ? 'active' : '' ?>">Plots</a>
-      <a href="staff_inventory.php" class="sidebar-link <?= $currentPage === 'staff_inventory.php' ? 'active' : '' ?>">Inventory</a>
-      <a href="staff_records.php" class="sidebar-link <?= $currentPage === 'staff_records.php' ? 'active' : '' ?>">Records</a>
+      <?php if (canOpen('staff_dashboard.php')): ?><a href="staff_dashboard.php" class="sidebar-link <?= $currentPage === 'staff_dashboard.php' ? 'active' : '' ?>">Dashboard</a><?php endif; ?>
+      <?php if (canOpen('staff_plots.php')): ?><a href="staff_plots.php" class="sidebar-link <?= $currentPage === 'staff_plots.php' ? 'active' : '' ?>">Plots</a><?php endif; ?>
+      <?php if (canOpen('staff_inventory.php')): ?><a href="staff_inventory.php" class="sidebar-link <?= $currentPage === 'staff_inventory.php' ? 'active' : '' ?>">Inventory</a><?php endif; ?>
+      <?php if (canOpen('staff_records.php')): ?><a href="staff_records.php" class="sidebar-link <?= $currentPage === 'staff_records.php' ? 'active' : '' ?>">Records</a><?php endif; ?>
       <?php if (hasRole('customer')): ?>
       <a href="customer_dashboard.php" class="sidebar-link <?= $currentPage === 'customer_dashboard.php' ? 'active' : '' ?>">Gardener Dashboard</a>
       <a href="customer_crops.php" class="sidebar-link <?= $currentPage === 'customer_crops.php' ? 'active' : '' ?>">My Crops</a>
@@ -22,6 +22,7 @@
     <div class="sidebar-footer" id="coordinatorSidebarLogout"><a href="logout.php" class="sidebar-link coordinator-logout">Log Out</a></div>
   </div>
 </aside>
+<?= permissionsScript() ?>
 <script>
 (function () {
   var nav = document.querySelector('.sidebar');

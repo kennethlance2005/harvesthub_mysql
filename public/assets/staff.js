@@ -21,6 +21,9 @@ let currentGardenerId = null;
 let plots = [];
 let resources = [];
 let activeRecordsTimeline = 'inventory';
+// What the logged-in person may do (printed by the sidebar). The server checks too.
+const allowed = permission => typeof window.hhCan === 'function' && window.hhCan(permission);
+const viewOnlyBadge = '<span class="badge badge-neutral" title="Your roles let you see this but not change it.">View only</span>';
 
 function matchesSearch(value, query) {
   const normalizedQuery = String(query || '').trim().toLowerCase();
@@ -74,8 +77,9 @@ function renderApplications() {
         <div class="action-row-actions">
           ${isSelfRequest
             ? '<span class="badge badge-neutral" title="Coordinators cannot review their own requests.">Cannot self-review</span>'
-            : `<button class="btn btn-accent btn-sm approve-app" data-id="${app.AppID}">${type === 'unassignment' ? 'Approve unassignment' : 'Approve assignment'}</button>
-              <button class="btn btn-ghost btn-sm reject-app" data-id="${app.AppID}">Reject</button>`}
+            : !allowed('plots.approve') && !allowed('plots.reject') ? viewOnlyBadge
+            : `${allowed('plots.approve') ? `<button class="btn btn-accent btn-sm approve-app" data-id="${app.AppID}">${type === 'unassignment' ? 'Approve unassignment' : 'Approve assignment'}</button>` : ''}
+              ${allowed('plots.reject') ? `<button class="btn btn-ghost btn-sm reject-app" data-id="${app.AppID}">Reject</button>` : ''}`}
         </div>
       </div>
     `;
@@ -121,10 +125,11 @@ function renderResourceTransactions() {
       <div class="action-row-actions">
         ${isSelfRequest
           ? '<span class="badge badge-neutral" title="Coordinators cannot review their own requests.">Cannot self-review</span>'
+          : !allowed('resources.approve') && !allowed('resources.reject') ? viewOnlyBadge
           : `<label class="sr-only" for="approve-qty-${txn.TxnID}">Quantity to ${txn.RequestType === 'Donation' ? 'accept' : 'approve'} or reject</label>
             <input type="number" class="qty-choice-input" id="approve-qty-${txn.TxnID}" min="1" max="${txn.Qty}" value="${txn.Qty}" title="Quantity for this decision">
-            <button class="btn btn-accent btn-sm approve-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Accept donation' : 'Approve'}</button>
-            <button class="btn btn-ghost btn-sm reject-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Reject donation' : 'Reject'}</button>`}
+            ${allowed('resources.approve') ? `<button class="btn btn-accent btn-sm approve-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Accept donation' : 'Approve'}</button>` : ''}
+            ${allowed('resources.reject') ? `<button class="btn btn-ghost btn-sm reject-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Reject donation' : 'Reject'}</button>` : ''}`}
       </div>
     </div>
   `;
@@ -358,11 +363,11 @@ function renderPlots(selectedFilter) {
           : ''}
         ${plot.ReturnRequestPending
           ? '<span class="badge badge-brown">Return request pending</span>'
-          : plot.GardenerName && String(plot.GardenerID) !== String(currentGardenerId)
+          : allowed('plots.approve') && plot.GardenerName && String(plot.GardenerID) !== String(currentGardenerId)
             ? `<button class="btn btn-ghost btn-sm request-plot-return" data-id="${plot.PltID}" data-label="${escapeHtml(plot.Label)}" data-gardener="${escapeHtml(plot.GardenerName)}" type="button">Ask gardener to return</button>`
             : ''}
-        <button class="btn btn-ghost btn-sm edit-plot" data-id="${plot.PltID}" data-label="${escapeHtml(plot.Label)}" data-location="${escapeHtml(plot.Location || '')}" data-area="${escapeHtml(String(plot.AreaSqM || ''))}" type="button">Edit details</button>
-        ${available && !plot.GardenerName
+        ${allowed('plots.add') ? `<button class="btn btn-ghost btn-sm edit-plot" data-id="${plot.PltID}" data-label="${escapeHtml(plot.Label)}" data-location="${escapeHtml(plot.Location || '')}" data-area="${escapeHtml(String(plot.AreaSqM || ''))}" type="button">Edit details</button>` : ''}
+        ${allowed('plots.delete') && available && !plot.GardenerName
           ? `<button class="btn btn-ghost btn-sm delete-plot" data-id="${plot.PltID}" data-label="${escapeHtml(plot.Label)}" type="button">Delete plot</button>`
           : ''}
       </article>
@@ -610,7 +615,7 @@ function renderResources() {
             <span class="borrower-assignment-meta" title="${escapeHtml(`${borrower.Qty}x · ${borrower.PlotLabel || 'No plot assigned'}`)}">${escapeHtml(String(borrower.Qty))}x · ${escapeHtml(borrower.PlotLabel || 'No plot assigned')}</span>
             ${borrower.Status === 'Return Requested' ? '<span class="borrower-return-status">Return requested</span>' : ''}
           </div>
-          ${document.body.dataset.inventoryRole !== 'admin' && borrower.Status === 'Approved'
+          ${allowed('resources.request_return') && borrower.Status === 'Approved'
             ? `<div class="return-request-control">
                 <label class="sr-only" for="return-qty-${borrower.TxnID}">Quantity to request back</label>
                 <input type="number" class="qty-choice-input" id="return-qty-${borrower.TxnID}" min="1" max="${borrower.Qty}" value="${borrower.Qty}" title="Quantity to request back">
@@ -619,7 +624,7 @@ function renderResources() {
             : ''}
         </div>
       `).join('') : resource.Borrowers.length ? '<span class="borrower-empty-state">No borrower assignments match this search.</span>' : '<span class="borrower-empty-state">No current borrowers</span>'}</div></td>
-      <td data-label="Actions"><button class="btn btn-ghost btn-sm edit-resource-btn" type="button" data-id="${resource.ResourceID}" data-name="${escapeHtml(resource.Name)}" data-total="${resource.TotalQty}">Edit</button></td>
+      <td data-label="Actions">${allowed('resources.add_stock') ? `<button class="btn btn-ghost btn-sm edit-resource-btn" type="button" data-id="${resource.ResourceID}" data-name="${escapeHtml(resource.Name)}" data-total="${resource.TotalQty}">Edit</button>` : viewOnlyBadge}</td>
     </tr>
   `).join('');
   tableEl.innerHTML = rows || '<tr class="resource-empty-row"><td colspan="5" class="text-muted">No resources match your search.</td></tr>';
@@ -813,10 +818,10 @@ function renderCoordinatorOverview() {
   if (!statsEl) return;
   const availablePlots = plots.filter(plot => String(plot.Status || '').trim().toLowerCase() === 'available').length;
   const stats = [
-    [resourceTransactions.length, 'Pending resource requests'],
-    [availablePlots, 'Available plots'],
-    [resources.length, 'Resource types'],
-  ];
+    allowed('resources.view') && [resourceTransactions.length, 'Pending resource requests'],
+    allowed('plots.view') && [availablePlots, 'Available plots'],
+    allowed('resources.view') && [resources.length, 'Resource types'],
+  ].filter(Boolean);
   statsEl.innerHTML = stats.map(([value, label]) => `
     <div class="stat-card"><div class="stat-value">${escapeHtml(String(value))}</div><div class="stat-label">${escapeHtml(label)}</div></div>
   `).join('');
@@ -894,8 +899,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const isDashboard = Boolean(document.getElementById('coordinator-stats'));
   if (document.getElementById('applications-list')) loadApplications();
   if (document.getElementById('crop-catalog-requests-list')) loadCropCatalogRequests();
-  if (isDashboard || document.getElementById('resource-txns-list')) loadResourceTxns();
-  if (isDashboard || document.getElementById('plot-map')) loadPlots();
-  if (isDashboard || document.getElementById('resources-table')) loadResources();
-  if (document.getElementById('resource-records-list')) loadResourceRecords();
+  if (isDashboard) renderCoordinatorOverview();
+  if ((isDashboard && allowed('resources.view')) || document.getElementById('resource-txns-list')) loadResourceTxns();
+  if ((isDashboard && allowed('plots.view')) || document.getElementById('plot-map')) loadPlots();
+  if ((isDashboard && allowed('resources.view')) || document.getElementById('resources-table')) loadResources();
+  // Records: start on the plots timeline for people who can't see inventory records
+  if (document.getElementById('resource-records-list')) {
+    if (allowed('resources.view')) loadResourceRecords();
+    else switchRecordsTimeline('plots');
+  }
 });

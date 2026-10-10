@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/auth.php';
-$isCoordinator = hasRole('staff');
-$user = $isCoordinator ? requireRole('staff') : requireRole('admin');
+$user = requirePageAccess();
+$isAdminView = hasRole('admin');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -12,22 +12,18 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=44">
+<link rel="stylesheet" href="assets/style.css?v=48">
 </head>
-<body class="account-page" data-inventory-role="<?= $isCoordinator ? 'staff' : 'admin' ?>">
+<body class="account-page">
 <div class="app-layout">
-  <?php if ($isCoordinator): ?>
-    <?php include __DIR__ . '/coordinator_sidebar.php'; ?>
-  <?php else: ?>
-    <?php include __DIR__ . '/admin_sidebar.php'; ?>
-  <?php endif; ?>
+  <?php include __DIR__ . ($isAdminView ? '/admin_sidebar.php' : '/coordinator_sidebar.php'); ?>
   <div class="main-content coordinator-main">
     <main class="coordinator-page" id="top">
       <header class="coordinator-page-head">
-        <div><p class="eyebrow"><?= $isCoordinator ? 'Garden operations' : 'System management' ?></p><h1>Inventory</h1><p class="text-muted"><?= $isCoordinator ? 'Review resource requests and keep track of shared stock.' : 'Review and update the shared resource stock.' ?></p></div>
+        <div><p class="eyebrow"><?= $isAdminView ? 'System management' : 'Garden operations' ?></p><h1>Inventory</h1><p class="text-muted">Review resource requests and keep track of shared stock.</p></div>
       </header>
 
-      <?php if ($isCoordinator): ?>
+      <?php if (can('crops.review_catalog')): ?>
       <section class="coordinator-section" aria-labelledby="crop-catalog-requests-heading">
         <div class="section-heading">
           <div><p class="eyebrow">Needs review</p><h2 id="crop-catalog-requests-heading">Crop catalog additions</h2></div>
@@ -35,6 +31,8 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
         <div class="pending-request-list coordinator-request-list" id="crop-catalog-requests-list"></div>
         <p class="text-muted" id="crop-catalog-requests-empty" hidden>No pending crop additions.</p>
       </section>
+      <?php endif; ?>
+      <?php if (can('resources.view')): ?>
       <section class="coordinator-section" aria-labelledby="resource-requests-heading">
         <div class="section-heading"><div><p class="eyebrow">Needs review</p><h2 id="resource-requests-heading">Resource requests</h2></div>
           <form class="table-search" id="resource-search-form">
@@ -45,7 +43,6 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
         <div class="pending-request-list coordinator-request-list" id="resource-txns-list"></div>
         <p class="text-muted" id="resource-txns-empty" hidden>No pending resource requests.</p>
       </section>
-      <?php endif; ?>
 
       <section class="coordinator-section" aria-labelledby="resource-stock-heading">
         <div class="section-heading"><div><p class="eyebrow">Shared supplies</p><h2 id="resource-stock-heading">Resource inventory</h2></div>
@@ -54,7 +51,7 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
             <input id="all-resources-search" type="search" placeholder="Search resource or borrower">
           </form>
         </div>
-        <?php if ($isCoordinator): ?>
+        <?php if (can('resources.add_stock')): ?>
         <form class="inventory-add-form" id="add-resource-form">
           <label for="resource-name">Add an item <span class="required">*</span></label>
           <input id="resource-name" name="name" type="text" maxlength="80" placeholder="Resource name" required>
@@ -70,6 +67,7 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
           </table>
         </div>
       </section>
+      <?php endif; ?>
     </main>
   </div>
 </div>
@@ -91,6 +89,6 @@ $user = $isCoordinator ? requireRole('staff') : requireRole('admin');
     </div>
   </form>
 </dialog>
-<script src="assets/staff.js?v=25"></script>
+<script src="assets/staff.js?v=26"></script>
 </body>
 </html>

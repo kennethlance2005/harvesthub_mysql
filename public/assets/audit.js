@@ -33,6 +33,13 @@ document.addEventListener('DOMContentLoaded', () => {
     coordinator_application_approved: 'Coordinator approved',
     coordinator_application_rejected: 'Coordinator application rejected',
     audit_exported: 'Audit log downloaded',
+    coordinator_demoted: 'Coordinator role removed',
+    role_created: 'Role created',
+    role_updated: 'Role edited',
+    role_permissions_changed: 'Permissions changed',
+    role_deleted: 'Role deleted',
+    role_assigned: 'Role given',
+    role_removed: 'Role taken away',
   };
   // Who did it, in words: visitors and automatic actions have no account name.
   const actorName = e => e.ActorName
@@ -223,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
     reload();
   });
 
-  document.getElementById('audit-export').addEventListener('click', () => {
+  document.getElementById('audit-export')?.addEventListener('click', () => {
     const params = filterParams();
     params.set('action', 'audit_log_export');
     window.location.href = `api.php?${params}`;

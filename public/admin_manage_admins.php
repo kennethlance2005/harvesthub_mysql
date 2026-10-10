@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
-$user = requireRole('admin');
+$user = requirePageAccess();
 $navTitle = 'Manage Administrators';
 ?>
 <!DOCTYPE html>
@@ -10,7 +10,7 @@ $navTitle = 'Manage Administrators';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Admins</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=44">
+<link rel="stylesheet" href="assets/style.css?v=48">
 </head>
 <body class="account-page">
 <div class="app-layout">
@@ -20,6 +20,7 @@ $navTitle = 'Manage Administrators';
       
       <div style="display: flex; flex-direction: column; gap: 32px;">
           
+          <?php if (can('accounts.create_admin')): ?>
           <!-- Register New Administrator Form -->
           <div class="panel">
             <h2 style="margin-bottom: 4px;">Register New Administrator</h2>
@@ -90,7 +91,10 @@ $navTitle = 'Manage Administrators';
             </form>
           </div>
 
+          <?php endif; ?>
+
           <!-- Admin Accounts Table -->
+          <?php if (can('accounts.view')): ?>
           <div class="panel">
             <div class="admin-table-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
               <p class="panel-title" style="margin: 0;">Administrators</p>
@@ -110,6 +114,7 @@ $navTitle = 'Manage Administrators';
               </table>
             </div>
           </div>
+          <?php endif; ?>
 
       </div>
 
@@ -119,6 +124,6 @@ $navTitle = 'Manage Administrators';
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js?v=18"></script>
+<script src="assets/admin.js?v=20"></script>
 </body>
 </html>

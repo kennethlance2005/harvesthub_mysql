@@ -32,9 +32,16 @@ $currentPage = basename($_SERVER['PHP_SELF']);
       <a href="customer_exchange.php" class="sidebar-link <?= $currentPage === 'customer_exchange.php' ? 'active' : '' ?>">
         Exchange Board
       </a>
-      <?php if (hasRole('staff')): ?>
-      <a href="staff_dashboard.php" class="sidebar-link <?= str_starts_with($currentPage, 'staff_') ? 'active' : '' ?>">
-        Coordinator Workspace
+      <?php $toolsPage = firstOpenablePage(['staff_dashboard.php', 'staff_plots.php', 'staff_inventory.php', 'staff_records.php']); ?>
+      <?php if ($toolsPage): ?>
+      <a href="<?= $toolsPage ?>" class="sidebar-link">
+        <?= hasRole('staff') ? 'Coordinator Workspace' : 'Garden Tools' ?>
+      </a>
+      <?php endif; ?>
+      <?php $adminPage = firstOpenablePage(array_keys(array_filter(PAGE_PERMISSIONS, fn ($perms, $page) => str_starts_with($page, 'admin_'), ARRAY_FILTER_USE_BOTH))); ?>
+      <?php if ($adminPage): ?>
+      <a href="<?= $adminPage ?>" class="sidebar-link">
+        Admin Tools
       </a>
       <?php endif; ?>
     </nav>
@@ -44,6 +51,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     </div>
   </div>
 </aside>
+<?= permissionsScript() ?>
 <script>
 (function () {
   var nav = document.querySelector('.sidebar');

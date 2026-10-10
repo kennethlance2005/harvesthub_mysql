@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
-$user = requireRole('admin');
+$user = requirePageAccess();
 $navTitle = 'Audit Log';
 ?>
 <!DOCTYPE html>
@@ -10,7 +10,7 @@ $navTitle = 'Audit Log';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Audit Log</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=44">
+<link rel="stylesheet" href="assets/style.css?v=48">
 </head>
 <body class="account-page">
 
@@ -84,7 +84,9 @@ $navTitle = 'Audit Log';
           </div>
           <div class="audit-filter-actions">
             <button type="button" class="btn btn-ghost btn-sm" id="audit-reset">Clear filters</button>
+            <?php if (can('reports.export')): ?>
             <button type="button" class="btn btn-accent btn-sm" id="audit-export">Download CSV</button>
+            <?php endif; ?>
           </div>
         </form>
       </section>
@@ -116,7 +118,7 @@ $navTitle = 'Audit Log';
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=18"></script>
-<script src="assets/audit.js?v=1"></script>
+<script src="assets/admin.js?v=20"></script>
+<script src="assets/audit.js?v=3"></script>
 </body>
 </html>

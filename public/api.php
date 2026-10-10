@@ -45,6 +45,7 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/audit.php';
+require_once __DIR__ . '/roles.php';
 require_once __DIR__ . '/email.php';
 
 function sendResetEmail(string $toEmail, string $resetLink): bool {
@@ -84,15 +85,41 @@ function requireJsonRole(string $role): array {
     return $user;
 }
 
-function requireInventoryManager(): array {
+/**
+ * Guard for admin and coordinator actions: the person needs at least one of
+ * the given permissions. Returns the user with:
+ *   role / id  - who is acting, for the audit log (administrator, else
+ *                coordinator, else their gardener account for custom roles)
+ *   coord_id   - their coordinator ID, or null (stored in CoordID columns)
+ *   admin_id   - their administrator ID, or null (stored in AdminID / ReviewedBy columns)
+ */
+function requireJsonPermission(string ...$anyOf): array {
     $user = currentUser();
-    if (!$user || (!in_array('staff', $user['roles'], true) && !in_array('admin', $user['roles'], true))) {
-        respond(['ok' => false, 'error' => 'Not authorized.'], 403);
+    if (!$user) {
+        respond(['ok' => false, 'error' => 'Please log in again.'], 401);
     }
-    $role = in_array('staff', $user['roles'], true) ? 'staff' : 'admin';
-    $user['id'] = $user['ids'][$role] ?? $user['id'];
-    $user['role'] = $role;
+    if (!canAny($anyOf)) {
+        respond(['ok' => false, 'error' => "You don't have permission to do this. Ask an administrator if you need it."], 403);
+    }
+    $acting = in_array('admin', $user['roles'], true) ? 'admin' : (in_array('staff', $user['roles'], true) ? 'staff' : $user['role']);
+    $user['role'] = $acting;
+    $user['id'] = $user['ids'][$acting] ?? $user['id'];
+    $user['coord_id'] = isset($user['ids']['staff']) ? (int) $user['ids']['staff'] : null;
+    $user['admin_id'] = isset($user['ids']['admin']) ? (int) $user['ids']['admin'] : null;
     return $user;
+}
+
+/** For actions whose permission depends on the choice made (approve vs reject). */
+function requirePermissionFor(string $permission): void {
+    if (!can($permission)) {
+        respond(['ok' => false, 'error' => "You don't have permission to do this. Ask an administrator if you need it."], 403);
+    }
+}
+
+/** Whether an account row is one the acting person is logged in with (no self-archiving etc.). */
+function isOwnAccount(array $user, string $table, int $id): bool {
+    $sessionRole = ['gardener' => 'customer', 'coordinator' => 'staff', 'admin' => 'admin'][$table] ?? null;
+    return $sessionRole !== null && isset($user['ids'][$sessionRole]) && (int) $user['ids'][$sessionRole] === $id;
 }
 
 /**
@@ -152,7 +179,7 @@ function syncLegacyCommunityPlots(PDO $pdo): void {
 // Adds an approved quantity onto the gardener's existing borrower assignment for
 // this resource (if one already exists) instead of creating a second row, so a
 // gardener only ever has one "Approved" line per resource with the totals summed.
-function mergeOrCreateApprovalRow(PDO $pdo, int $gardenerId, int $resourceId, int $qty, int $coordId, ?int $pltId): void {
+function mergeOrCreateApprovalRow(PDO $pdo, int $gardenerId, int $resourceId, int $qty, ?int $coordId, ?int $pltId): void {
     $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Approved' FOR UPDATE");
     $existing->execute([$gardenerId, $resourceId]);
     $existingId = $existing->fetchColumn();
@@ -168,7 +195,7 @@ function mergeOrCreateApprovalRow(PDO $pdo, int $gardenerId, int $resourceId, in
 
 // Same idea for return requests: fold the requested-back quantity into the
 // gardener's existing "Return Requested" row for this resource, if any.
-function mergeOrCreateReturnRequestRow(PDO $pdo, int $gardenerId, int $resourceId, int $qty, int $coordId, ?int $pltId, string $reason): void {
+function mergeOrCreateReturnRequestRow(PDO $pdo, int $gardenerId, int $resourceId, int $qty, ?int $coordId, ?int $pltId, string $reason): void {
     $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Return Requested' FOR UPDATE");
     $existing->execute([$gardenerId, $resourceId]);
     $existingId = $existing->fetchColumn();
@@ -652,7 +679,7 @@ try {
         }
 
         case 'request_plot_return': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('plots.approve');
             foreach (['plot_id', 'reason'] as $field) {
                 if (isset($_POST[$field]) && !is_string($_POST[$field])) {
                     respond(['ok' => false, 'error' => 'Plot return request details must be text values.'], 422);
@@ -702,8 +729,8 @@ try {
                         (GardenerID, CoordID, PltID, Status, RequestType, RequestReason)
                     VALUES (?, ?, ?, 'Pending', 'Return', ?)
                 ");
-                $insert->execute([(int) $plot['GardenerID'], (int) $user['id'], (int) $plotId, $reason]);
-                recordPlotEvent($pdo, 'Request Unassign', 'staff', $user['name'], $plot['Label'], (int) $plotId, (int) $plot['GardenerID'], $plot['GardenerName'], (int) $user['id'], (int) $pdo->lastInsertId());
+                $insert->execute([(int) $plot['GardenerID'], $user['coord_id'], (int) $plotId, $reason]);
+                recordPlotEvent($pdo, 'Request Unassign', 'staff', $user['name'], $plot['Label'], (int) $plotId, (int) $plot['GardenerID'], $plot['GardenerName'], $user['coord_id'], (int) $pdo->lastInsertId());
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -1613,7 +1640,7 @@ try {
         // ---------------- STAFF ----------------
 
         case 'pending_applications': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('plots.view');
             $rows = $pdo->query("
                 SELECT PA.AppID, PA.GardenerID,
                        G.Name AS GardenerName,
@@ -1643,13 +1670,14 @@ try {
         }
 
         case 'process_application': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('plots.approve', 'plots.reject');
             $appId = $_POST['app_id'] ?? '';
             $decision = $_POST['decision'] ?? '';
             $rejectionReason = trim($_POST['reason'] ?? '');
             if (!ctype_digit((string) $appId) || !in_array($decision, ['approve', 'reject'], true)) {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
             }
+            requirePermissionFor($decision === 'approve' ? 'plots.approve' : 'plots.reject');
             if ($decision === 'reject' && ($rejectionReason === '' || mb_strlen($rejectionReason) > 1000)) {
                 respond(['ok' => false, 'error' => 'Please provide a rejection reason of no more than 1,000 characters.'], 422);
             }
@@ -1690,7 +1718,7 @@ try {
 
                 $newStatus = $decision === 'approve' ? 'Approved' : 'Rejected';
                 $pdo->prepare("UPDATE PLOT_APPLICATION SET Status = ?, CoordID = ?, ProcessedAt = NOW(), RejectionReason = ? WHERE AppID = ?")
-                    ->execute([$newStatus, $user['id'], $decision === 'reject' ? $rejectionReason : null, (int) $appId]);
+                    ->execute([$newStatus, $user['coord_id'], $decision === 'reject' ? $rejectionReason : null, (int) $appId]);
                 $autoRejected = 0;
 
                 if ($decision === 'approve') {
@@ -1714,9 +1742,9 @@ try {
                         $rejectedRequests = $otherRequests->fetchAll(PDO::FETCH_ASSOC);
                         if ($rejectedRequests) {
                             $rejectOthers = $pdo->prepare("UPDATE PLOT_APPLICATION SET Status = 'Rejected', CoordID = ?, ProcessedAt = NOW(), RejectionReason = ? WHERE PltID = ? AND AppID <> ? AND Status = 'Pending' AND RequestType = 'Apply'");
-                            $rejectOthers->execute([$user['id'], 'Another gardener was approved for this plot.', $row['PltID'], (int) $appId]);
+                            $rejectOthers->execute([$user['coord_id'], 'Another gardener was approved for this plot.', $row['PltID'], (int) $appId]);
                             foreach ($rejectedRequests as $rejectedRequest) {
-                                recordPlotEvent($pdo, 'Request Rejected', 'staff', $user['name'], $plot['Label'], (int) $row['PltID'], (int) $rejectedRequest['GardenerID'], $rejectedRequest['GardenerName'], (int) $user['id'], (int) $rejectedRequest['AppID']);
+                                recordPlotEvent($pdo, 'Request Rejected', 'staff', $user['name'], $plot['Label'], (int) $row['PltID'], (int) $rejectedRequest['GardenerID'], $rejectedRequest['GardenerName'], $user['coord_id'], (int) $rejectedRequest['AppID']);
                             }
                         }
                         $autoRejected = count($rejectedRequests);
@@ -1724,7 +1752,7 @@ try {
                 }
 
                 $eventType = $decision === 'approve' ? 'Request Accepted' : 'Request Rejected';
-                recordPlotEvent($pdo, $eventType, 'staff', $user['name'], $plot['Label'], (int) $row['PltID'], (int) $row['GardenerID'], $row['GardenerName'], (int) $user['id'], (int) $appId);
+                recordPlotEvent($pdo, $eventType, 'staff', $user['name'], $plot['Label'], (int) $row['PltID'], (int) $row['GardenerID'], $row['GardenerName'], $user['coord_id'], (int) $appId);
 
                 $pdo->commit();
             } catch (Throwable $error) {
@@ -1735,7 +1763,7 @@ try {
         }
 
         case 'pending_resource_txns': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('resources.view');
             $rows = $pdo->query("
                 SELECT T.TxnID, T.GardenerID, G.Name AS GardenerName, R.Name AS ResourceName, T.Qty,
                        T.RequestType, T.RequestNotes, T.RequestedAt
@@ -1752,7 +1780,7 @@ try {
         }
 
         case 'pending_crop_catalog_requests': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('crops.review_catalog');
             $stmt = $pdo->query("
                 SELECT R.RequestID, R.GardenerID, R.CropName,
                        R.Notes, R.RequestedAt, G.Name AS GardenerName
@@ -1769,7 +1797,7 @@ try {
         }
 
         case 'process_crop_catalog_request': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('crops.review_catalog');
             foreach (['request_id', 'decision', 'reason', 'confirmed_crop'] as $field) {
                 if (isset($_POST[$field]) && !is_string($_POST[$field])) {
                     respond(['ok' => false, 'error' => 'Crop catalog review fields must be text values.'], 422);
@@ -1821,7 +1849,7 @@ try {
                 ")->execute([
                     $decision === 'approve' ? 'Approved' : 'Rejected',
                     $decision === 'reject' ? $reason : null,
-                    (int) $user['id'],
+                    $user['coord_id'],
                     (int) $requestId,
                 ]);
                 $pdo->commit();
@@ -1833,7 +1861,7 @@ try {
         }
 
         case 'add_resource': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('resources.add_stock');
             $name = trim($_POST['name'] ?? '');
             $qty = $_POST['qty'] ?? '';
             if ($name === '' || mb_strlen($name) > 80 || !ctype_digit((string) $qty) || (int) $qty < 1 || (int) $qty > 100000) {
@@ -1856,18 +1884,19 @@ try {
                     ->execute([$name, (int) $qty, (int) $qty]);
                 $resourceId = (int) $pdo->lastInsertId();
             }
-            recordResourceEvent($pdo, $resourceId, 'Added', (int) $qty, 'staff', $user['name'], null, null, (int) $user['id']);
+            recordResourceEvent($pdo, $resourceId, 'Added', (int) $qty, 'staff', $user['name'], null, null, $user['coord_id']);
             $pdo->commit();
             respond(['ok' => true]);
         }
 
         case 'process_resource_txn': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('resources.approve', 'resources.reject');
             $txnId = $_POST['txn_id'] ?? '';
             $decision = $_POST['decision'] ?? '';
             if (!ctype_digit((string) $txnId) || !in_array($decision, ['approve', 'reject'], true)) {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
             }
+            requirePermissionFor($decision === 'approve' ? 'resources.approve' : 'resources.reject');
 
             $pdo->beginTransaction();
             $txn = $pdo->prepare("
@@ -1949,13 +1978,13 @@ try {
                         }
                     }
 
-                    recordResourceEvent($pdo, (int) $row['ResourceID'], 'Added', $chosenQty, 'staff', $user['name'], (int) $row['GardenerID'], $row['GardenerName'], (int) $user['id']);
+                    recordResourceEvent($pdo, (int) $row['ResourceID'], 'Added', $chosenQty, 'staff', $user['name'], (int) $row['GardenerID'], $row['GardenerName'], $user['coord_id']);
                     if ($remainder > 0) {
                         $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = ?, ProcessedQty = ?, Status = 'Rejected', CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
-                            ->execute([$remainder, $chosenQty, $user['id'], $rejectionReason, (int) $txnId]);
+                            ->execute([$remainder, $chosenQty, $user['coord_id'], $rejectionReason, (int) $txnId]);
                     } else {
                         $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Donated', ProcessedQty = ?, CoordID = ?, ApprovedAt = NOW() WHERE TxnID = ?")
-                            ->execute([$chosenQty, $user['id'], (int) $txnId]);
+                            ->execute([$chosenQty, $user['coord_id'], (int) $txnId]);
                     }
                     $pdo->commit();
                     respond(['ok' => true]);
@@ -1977,14 +2006,14 @@ try {
 
                 // Fold the approved amount into the gardener's existing borrower
                 // assignment for this resource rather than adding a new row.
-                mergeOrCreateApprovalRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $chosenQty, (int) $user['id'], $plotId);
+                mergeOrCreateApprovalRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $chosenQty, $user['coord_id'], $plotId);
                 recordResourceEvent($pdo, (int) $row['ResourceID'], 'Borrowed', $chosenQty, 'customer', $row['GardenerName'], (int) $row['GardenerID'], $row['GardenerName'], null, $plotId, $plotLabel);
 
                 if ($remainder > 0) {
                     // The approved amount is recorded as borrowed; close the
                     // remainder as rejected so it does not remain in the queue.
                     $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = ?, ProcessedQty = ?, Status = 'Rejected', CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
-                        ->execute([$remainder, $chosenQty, $user['id'], $rejectionReason, (int) $txnId]);
+                        ->execute([$remainder, $chosenQty, $user['coord_id'], $rejectionReason, (int) $txnId]);
                 } else {
                     // Nothing left over — the original "Requested" row has been
                     // fully folded into the approval above and is no longer needed.
@@ -2005,12 +2034,12 @@ try {
                             (GardenerID, CoordID, ResourceID, Qty, RequestType, RequestNotes, SourcePersonalItemID, ProcessedQty, Status, RejectionReason)
                         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'Rejected', ?)
                     ")->execute([
-                        (int) $row['GardenerID'], (int) $user['id'], (int) $row['ResourceID'],
+                        (int) $row['GardenerID'], $user['coord_id'], (int) $row['ResourceID'],
                         $chosenQty, $row['RequestType'], $row['RequestNotes'], $row['SourcePersonalItemID'], $rejectionReason,
                     ]);
                 } else {
                     $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Rejected', CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
-                        ->execute([$user['id'], $rejectionReason, (int) $txnId]);
+                        ->execute([$user['coord_id'], $rejectionReason, (int) $txnId]);
                 }
             }
             $pdo->commit();
@@ -2018,7 +2047,7 @@ try {
         }
 
         case 'create_plot': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('plots.add');
             foreach (['label', 'location', 'area_sqm'] as $field) {
                 if (isset($_POST[$field]) && !is_string($_POST[$field])) {
                     respond(['ok' => false, 'error' => 'Plot details must be submitted as text values.'], 422);
@@ -2051,7 +2080,7 @@ try {
 
                 $pdo->prepare("INSERT INTO PLOT (Label, Location, AreaSqM, GardenerID, Status) VALUES (?, ?, ?, NULL, 'Available')")
                     ->execute([$label, $location, $areaSqM]);
-                recordPlotEvent($pdo, 'Plot Added', 'staff', $user['name'], $label, (int) $pdo->lastInsertId(), null, null, (int) $user['id']);
+                recordPlotEvent($pdo, 'Plot Added', 'staff', $user['name'], $label, (int) $pdo->lastInsertId(), null, null, $user['coord_id']);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -2061,7 +2090,7 @@ try {
         }
 
         case 'update_plot_details': {
-            requireJsonRole('staff');
+            requireJsonPermission('plots.add');
             foreach (['plot_id', 'location', 'area_sqm'] as $field) {
                 if (isset($_POST[$field]) && !is_string($_POST[$field])) {
                     respond(['ok' => false, 'error' => 'Plot details must be submitted as text values.'], 422);
@@ -2090,7 +2119,7 @@ try {
         }
 
         case 'delete_plot': {
-            requireJsonRole('staff');
+            requireJsonPermission('plots.delete');
             $plotId = $_POST['plot_id'] ?? '';
             if (!ctype_digit((string) $plotId)) {
                 respond(['ok' => false, 'error' => 'Invalid plot.'], 422);
@@ -2115,7 +2144,7 @@ try {
         }
 
         case 'all_plots': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('plots.view');
             syncLegacyCommunityPlots($pdo);
             $rows = $pdo->query("
                 SELECT P.PltID,
@@ -2156,7 +2185,7 @@ try {
         }
 
         case 'all_resources': {
-            requireInventoryManager();
+            requireJsonPermission('resources.view');
             $rows = $pdo->query("
                 SELECT R.ResourceID, R.Name, R.TotalQty, R.AvailableQty,
                        G.Name AS BorrowerName, T.TxnID, T.Qty AS BorrowedQty, T.Status AS BorrowerStatus,
@@ -2199,7 +2228,7 @@ try {
         }
 
         case 'update_resource_total': {
-            $user = requireInventoryManager();
+            $user = requireJsonPermission('resources.add_stock');
             $resourceId = $_POST['resource_id'] ?? '';
             $totalQtyRaw = $_POST['total_qty'] ?? '';
             if (!ctype_digit((string) $resourceId) || !ctype_digit((string) $totalQtyRaw) || (int) $totalQtyRaw > 100000) {
@@ -2237,7 +2266,7 @@ try {
         }
 
         case 'resource_records': {
-            requireJsonRole('staff');
+            requireJsonPermission('resources.view');
             $selectedDate = $_GET['date'] ?? date('Y-m-d');
             if (!is_string($selectedDate)) {
                 respond(['ok' => false, 'error' => 'Choose a valid date.'], 422);
@@ -2261,7 +2290,7 @@ try {
         }
 
         case 'plot_records': {
-            requireJsonRole('staff');
+            requireJsonPermission('plots.view');
             $selectedDate = $_GET['date'] ?? date('Y-m-d');
             if (!is_string($selectedDate)) {
                 respond(['ok' => false, 'error' => 'Choose a valid date.'], 422);
@@ -2284,7 +2313,7 @@ try {
         }
 
         case 'request_resource_return': {
-            $user = requireJsonRole('staff');
+            $user = requireJsonPermission('resources.request_return');
             $txnId = $_POST['txn_id'] ?? '';
             $reason = trim($_POST['reason'] ?? '');
             if (!ctype_digit((string) $txnId)) {
@@ -2318,8 +2347,8 @@ try {
             }
 
             $pltId = $row['PltID'] === null ? null : (int) $row['PltID'];
-            mergeOrCreateReturnRequestRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $returnQty, (int) $user['id'], $pltId, $reason);
-            recordResourceEvent($pdo, (int) $row['ResourceID'], 'Return Requested', $returnQty, 'staff', $user['name'], (int) $row['GardenerID'], $row['GardenerName'], (int) $user['id'], $pltId, $row['PlotLabel']);
+            mergeOrCreateReturnRequestRow($pdo, (int) $row['GardenerID'], (int) $row['ResourceID'], $returnQty, $user['coord_id'], $pltId, $reason);
+            recordResourceEvent($pdo, (int) $row['ResourceID'], 'Return Requested', $returnQty, 'staff', $user['name'], (int) $row['GardenerID'], $row['GardenerName'], $user['coord_id'], $pltId, $row['PlotLabel']);
 
             $remaining = $borrowedQty - $returnQty;
             if ($remaining > 0) {
@@ -2594,7 +2623,7 @@ try {
         // ---------------- ADMIN ----------------
 
         case 'stats': {
-            requireJsonRole('admin');
+            requireJsonPermission('reports.view');
             $count = fn($sql) => (int) $pdo->query($sql)->fetchColumn();
             respond(['ok' => true, 'stats' => [
                 'admins' => $count("SELECT COUNT(*) FROM SYSTEM_ADMINISTRATOR WHERE Status = 'Active'"),
@@ -2612,16 +2641,32 @@ try {
         }
 
         case 'accounts': {
-            $user = requireJsonRole('admin');
+            $user = requireJsonPermission('accounts.view');
             $gardeners = $pdo->query("SELECT GardenerID AS id, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM COMMUNITY_GARDENER WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
             $coordinators = $pdo->query("SELECT CoordID AS id, GardenerID, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, Shift, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM GARDEN_COORDINATOR WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
             $admins = $pdo->query("SELECT AdminID AS id, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM SYSTEM_ADMINISTRATOR WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
-            
-            respond(['ok' => true, 'current_user_id' => $user['id'], 'gardeners' => $gardeners, 'coordinators' => $coordinators, 'admins' => $admins]);
+
+            // Custom roles shown as badges. A dual-role person's roles live on their gardener account.
+            $customRoles = [];
+            foreach ($pdo->query('SELECT UR.AccountType, UR.AccountID, R.Name FROM USER_ROLE UR JOIN ROLE R ON R.RoleID = UR.RoleID ORDER BY R.Name') as $row) {
+                $customRoles[$row['AccountType']][(int) $row['AccountID']][] = $row['Name'];
+            }
+            foreach ($gardeners as &$gardener) {
+                $gardener['custom_roles'] = $customRoles['gardener'][(int) $gardener['id']] ?? [];
+            }
+            unset($gardener);
+            foreach ($coordinators as &$coordinator) {
+                $coordinator['custom_roles'] = $coordinator['GardenerID'] !== null
+                    ? ($customRoles['gardener'][(int) $coordinator['GardenerID']] ?? [])
+                    : ($customRoles['coordinator'][(int) $coordinator['id']] ?? []);
+            }
+            unset($coordinator);
+
+            respond(['ok' => true, 'current_user_id' => $user['admin_id'], 'gardeners' => $gardeners, 'coordinators' => $coordinators, 'admins' => $admins]);
         }
 
         case 'pending_signups': {
-            requireJsonRole('admin');
+            requireJsonPermission('registrations.review');
             $rows = $pdo->query("
                 SELECT RequestID, FirstName, LastName, Age, Location, Email, Role, Shift, RequestedAt
                 FROM SIGNUP_REQUEST WHERE Status = 'Pending' ORDER BY RequestedAt ASC
@@ -2631,7 +2676,7 @@ try {
 
         // Everything the admin needs to decide on one registration request.
         case 'signup_request_details': {
-            requireJsonRole('admin');
+            requireJsonPermission('registrations.review');
             $requestId = $_GET['request_id'] ?? '';
             if (!ctype_digit((string) $requestId)) {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
@@ -2798,7 +2843,7 @@ try {
 
         // What removing this coordinator's role will mean, for the confirm dialog.
         case 'coordinator_demotion_preview': {
-            requireJsonRole('admin');
+            requireJsonPermission('accounts.demote');
             $coordId = $_GET['coord_id'] ?? '';
             if (!ctype_digit((string) $coordId)) respond(['ok' => false, 'error' => 'Invalid request.'], 422);
 
@@ -2838,7 +2883,7 @@ try {
         // Takes coordinator tools away. Records are kept (status "Demoted") so
         // plot/resource history that points at this coordinator stays intact.
         case 'demote_coordinator': {
-            $admin = requireJsonRole('admin');
+            $admin = requireJsonPermission('accounts.demote');
             $coordId = $_POST['coord_id'] ?? '';
             $category = $_POST['reason'] ?? '';
             $details = trim((string) ($_POST['details'] ?? ''));
@@ -2861,8 +2906,8 @@ try {
             }
             // Administrators can't take a role away from themselves.
             $selfCheck = $pdo->prepare('SELECT Email FROM SYSTEM_ADMINISTRATOR WHERE AdminID = ?');
-            $selfCheck->execute([(int) $admin['id']]);
-            if (strcasecmp((string) $selfCheck->fetchColumn(), $coordinator['Email']) === 0) {
+            $selfCheck->execute([$admin['admin_id']]);
+            if (isOwnAccount($admin, 'coordinator', (int) $coordId) || strcasecmp((string) $selfCheck->fetchColumn(), $coordinator['Email']) === 0) {
                 $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'You cannot remove your own coordinator role.'], 403);
             }
@@ -2899,7 +2944,7 @@ try {
             $pdo->prepare("
                 INSERT INTO ROLE_HISTORY (AccountType, AccountID, AccountName, RoleID, RoleName, ChangeType, ReasonCategory, ReasonDetails, ChangedBy, ChangedByName)
                 SELECT ?, ?, ?, RoleID, Name, 'demoted', ?, ?, ?, ? FROM ROLE WHERE Code = 'coordinator'
-            ")->execute([$historyType, $historyId, $coordinator['Name'], $category, $details, (int) $admin['id'], $admin['name']]);
+            ")->execute([$historyType, $historyId, $coordinator['Name'], $category, $details, $admin['admin_id'], $admin['name']]);
 
             logAudit($pdo, 'roles', 'coordinator_demoted', "{$admin['name']} removed " . possessive($coordinator['Name']) . " coordinator role. $outcomeText", [
                 'actor' => auditActor($admin),
@@ -2913,7 +2958,7 @@ try {
         }
 
         case 'pending_coordinator_applications': {
-            requireJsonRole('admin');
+            requireJsonPermission('coordinator_applications.review');
             $rows = $pdo->query("
                 SELECT A.ApplicationID, A.GardenerID, A.Shift, A.Motivation, A.RequestedAt,
                        G.Name, G.Email, G.Location
@@ -2928,7 +2973,7 @@ try {
         // The applicant's profile and garden activity, for reviewing one
         // coordinator application before deciding on it.
         case 'coordinator_application_details': {
-            requireJsonRole('admin');
+            requireJsonPermission('coordinator_applications.review');
             $applicationId = $_GET['application_id'] ?? '';
             if (!ctype_digit((string) $applicationId)) {
                 respond(['ok' => false, 'error' => 'Invalid application.'], 422);
@@ -3022,7 +3067,7 @@ try {
         }
 
         case 'process_coordinator_application': {
-            $admin = requireJsonRole('admin');
+            $admin = requireJsonPermission('coordinator_applications.review');
             $applicationId = $_POST['application_id'] ?? '';
             $decision = $_POST['decision'] ?? '';
             $reason = trim($_POST['reason'] ?? '');
@@ -3045,6 +3090,10 @@ try {
                 if (!$application || $application['Status'] !== 'Pending') {
                     $pdo->rollBack();
                     respond(['ok' => false, 'error' => 'This coordinator application has already been reviewed.'], 409);
+                }
+                if (isOwnAccount($admin, 'gardener', (int) $application['GardenerID'])) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'You cannot review your own coordinator application.'], 403);
                 }
                 if ($decision === 'approve') {
                     if ($application['GardenerStatus'] !== 'Active') {
@@ -3080,7 +3129,7 @@ try {
                 ")->execute([
                     $decision === 'approve' ? 'Approved' : 'Rejected',
                     $decision === 'reject' ? $reason : null,
-                    $admin['id'],
+                    $admin['admin_id'],
                     (int) $applicationId,
                 ]);
                 $applicantId = (int) $application['GardenerID'];
@@ -3088,7 +3137,7 @@ try {
                     $pdo->prepare("
                         INSERT INTO ROLE_HISTORY (AccountType, AccountID, AccountName, RoleID, RoleName, ChangeType, ChangedBy, ChangedByName)
                         SELECT 'gardener', ?, ?, RoleID, Name, 'granted', ?, ? FROM ROLE WHERE Code = 'coordinator'
-                    ")->execute([$applicantId, $application['Name'], (int) $admin['id'], $admin['name']]);
+                    ")->execute([$applicantId, $application['Name'], $admin['admin_id'], $admin['name']]);
                     logAudit($pdo, 'roles', 'coordinator_application_approved', "{$admin['name']} approved " . possessive($application['Name']) . " coordinator application. They now have coordinator tools for the {$application['Shift']} shift.", [
                         'actor' => auditActor($admin),
                         'target' => ['gardener', $applicantId, $application['Name']],
@@ -3113,13 +3162,14 @@ try {
         }
 
         case 'process_signup': {
-            $user = requireJsonRole('admin');
+            $user = requireJsonPermission('registrations.approve', 'registrations.reject');
             $requestId = $_POST['request_id'] ?? '';
             $decision = $_POST['decision'] ?? '';
             $reason = trim($_POST['reason'] ?? '');
             if (!ctype_digit((string) $requestId) || !in_array($decision, ['approve', 'reject'], true)) {
                 respond(['ok' => false, 'error' => 'Invalid request.'], 422);
             }
+            requirePermissionFor($decision === 'approve' ? 'registrations.approve' : 'registrations.reject');
             if ($decision === 'reject' && ($reason === '' || mb_strlen($reason) > 1000)) {
                 respond(['ok' => false, 'error' => 'Please provide a rejection reason of no more than 1,000 characters.'], 422);
             }
@@ -3169,7 +3219,7 @@ try {
                     ->execute([
                         $decision === 'approve' ? 'Approved' : 'Rejected',
                         $decision === 'reject' ? $reason : null,
-                        $user['id'],
+                        $user['admin_id'],
                         (int) $requestId,
                     ]);
                 $pdo->commit();
@@ -3185,7 +3235,7 @@ try {
         }
 
         case 'create_admin': {
-            $user = requireJsonRole('admin');
+            $user = requireJsonPermission('accounts.create_admin');
             $firstName = trim($_POST['first_name'] ?? '');
             $lastName = trim($_POST['last_name'] ?? '');
             $name = trim($firstName . ' ' . $lastName);
@@ -3233,7 +3283,7 @@ try {
         }
         
         case 'archive_account': {
-            $user = requireJsonRole('admin');
+            $user = requireJsonPermission('accounts.archive');
             $table = $_POST['table'] ?? '';
             $id = $_POST['id'] ?? '';
             $map = [
@@ -3245,8 +3295,8 @@ try {
 
             $idNum = (int) $id;
             
-            // Prevent an admin from archiving themselves
-            if ($table === 'admin' && $idNum === $user['id']) {
+            // Nobody can archive an account they are logged in with
+            if (isOwnAccount($user, $table, $idNum)) {
                 respond(['ok' => false, 'error' => 'You cannot archive your own account.'], 403);
             }
             // HarvestHub must always keep at least one administrator who can log in.
@@ -3301,7 +3351,7 @@ try {
                     $pdo->prepare("
                         INSERT INTO ACCOUNT_ARCHIVE_NOTICE (GardenerID, AdminID, Reason, Details)
                         VALUES (?, ?, ?, ?)
-                    ")->execute([$idNum, (int) $user['id'], $reason, $details]);
+                    ")->execute([$idNum, $user['admin_id'], $reason, $details]);
                     $plotsStmt = $pdo->prepare('SELECT PltID, Label FROM PLOT WHERE GardenerID = ? FOR UPDATE');
                     $plotsStmt->execute([$idNum]);
                     $assignedPlots = $plotsStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -3322,7 +3372,7 @@ try {
                 if ($table === 'gardener') {
                     $pdo->prepare("UPDATE PLOT SET GardenerID = NULL, Status = 'Available' WHERE GardenerID = ?")->execute([$idNum]);
                     foreach ($assignedPlots as $plot) {
-                        recordPlotEvent($pdo, 'Plot Unassigned', 'admin', $user['name'], $plot['Label'], (int) $plot['PltID'], $idNum, $gardenerName, (int) $user['id']);
+                        recordPlotEvent($pdo, 'Plot Unassigned', 'admin', $user['name'], $plot['Label'], (int) $plot['PltID'], $idNum, $gardenerName, null);
                     }
                 }
                 $pdo->commit();
@@ -3335,7 +3385,7 @@ try {
         }
 
         case 'send_archive_notice': {
-            $user = requireJsonRole('admin');
+            $user = requireJsonPermission('accounts.archive');
             $id = $_POST['id'] ?? '';
             $reason = trim($_POST['reason'] ?? '');
             $details = trim($_POST['details'] ?? '');
@@ -3361,7 +3411,7 @@ try {
                 $pdo->prepare("
                     INSERT INTO ACCOUNT_ARCHIVE_NOTICE (GardenerID, AdminID, Reason, Details)
                     VALUES (?, ?, ?, ?)
-                ")->execute([$gardenerId, (int) $user['id'], $reason, $details]);
+                ")->execute([$gardenerId, $user['admin_id'], $reason, $details]);
                 logAudit($pdo, 'accounts', 'archive_notice_sent', "{$user['name']} warned $noticeGardenerName that their account will be archived unless the issue is resolved.", [
                     'actor' => auditActor($user),
                     'target' => ['gardener', $gardenerId, $noticeGardenerName],
@@ -3377,7 +3427,7 @@ try {
         }
 
         case 'enable_account': {
-            $user = requireJsonRole('admin');
+            $user = requireJsonPermission('accounts.enable');
             $table = $_POST['table'] ?? '';
             $id = $_POST['id'] ?? '';
             $map = [
@@ -3402,7 +3452,7 @@ try {
         }
 
         case 'user_archive_details': {
-            requireJsonRole('admin');
+            requireJsonPermission('accounts.view');
             $table = $_GET['table'] ?? '';
             $id = (int)($_GET['id'] ?? 0);
 
@@ -3461,7 +3511,7 @@ try {
         }
 
         case 'archived_accounts': {
-            requireJsonRole('admin');
+            requireJsonPermission('accounts.view');
             $gardeners = $pdo->query("
                 SELECT G.GardenerID AS id, G.Name, G.Email, 'Customer' AS Role,
                        COALESCE(NULLIF(G.Location, ''), 'Not provided') AS Location,
@@ -3482,7 +3532,7 @@ try {
         }
 
         case 'unarchive_account': {
-            $user = requireJsonRole('admin');
+            $user = requireJsonPermission('accounts.archive');
             $role = $_POST['role'] ?? '';
             $id = (int)($_POST['id'] ?? 0);
             
@@ -3519,7 +3569,7 @@ try {
 
         // Filtered, paged list of audit entries (newest first).
         case 'audit_log': {
-            requireJsonRole('admin');
+            requireJsonPermission('audit.view');
             [$where, $params] = auditLogFilters($_GET);
             $perPage = 50;
             $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -3553,7 +3603,8 @@ try {
 
         // Same filters as audit_log, downloaded as a CSV file.
         case 'audit_log_export': {
-            $user = requireJsonRole('admin');
+            $user = requireJsonPermission('audit.view');
+            requirePermissionFor('reports.export');
             [$where, $params] = auditLogFilters($_GET);
             $rows = $pdo->prepare("
                 SELECT OccurredAt, ActorName, ActorType, Module, Action, TargetName, Summary, Reason, IpAddress
@@ -3587,8 +3638,284 @@ try {
             exit;
         }
 
+        // ---------- Roles and permissions (section 6) ----------
+
+        // Every role with its member count and permissions, plus the permission list for the matrix.
+        case 'roles_overview': {
+            requireJsonPermission('roles.manage');
+            $counts = roleMemberCounts($pdo);
+            $grants = [];
+            foreach ($pdo->query('SELECT RP.RoleID, P.Code FROM ROLE_PERMISSION RP JOIN PERMISSION P ON P.PermissionID = RP.PermissionID ORDER BY P.SortOrder') as $row) {
+                $grants[(int) $row['RoleID']][] = $row['Code'];
+            }
+            $roles = [];
+            foreach ($pdo->query("SELECT RoleID, Code, Name, Description, IsBuiltIn FROM ROLE ORDER BY IsBuiltIn DESC, FIELD(Code, 'admin', 'coordinator', 'gardener'), Name") as $role) {
+                $id = (int) $role['RoleID'];
+                $roles[] = [
+                    'id' => $id,
+                    'code' => $role['Code'],
+                    'name' => $role['Name'],
+                    'description' => $role['Description'],
+                    'built_in' => (bool) $role['IsBuiltIn'],
+                    'locked' => $role['Code'] === 'admin',
+                    'members' => $counts[$id] ?? 0,
+                    'permissions' => $grants[$id] ?? [],
+                ];
+            }
+            $permissions = $pdo->query('SELECT Code AS code, Module AS module, Name AS name, Description AS description FROM PERMISSION ORDER BY SortOrder')->fetchAll(PDO::FETCH_ASSOC);
+            respond(['ok' => true, 'roles' => $roles, 'permissions' => $permissions]);
+        }
+
+        // Create a custom role, or change a role's name/description/permissions.
+        // Built-in roles keep their name; the Administrator role can't be changed at all.
+        case 'role_save': {
+            $admin = requireJsonPermission('roles.manage');
+            $roleId = (int) ($_POST['role_id'] ?? 0);
+            $name = trim(preg_replace('/\s+/', ' ', (string) ($_POST['name'] ?? '')));
+            $description = trim((string) ($_POST['description'] ?? ''));
+            $codes = array_values(array_unique(array_map('strval', (array) ($_POST['permissions'] ?? []))));
+
+            $allPermissions = permissionNames($pdo);
+            if (array_diff($codes, array_keys($allPermissions))) {
+                respond(['ok' => false, 'error' => 'One of the chosen permissions does not exist.'], 422);
+            }
+            if (mb_strlen($description) > 255) {
+                respond(['ok' => false, 'error' => 'Keep the description to 255 characters or fewer.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            $role = $roleId > 0 ? findRole($pdo, $roleId, true) : null;
+            if ($roleId > 0 && !$role) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'This role no longer exists.'], 404);
+            }
+            if ($role && $role['Code'] === 'admin') {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'Administrators always have every permission, so this role cannot be changed.'], 403);
+            }
+            $isBuiltIn = $role && $role['IsBuiltIn'];
+            if (!$isBuiltIn) {
+                if (mb_strlen($name) < 2 || mb_strlen($name) > 60) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Give the role a name between 2 and 60 characters.'], 422);
+                }
+                $taken = $pdo->prepare('SELECT 1 FROM ROLE WHERE LOWER(Name) = LOWER(?) AND RoleID <> ?');
+                $taken->execute([$name, $roleId]);
+                if ($taken->fetchColumn()) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => "There is already a role called \"$name\"."], 409);
+                }
+            } else {
+                $name = $role['Name'];
+                $description = (string) $role['Description'];
+            }
+
+            $namesOf = static fn (array $list) => array_values(array_map(static fn ($code) => $allPermissions[$code], array_values(array_intersect(array_keys($allPermissions), $list))));
+            $before = $role ? ['Name' => $role['Name'], 'Description' => (string) $role['Description'], 'Permissions' => $namesOf(rolePermissionCodes($pdo, $roleId))] : null;
+
+            if ($role) {
+                $pdo->prepare('UPDATE ROLE SET Name = ?, Description = ?, UpdatedAt = NOW() WHERE RoleID = ?')
+                    ->execute([$name, $description !== '' ? $description : null, $roleId]);
+            } else {
+                $pdo->prepare('INSERT INTO ROLE (Code, Name, Description, IsBuiltIn, CreatedBy) VALUES (?, ?, ?, 0, ?)')
+                    ->execute([newRoleCode($pdo, $name), $name, $description !== '' ? $description : null, $admin['admin_id']]);
+                $roleId = (int) $pdo->lastInsertId();
+            }
+            $pdo->prepare('DELETE FROM ROLE_PERMISSION WHERE RoleID = ?')->execute([$roleId]);
+            if ($codes) {
+                $placeholders = implode(',', array_fill(0, count($codes), '?'));
+                $pdo->prepare("INSERT INTO ROLE_PERMISSION (RoleID, PermissionID) SELECT ?, PermissionID FROM PERMISSION WHERE Code IN ($placeholders)")
+                    ->execute(array_merge([$roleId], $codes));
+            }
+            $after = ['Name' => $name, 'Description' => $description, 'Permissions' => $namesOf($codes)];
+
+            if (!$role) {
+                $can = $after['Permissions'] ? 'It can: ' . implode(', ', $after['Permissions']) . '.' : 'It has no permissions yet.';
+                logAudit($pdo, 'roles', 'role_created', "{$admin['name']} created the $name role. $can", [
+                    'actor' => auditActor($admin), 'target' => ['role', $roleId, $name], 'after' => $after,
+                ]);
+            } elseif ($before != $after) {
+                $changes = [];
+                if ($before['Name'] !== $name) $changes[] = "Renamed from \"{$before['Name']}\".";
+                if ($before['Description'] !== $description) $changes[] = 'Description changed.';
+                $added = array_values(array_diff($after['Permissions'], $before['Permissions']));
+                $removed = array_values(array_diff($before['Permissions'], $after['Permissions']));
+                if ($added) $changes[] = 'Now allowed: ' . implode(', ', $added) . '.';
+                if ($removed) $changes[] = 'No longer allowed: ' . implode(', ', $removed) . '.';
+                logAudit($pdo, 'roles', $added || $removed ? 'role_permissions_changed' : 'role_updated',
+                    "{$admin['name']} changed the $name role. " . implode(' ', $changes), [
+                    'actor' => auditActor($admin), 'target' => ['role', $roleId, $name], 'before' => $before, 'after' => $after,
+                ]);
+            }
+            $pdo->commit();
+            respond(['ok' => true, 'role_id' => $roleId, 'created' => !$role]);
+        }
+
+        // Delete a custom role. Only allowed once nobody has it.
+        case 'role_delete': {
+            $admin = requireJsonPermission('roles.manage');
+            $pdo->beginTransaction();
+            $role = findRole($pdo, (int) ($_POST['role_id'] ?? 0), true);
+            if (!$role) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'This role no longer exists.'], 404);
+            }
+            if ($role['IsBuiltIn']) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'Built-in roles cannot be deleted.'], 403);
+            }
+            $members = $pdo->prepare('SELECT COUNT(*) FROM USER_ROLE WHERE RoleID = ?');
+            $members->execute([(int) $role['RoleID']]);
+            $memberCount = (int) $members->fetchColumn();
+            if ($memberCount > 0) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => "{$memberCount} " . ($memberCount === 1 ? 'person still has' : 'people still have') . " this role. Remove it from them first."], 409);
+            }
+            $names = permissionNames($pdo);
+            $permissions = array_map(static fn ($code) => $names[$code], rolePermissionCodes($pdo, (int) $role['RoleID']));
+            $pdo->prepare('DELETE FROM ROLE WHERE RoleID = ?')->execute([(int) $role['RoleID']]);
+            logAudit($pdo, 'roles', 'role_deleted', "{$admin['name']} deleted the {$role['Name']} role.", [
+                'actor' => auditActor($admin),
+                'target' => ['role', (int) $role['RoleID'], $role['Name']],
+                'before' => ['Name' => $role['Name'], 'Description' => (string) $role['Description'], 'Permissions' => $permissions],
+            ]);
+            $pdo->commit();
+            respond(['ok' => true]);
+        }
+
+        // Who has a role. Built-in roles list the matching accounts (read-only).
+        case 'role_members': {
+            requireJsonPermission('roles.manage');
+            $role = findRole($pdo, (int) ($_GET['role_id'] ?? 0));
+            if (!$role) respond(['ok' => false, 'error' => 'This role no longer exists.'], 404);
+            $status = "COALESCE(NULLIF(Status, ''), 'Active')";
+            if ($role['IsBuiltIn']) {
+                $sql = [
+                    'admin' => "SELECT 'admin' AS type, AdminID AS id, Name, Email, $status AS Status FROM SYSTEM_ADMINISTRATOR WHERE $status IN ('Active', 'Disabled') ORDER BY Name",
+                    'coordinator' => "SELECT 'coordinator' AS type, CoordID AS id, Name, Email, $status AS Status FROM GARDEN_COORDINATOR WHERE $status IN ('Active', 'Disabled') ORDER BY Name",
+                    'gardener' => "SELECT 'gardener' AS type, GardenerID AS id, Name, Email, $status AS Status FROM COMMUNITY_GARDENER WHERE $status IN ('Active', 'Disabled') ORDER BY Name",
+                ][$role['Code']] ?? null;
+                $members = $sql ? $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) : [];
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT UR.AccountType AS type, UR.AccountID AS id,
+                           COALESCE(G.Name, C.Name, 'Deleted account') AS Name, COALESCE(G.Email, C.Email, '') AS Email,
+                           COALESCE(NULLIF(COALESCE(G.Status, C.Status), ''), 'Active') AS Status, UR.AssignedAt
+                    FROM USER_ROLE UR
+                    LEFT JOIN COMMUNITY_GARDENER G ON UR.AccountType = 'gardener' AND G.GardenerID = UR.AccountID
+                    LEFT JOIN GARDEN_COORDINATOR C ON UR.AccountType = 'coordinator' AND C.CoordID = UR.AccountID
+                    WHERE UR.RoleID = ?
+                    ORDER BY Name
+                ");
+                $stmt->execute([(int) $role['RoleID']]);
+                $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+            respond(['ok' => true, 'built_in' => (bool) $role['IsBuiltIn'], 'members' => $members]);
+        }
+
+        // People who could be given a custom role: active gardeners, plus
+        // coordinators who have no gardener account (dual-role people get
+        // custom roles on their gardener account, so they show up once).
+        case 'role_candidates': {
+            requireJsonPermission('roles.manage');
+            $roleId = (int) ($_GET['role_id'] ?? 0);
+            $q = '%' . trim((string) ($_GET['q'] ?? '')) . '%';
+            $active = "COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled')";
+            $stmt = $pdo->prepare("
+                SELECT * FROM (
+                    SELECT 'gardener' AS type, GardenerID AS id, Name, Email FROM COMMUNITY_GARDENER WHERE $active
+                    UNION ALL
+                    SELECT 'coordinator', CoordID, Name, Email FROM GARDEN_COORDINATOR WHERE $active AND GardenerID IS NULL
+                ) A
+                WHERE (A.Name LIKE ? OR A.Email LIKE ?)
+                  AND NOT EXISTS (SELECT 1 FROM USER_ROLE UR WHERE UR.RoleID = ? AND UR.AccountType = A.type AND UR.AccountID = A.id)
+                ORDER BY A.Name LIMIT 10
+            ");
+            $stmt->execute([$q, $q, $roleId]);
+            respond(['ok' => true, 'people' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        }
+
+        // Give one person a custom role, or take it away.
+        case 'role_assign':
+        case 'role_unassign': {
+            $admin = requireJsonPermission('roles.manage');
+            $grant = $action === 'role_assign';
+            $reason = trim((string) ($_POST['reason'] ?? ''));
+            if (mb_strlen($reason) > 1000) respond(['ok' => false, 'error' => 'Keep the reason to 1,000 characters or fewer.'], 422);
+
+            $pdo->beginTransaction();
+            $role = findRole($pdo, (int) ($_POST['role_id'] ?? 0), true);
+            if (!$role) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'This role no longer exists.'], 404);
+            }
+            if ($role['IsBuiltIn']) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'Built-in roles come from the account type. Use the Manage Accounts pages to change them.'], 403);
+            }
+            $account = findRoleAccount($pdo, (string) ($_POST['account_type'] ?? ''), (int) ($_POST['account_id'] ?? 0), $grant);
+            if (!$account) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => $grant ? 'Roles can only be given to active gardener or coordinator accounts.' : 'This account no longer exists.'], 404);
+            }
+            $changed = setAccountCustomRole($pdo, $admin, $account, $role, $grant, $reason);
+            $pdo->commit();
+            respond(['ok' => true, 'changed' => $changed]);
+        }
+
+        // The roles one account holds, for the "Roles" button on the account pages.
+        // A coordinator who is also a gardener keeps custom roles on their gardener account.
+        case 'account_roles': {
+            requireJsonPermission('roles.manage');
+            [$type, $id] = roleAccountFor($pdo, (string) ($_GET['account_type'] ?? ''), (int) ($_GET['account_id'] ?? 0));
+            $account = findRoleAccount($pdo, $type, $id);
+            if (!$account) respond(['ok' => false, 'error' => 'Roles can only be given to active gardener or coordinator accounts.'], 404);
+
+            $builtIn = $type === 'gardener' ? ['Gardener'] : ['Coordinator'];
+            if ($type === 'gardener') {
+                $coord = $pdo->prepare("SELECT 1 FROM GARDEN_COORDINATOR WHERE GardenerID = ? AND COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled')");
+                $coord->execute([$id]);
+                if ($coord->fetchColumn()) $builtIn[] = 'Coordinator';
+            }
+            $held = array_map('intval', array_column(accountCustomRoles($pdo, $type, $id), 'RoleID'));
+            $custom = $pdo->query('SELECT RoleID AS id, Name AS name, Description AS description FROM ROLE WHERE IsBuiltIn = 0 ORDER BY Name')->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($custom as &$role) {
+                $role['id'] = (int) $role['id'];
+                $role['held'] = in_array($role['id'], $held, true);
+            }
+            unset($role);
+            respond(['ok' => true, 'account' => $account, 'built_in' => $builtIn, 'custom_roles' => $custom]);
+        }
+
+        // Save the ticked custom roles for one account (adds and removes the difference).
+        case 'account_roles_save': {
+            $admin = requireJsonPermission('roles.manage');
+            $wanted = array_map('intval', (array) ($_POST['role_ids'] ?? []));
+            $reason = trim((string) ($_POST['reason'] ?? ''));
+            if (mb_strlen($reason) > 1000) respond(['ok' => false, 'error' => 'Keep the reason to 1,000 characters or fewer.'], 422);
+            [$type, $id] = roleAccountFor($pdo, (string) ($_POST['account_type'] ?? ''), (int) ($_POST['account_id'] ?? 0));
+
+            $pdo->beginTransaction();
+            $account = findRoleAccount($pdo, $type, $id);
+            if (!$account) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'Roles can only be given to active gardener or coordinator accounts.'], 404);
+            }
+            $held = array_map('intval', array_column(accountCustomRoles($pdo, $type, $id), 'RoleID'));
+            $changes = 0;
+            foreach (array_unique(array_merge($held, $wanted)) as $roleId) {
+                $grant = in_array($roleId, $wanted, true);
+                if ($grant === in_array($roleId, $held, true)) continue;
+                $role = findRole($pdo, $roleId, true);
+                if (!$role || $role['IsBuiltIn']) continue;
+                if (setAccountCustomRole($pdo, $admin, $account, $role, $grant, $reason)) $changes++;
+            }
+            $pdo->commit();
+            respond(['ok' => true, 'changes' => $changes]);
+        }
+
         case 'dashboard_charts': {
-            requireJsonRole('admin');
+            requireJsonPermission('reports.view');
             
             // 1. Plot Utilization
             $plots = [

@@ -2,9 +2,33 @@
 // Get the current filename to highlight the active tab
 $currentPage = basename($_SERVER['PHP_SELF']);
 
-// Define which pages belong inside the Manage Accounts dropdown
-$managePages = ['admin_manage_gardeners.php', 'admin_manage_coordinators.php', 'admin_manage_admins.php'];
-$isManageActive = in_array($currentPage, $managePages);
+// Links grouped into dropdowns. Each link only shows when the person's roles
+// allow them to open that page (see PAGE_PERMISSIONS in auth.php).
+$gardenPages = ['staff_plots.php' => 'Plots', 'staff_inventory.php' => 'Resource Inventory', 'staff_records.php' => 'Records'];
+$managePages = ['admin_manage_gardeners.php' => 'Gardeners', 'admin_manage_coordinators.php' => 'Coordinators', 'admin_manage_admins.php' => 'Administrators'];
+$visible = static fn (array $pages) => array_filter($pages, 'canOpen', ARRAY_FILTER_USE_KEY);
+$gardenLinks = $visible($gardenPages);
+$manageLinks = $visible($managePages);
+
+$sidebarLink = static function (string $page, string $label) use ($currentPage): string {
+    if (!canOpen($page)) return '';
+    $active = $currentPage === $page ? ' active' : '';
+    return "<a href=\"$page\" class=\"sidebar-link$active\">$label</a>";
+};
+$sidebarDropdown = static function (string $id, string $label, array $links) use ($currentPage): string {
+    if (!$links) return '';
+    $open = isset($links[$currentPage]);
+    $items = '';
+    foreach ($links as $page => $text) {
+        $active = $currentPage === $page ? ' active' : '';
+        $items .= "<a href=\"$page\" class=\"sidebar-link$active\" style=\"padding: 8px 16px; font-size: 0.9em;\">$text</a>";
+    }
+    return '<div class="sidebar-dropdown">'
+        . "<button type=\"button\" class=\"sidebar-link dropdown-toggle" . ($open ? ' active' : '') . "\" aria-expanded=\"" . ($open ? 'true' : 'false') . "\" aria-controls=\"{$id}Menu\" style=\"width: 100%; text-align: left; background: none; border: none; font-family: inherit; font-size: inherit; cursor: pointer; display: flex; justify-content: space-between; align-items: center;\">"
+        . "$label <span class=\"chevron\" style=\"transform: " . ($open ? 'rotate(180deg)' : 'rotate(0)') . "; transition: transform 0.2s; font-size: 0.75rem;\">▼</span></button>"
+        . "<div class=\"dropdown-menu\" id=\"{$id}Menu\" style=\"display: " . ($open ? 'flex' : 'none') . "; flex-direction: column; padding-left: 12px; margin-top: 4px; gap: 4px;\">$items</div>"
+        . '</div>';
+};
 ?>
 <aside class="sidebar">
   <div class="sidebar-inner">
@@ -15,48 +39,17 @@ $isManageActive = in_array($currentPage, $managePages);
   <button class="sidebar-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="adminSidebarNav adminSidebarLogout">
     <span></span><span></span><span></span>
   </button>
-  
+
   <nav class="sidebar-nav" id="adminSidebarNav" aria-label="Administrator navigation">
-    <a href="admin_dashboard.php" class="sidebar-link <?= $currentPage === 'admin_dashboard.php' ? 'active' : '' ?>">
-      Dashboard
-    </a>
-    <a href="staff_inventory.php" class="sidebar-link <?= $currentPage === 'staff_inventory.php' ? 'active' : '' ?>">
-      Resource Inventory
-    </a>
-    
-    <!-- Collapsible Dropdown -->
-    <div class="sidebar-dropdown">
-      <button class="sidebar-link dropdown-toggle <?= $isManageActive ? 'active' : '' ?>" id="manageAccountsBtn" style="width: 100%; text-align: left; background: none; border: none; font-family: inherit; font-size: inherit; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
-        Manage Accounts
-        <span class="chevron" style="transform: <?= $isManageActive ? 'rotate(180deg)' : 'rotate(0)' ?>; transition: transform 0.2s; font-size: 0.75rem;">▼</span>
-      </button>
-      
-      <div class="dropdown-menu" id="manageAccountsMenu" style="display: <?= $isManageActive ? 'flex' : 'none' ?>; flex-direction: column; padding-left: 12px; margin-top: 4px; gap: 4px;">
-        <a href="admin_manage_gardeners.php" class="sidebar-link <?= $currentPage === 'admin_manage_gardeners.php' ? 'active' : '' ?>" style="padding: 8px 16px; font-size: 0.9em;">
-          Gardeners
-        </a>
-        <a href="admin_manage_coordinators.php" class="sidebar-link <?= $currentPage === 'admin_manage_coordinators.php' ? 'active' : '' ?>" style="padding: 8px 16px; font-size: 0.9em;">
-          Coordinators
-        </a>
-        <a href="admin_manage_admins.php" class="sidebar-link <?= $currentPage === 'admin_manage_admins.php' ? 'active' : '' ?>" style="padding: 8px 16px; font-size: 0.9em;">
-          Administrators
-        </a>
-      </div>
-    </div>
-
-    <!-- ALTERNATIVE FLAT LINKS: Uncomment these 3 lines and delete the dropdown block above -->
-    <!--
-    <a href="admin_manage_gardeners.php" class="sidebar-link <?= $currentPage === 'admin_manage_gardeners.php' ? 'active' : '' ?>">Manage Gardeners</a>
-    <a href="admin_manage_coordinators.php" class="sidebar-link <?= $currentPage === 'admin_manage_coordinators.php' ? 'active' : '' ?>">Manage Coordinators</a>
-    <a href="admin_manage_admins.php" class="sidebar-link <?= $currentPage === 'admin_manage_admins.php' ? 'active' : '' ?>">Manage Administrators</a>
-    -->
-
-    <a href="admin_archived_accounts.php" class="sidebar-link <?= $currentPage === 'admin_archived_accounts.php' ? 'active' : '' ?>">
-      Archived Accounts
-    </a>
-    <a href="admin_audit_log.php" class="sidebar-link <?= $currentPage === 'admin_audit_log.php' ? 'active' : '' ?>">
-      Audit Log
-    </a>
+    <?= $sidebarLink('admin_dashboard.php', 'Dashboard') ?>
+    <?= $sidebarDropdown('garden', 'Garden', $gardenLinks) ?>
+    <?= $sidebarDropdown('manageAccounts', 'Manage Accounts', $manageLinks) ?>
+    <?= $sidebarLink('admin_archived_accounts.php', 'Archived Accounts') ?>
+    <?= $sidebarLink('admin_roles.php', 'Roles') ?>
+    <?= $sidebarLink('admin_audit_log.php', 'Audit Log') ?>
+    <?php if (!hasRole('admin') && hasRole('customer')): ?>
+    <a href="customer_dashboard.php" class="sidebar-link">My Gardener Dashboard</a>
+    <?php endif; ?>
   </nav>
 
   <div class="sidebar-footer" id="adminSidebarLogout">
@@ -64,21 +57,22 @@ $isManageActive = in_array($currentPage, $managePages);
   </div>
   </div>
 </aside>
+<?= permissionsScript() ?>
 
 <script>
-// Simple toggle logic for the sidebar dropdown
+// Open and close the sidebar dropdowns (Garden, Manage Accounts)
 document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('manageAccountsBtn');
-  const menu = document.getElementById('manageAccountsMenu');
-  const chevron = btn.querySelector('.chevron');
-  
-  if (btn && menu) {
+  document.querySelectorAll('.sidebar .dropdown-toggle').forEach(btn => {
+    const menu = document.getElementById(btn.getAttribute('aria-controls'));
+    const chevron = btn.querySelector('.chevron');
+    if (!menu) return;
     btn.addEventListener('click', () => {
       const isExpanded = menu.style.display === 'flex';
       menu.style.display = isExpanded ? 'none' : 'flex';
-      chevron.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(180deg)';
+      btn.setAttribute('aria-expanded', String(!isExpanded));
+      if (chevron) chevron.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(180deg)';
     });
-  }
+  });
 });
 
 // Fade the top nav to a translucent look once the page is scrolled;

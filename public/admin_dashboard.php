@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
-$user = requireRole('admin');
+$user = requirePageAccess();
 $navTitle = 'System Dashboard';
 ?>
 <!DOCTYPE html>
@@ -10,7 +10,7 @@ $navTitle = 'System Dashboard';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Admin Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=44">
+<link rel="stylesheet" href="assets/style.css?v=48">
 <!-- Load Chart.js for the graph -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -26,10 +26,12 @@ $navTitle = 'System Dashboard';
               <h2 style="margin: 0; font-family: var(--font-display); color: var(--green-900); font-size: 1.8rem;">System Overview</h2>
               
           </div>
+          <?php if (can('reports.export')): ?>
           <div style="display: flex; gap: 12px;">
               <button type="button" class="btn btn-accent" id="export-report-btn">Export CSV</button>
               <button type="button" class="btn btn-accent" id="export-pdf-btn">Save as PDF</button>
           </div>
+          <?php endif; ?>
       </div>
 
       <div class="stat-grid" id="stats-row" style="margin-bottom: 28px;"></div>
@@ -69,6 +71,6 @@ $navTitle = 'System Dashboard';
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=18"></script>
+<script src="assets/admin.js?v=20"></script>
 </body>
 </html>

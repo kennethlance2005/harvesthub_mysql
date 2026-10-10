@@ -4,6 +4,31 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// Whether the logged-in person's roles allow something (window.hhCan comes from
+// the sidebar). This only hides buttons; the server checks every action too.
+function adminCan(permission) {
+  return !permission || (typeof window.hhCan === 'function' && window.hhCan(permission));
+}
+
+// Account-table buttons and the permission each one needs
+const ACCOUNT_BUTTON_PERMISSIONS = {
+  '.account-roles-btn': 'roles.manage',
+  '.delete-btn': 'accounts.archive',
+  '.unarchive-btn': 'accounts.archive',
+  '.enable-account-btn': 'accounts.enable',
+  '.demote-coordinator-btn': 'accounts.demote',
+};
+
+// Removes the buttons this person's roles don't allow, leaving a note when a row has none.
+function removeDisallowedButtons(root = document) {
+  Object.entries(ACCOUNT_BUTTON_PERMISSIONS).forEach(([selector, permission]) => {
+    if (!adminCan(permission)) root.querySelectorAll(selector).forEach(btn => btn.remove());
+  });
+  root.querySelectorAll('.account-action-buttons').forEach(group => {
+    if (!group.querySelector('button')) group.innerHTML = '<span class="text-muted">View only</span>';
+  });
+}
+
 function showToast(message, type = 'success') {
   const toastEl = document.createElement('div');
   toastEl.className = `toast${type === 'danger' ? ' toast-danger' : ''}`;
@@ -105,12 +130,13 @@ async function loadAccounts() {
   if (gardenersTable) {
     gardenersTable.innerHTML = data.gardeners.map(g => `
       <tr data-name="${escapeHtml(g.Name)}" data-location="${escapeHtml(g.Location || '')}" data-status="${escapeHtml(g.Status)}">
-        <td data-label="Name">${escapeHtml(g.Name)}</td>
+        <td data-label="Name">${escapeHtml(g.Name)}${customRoleBadges(g.custom_roles)}</td>
         <td data-label="Email">${escapeHtml(g.Email)}</td>
         <td data-label="Location">${escapeHtml(g.Location || 'Not provided')}</td>
         <td data-label="Status">${accountStatusBadge(g.Status)}</td>
         <td data-label="Actions">
-          <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}">Archive</button>
+          <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm account-roles-btn" data-type="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}">Roles</button>
+          <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}">Archive</button>
           <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="gardener" data-id="${g.id}" data-name="${escapeHtml(g.Name)}" ${g.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
@@ -122,13 +148,14 @@ async function loadAccounts() {
   if (coordsTable) {
     coordsTable.innerHTML = data.coordinators.map(c => `
       <tr data-name="${escapeHtml(c.Name)}" data-location="${escapeHtml(c.Location || '')}" data-status="${escapeHtml(c.Status)}">
-        <td data-label="Name">${escapeHtml(c.Name)}${c.GardenerID ? ' <span class="badge badge-neutral admin-you-badge" title="This person also has a gardener account, which they keep if the coordinator role is removed.">Also a gardener</span>' : ''}</td>
+        <td data-label="Name">${escapeHtml(c.Name)}${c.GardenerID ? ' <span class="badge badge-neutral admin-you-badge" title="This person also has a gardener account, which they keep if the coordinator role is removed.">Also a gardener</span>' : ''}${customRoleBadges(c.custom_roles)}</td>
         <td data-label="Email">${escapeHtml(c.Email)}</td>
         <td data-label="Shift">${escapeHtml(c.Shift)}</td>
         <td data-label="Location">${escapeHtml(c.Location || 'Not provided')}</td>
         <td data-label="Status">${accountStatusBadge(c.Status)}</td>
         <td data-label="Actions">
-          <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm demote-coordinator-btn" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Remove role</button>
+          <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm account-roles-btn" data-type="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Roles</button>
+          <button type="button" class="btn btn-ghost btn-sm demote-coordinator-btn" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Remove role</button>
           <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Archive</button>
           <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}" ${c.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
         </td>
@@ -152,6 +179,10 @@ async function loadAccounts() {
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No administrators yet.</td></tr>';
   }
+
+  document.querySelectorAll('.account-roles-btn').forEach(btn => {
+    btn.onclick = () => manageAccountRoles(btn.dataset.type, btn.dataset.id, btn.dataset.name);
+  });
 
   document.querySelectorAll('.demote-coordinator-btn').forEach(btn => {
     btn.onclick = () => removeCoordinatorRole(btn.dataset.id, btn);
@@ -188,7 +219,72 @@ async function loadAccounts() {
     };
   });
 
+  removeDisallowedButtons();
   reapplyAccountFilters();
+}
+
+// ---------- Custom roles on an account ----------
+
+// Small badges after a name for each extra role, e.g. "Inventory Clerk"
+function customRoleBadges(names) {
+  return (names || []).map(name => ` <span class="badge badge-brown account-role-badge">${escapeHtml(name)}</span>`).join('');
+}
+
+async function manageAccountRoles(type, id, name) {
+  const res = await fetch(`api.php?${new URLSearchParams({ action: 'account_roles', account_type: type, account_id: id })}`);
+  const data = await res.json();
+  if (!data.ok) {
+    showToast(data.error || 'Could not load roles.', 'danger');
+    return;
+  }
+  const builtIn = `<p class="review-muted">From their account: <strong>${data.built_in.map(escapeHtml).join(' and ')}</strong>. These come with the account and are changed elsewhere (for example, Remove role on a coordinator).</p>`;
+  if (!data.custom_roles.length) {
+    await hhDetails({
+      title: `${name}'s roles`,
+      bodyHtml: `${builtIn}<p class="review-muted">There are no extra roles to give yet. Create one on the <a href="admin_roles.php">Roles and Permissions</a> page, for example "Inventory Clerk".</p>`,
+    });
+    return;
+  }
+  const held = new Set(data.custom_roles.filter(r => r.held).map(r => r.id));
+  const result = await hhForm({
+    title: `${name}'s roles`,
+    bodyHtml: `${builtIn}
+      <fieldset class="role-form-group">
+        <legend>Extra roles</legend>
+        ${data.custom_roles.map(r => `
+          <label class="role-form-check">
+            <input type="checkbox" name="role_ids" value="${r.id}" ${r.held ? 'checked' : ''}>
+            <span><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(r.description || 'No description.')}</small></span>
+          </label>`).join('')}
+      </fieldset>
+      <div class="field">
+        <label for="account-roles-reason">Reason (optional)</label>
+        <textarea id="account-roles-reason" name="reason" rows="2" maxlength="1000" placeholder="Why are their roles changing?"></textarea>
+      </div>
+      <p class="review-muted">Changes apply straight away and are saved in their role history and the audit log.</p>`,
+    confirmText: 'Save roles',
+    // Only allow saving once a box was actually changed
+    isValid: form => {
+      const ticked = [...form.querySelectorAll('input[name="role_ids"]:checked')].map(i => Number(i.value));
+      return ticked.length !== held.size || ticked.some(roleId => !held.has(roleId));
+    },
+    collect: form => ({
+      roleIds: [...form.querySelectorAll('input[name="role_ids"]:checked')].map(i => i.value),
+      reason: form.elements.reason.value.trim(),
+    }),
+  });
+  if (!result) return;
+
+  const params = new URLSearchParams({ action: 'account_roles_save', account_type: type, account_id: id, reason: result.reason });
+  result.roleIds.forEach(roleId => params.append('role_ids[]', roleId));
+  const saveRes = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params });
+  const saved = await saveRes.json();
+  if (!saved.ok) {
+    showToast(saved.error || 'Could not save roles.', 'danger');
+    return;
+  }
+  showToast(`${name}'s roles updated.`);
+  loadAccounts();
 }
 
 // ---------- Remove a coordinator role (demote) ----------
@@ -308,6 +404,8 @@ async function loadArchivedAccounts() {
     `;
   }).join('');
 
+  if (!adminCan('accounts.archive')) table.querySelectorAll('.unarchive-btn').forEach(btn => btn.replaceWith(Object.assign(document.createElement('span'), { className: 'text-muted', textContent: 'View only' })));
+
   // Re-apply any active search filter immediately after table loads
   const searchInput = document.getElementById('search-archived');
   if (searchInput && searchInput.value) {
@@ -407,16 +505,13 @@ function renderGardenerActivity(items) {
 }
 
 // Shows the review dialog; a cancelled rejection reason returns to the review.
-async function runReview({ title, bodyHtml, approveDisabledReason, rejectTitle, onDecision }) {
+// approvePermission / rejectPermission: each button only appears for people whose roles allow it.
+async function runReview({ title, bodyHtml, approveDisabledReason, rejectTitle, onDecision, approvePermission, rejectPermission }) {
   while (true) {
-    const choice = await hhDetails({
-      title,
-      bodyHtml,
-      actions: [
-        { label: 'Reject', value: 'reject', tone: 'danger' },
-        { label: 'Approve', value: 'approve', disabled: Boolean(approveDisabledReason), title: approveDisabledReason || '' },
-      ],
-    });
+    const actions = [];
+    if (adminCan(rejectPermission)) actions.push({ label: 'Reject', value: 'reject', tone: 'danger' });
+    if (adminCan(approvePermission)) actions.push({ label: 'Approve', value: 'approve', disabled: Boolean(approveDisabledReason), title: approveDisabledReason || '' });
+    const choice = await hhDetails({ title, bodyHtml, actions });
     if (choice === 'approve') return onDecision('approve');
     if (choice !== 'reject') return;
     const reason = await requestAdminRejectionReason(rejectTitle);
@@ -473,6 +568,8 @@ async function reviewSignupRequest(requestId, button) {
     bodyHtml,
     approveDisabledReason: data.email_in_use ? 'This email is already in use.' : '',
     rejectTitle: 'Why is this registration being declined?',
+    approvePermission: 'registrations.approve',
+    rejectPermission: 'registrations.reject',
     onDecision: (decision, reason) => processSignup(requestId, decision, reason),
   });
 }
@@ -558,6 +655,8 @@ async function reviewCoordinatorApplication(applicationId, button) {
     bodyHtml,
     approveDisabledReason: app.AccountStatus !== 'Active' ? 'The gardener account is not active.' : '',
     rejectTitle: 'Why is this coordinator application being declined?',
+    approvePermission: 'coordinator_applications.review',
+    rejectPermission: 'coordinator_applications.review',
     onDecision: (decision, reason) => processCoordinatorApplication(applicationId, decision, reason),
   });
 }
