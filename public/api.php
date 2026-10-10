@@ -45,10 +45,29 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/auth.php';
 
-function sendResetEmail($toEmail, $resetLink) {
-    // Your Bird API Key
-    $apiKey = 'bk_eu1_5vCFHtcgJ9G2iPdwf5EIaYT4AbFB5'; 
-    
+// The Bird email API key is a secret, so it never lives in the code. Set the
+// BIRD_API_KEY environment variable on the server (e.g. Render), or for local
+// XAMPP copy secrets.local.example.php to secrets.local.php (git-ignored).
+function birdApiKey(): string {
+    $key = getenv('BIRD_API_KEY');
+    if ($key) return $key;
+    $localFile = __DIR__ . '/../secrets.local.php';
+    if (is_file($localFile)) {
+        $secrets = require $localFile;
+        return (string) ($secrets['bird_api_key'] ?? '');
+    }
+    return '';
+}
+
+// Returns true when Bird accepted the email. Failures are logged on the server
+// only; the details are never shown to the person resetting their password.
+function sendResetEmail(string $toEmail, string $resetLink): bool {
+    $apiKey = birdApiKey();
+    if ($apiKey === '') {
+        error_log('HarvestHub: BIRD_API_KEY is not configured, so the password reset email was not sent.');
+        return false;
+    }
+
     // Bird requires you to use the regional host that matches your key prefix (eu1)
     $apiUrl = 'https://eu1.platform.bird.com/v1/email/messages';
 
@@ -87,18 +106,27 @@ function sendResetEmail($toEmail, $resetLink) {
 
     // 1. Check if the server failed to connect entirely
     if ($curlError) {
-        respond(['ok' => false, 'error' => "Connection Error: " . $curlError], 500);
+        error_log('HarvestHub: password reset email connection error: ' . $curlError);
+        return false;
     }
-    
+
     // 2. Check if Bird rejected the email (HTTP codes 400 and above are errors)
     if ($httpCode >= 400) {
-        respond(['ok' => false, 'error' => "Bird API Error: " . $response], 500);
+        error_log("HarvestHub: Bird rejected the password reset email (HTTP $httpCode): " . $response);
+        return false;
     }
+    return true;
 }
 
 header('Content-Type: application/json');
 
-$pdo = getDb();
+try {
+    $pdo = getDb();
+} catch (Throwable $e) {
+    http_response_code(503);
+    echo json_encode(['ok' => false, 'error' => 'HarvestHub cannot reach its database right now. Please try again in a few minutes.']);
+    exit;
+}
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 function respond(array $data, int $status = 200): void {
@@ -429,10 +457,11 @@ try {
                 UNION SELECT Email FROM SYSTEM_ADMINISTRATOR WHERE Email = ?
             ");
             $stmt->execute([$email, $email, $email]);
-            
-            // Temporarily throw an error so we can debug
+
+            // Unknown emails get the same answer as known ones, so this form
+            // can't be used to find out who has an account.
             if (!$stmt->fetchColumn()) {
-                respond(['ok' => false, 'error' => 'Not found in database!'], 404); 
+                respond(['ok' => true]);
             }
 
             // 2. Generate a secure random token
@@ -454,7 +483,9 @@ try {
             $baseDir = dirname($_SERVER['REQUEST_URI']);
             $resetLink = $protocol . $_SERVER['HTTP_HOST'] . $baseDir . "/reset_password.php?email=" . urlencode($email) . "&token=" . $token;
             
-            sendResetEmail($email, $resetLink);
+            if (!sendResetEmail($email, $resetLink)) {
+                respond(['ok' => false, 'error' => 'We could not send the reset email right now. Please try again later or contact an administrator.'], 503);
+            }
 
             respond(['ok' => true]);
         }
@@ -2406,8 +2437,8 @@ try {
                 'pending_resource_txns' => $count("SELECT COUNT(*) FROM RESOURCE_TXN WHERE Status = 'Requested'"),
                 'pending_signups' => $count("SELECT COUNT(*) FROM SIGNUP_REQUEST WHERE Status = 'Pending'"),
                 'pending_coordinator_applications' => $count("SELECT COUNT(*) FROM COORDINATOR_APPLICATION WHERE Status = 'Pending'"),
-                'active_listings' => $count("SELECT COUNT(*) FROM EXCHANGE_LISTING WHERE ListingID NOT IN (SELECT ListingID FROM EXCHANGE_ORDER)"),
-                'completed_trades' => $count("SELECT COUNT(*) FROM EXCHANGE_ORDER"),
+                'active_listings' => $count("SELECT COUNT(*) FROM EXCHANGE_BOARD WHERE Status = 'Active'"),
+                'completed_trades' => $count("SELECT COUNT(*) FROM EXCHANGE_CLAIMS WHERE Status = 'Accepted'"),
             ]]);
         }
 
@@ -3068,7 +3099,19 @@ try {
             if (!isset($map[$role]) || !$id) respond(['ok' => false, 'error' => 'Invalid request.'], 422);
 
             [$tbl, $col] = $map[$role];
-            $pdo->prepare("UPDATE $tbl SET Status = 'Active', FailedLoginAttempts = 0 WHERE $col = ?")->execute([$id]);
+            $pdo->beginTransaction();
+            $restore = $pdo->prepare("UPDATE $tbl SET Status = 'Active', FailedLoginAttempts = 0 WHERE $col = ? AND Status = 'Archived'");
+            $restore->execute([$id]);
+            if ($restore->rowCount() === 0) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'This account is not archived, so there is nothing to restore.'], 409);
+            }
+            // The archive warning no longer applies once the gardener is back,
+            // so their dashboard shouldn't keep showing it.
+            if ($tbl === 'COMMUNITY_GARDENER') {
+                $pdo->prepare('DELETE FROM ACCOUNT_ARCHIVE_NOTICE WHERE GardenerID = ?')->execute([$id]);
+            }
+            $pdo->commit();
             respond(['ok' => true]);
         }
 
@@ -3084,8 +3127,8 @@ try {
 
             // 2. Exchange Market
             $exchange = [
-                'Active' => (int) $pdo->query("SELECT COUNT(*) FROM EXCHANGE_LISTING WHERE ListingID NOT IN (SELECT ListingID FROM EXCHANGE_ORDER)")->fetchColumn(),
-                'Completed' => (int) $pdo->query("SELECT COUNT(*) FROM EXCHANGE_ORDER")->fetchColumn()
+                'Active' => (int) $pdo->query("SELECT COUNT(*) FROM EXCHANGE_BOARD WHERE Status = 'Active'")->fetchColumn(),
+                'Completed' => (int) $pdo->query("SELECT COUNT(*) FROM EXCHANGE_CLAIMS WHERE Status = 'Accepted'")->fetchColumn()
             ];
 
             // 3. Resource Inventory (Per Item)
@@ -3116,6 +3159,9 @@ try {
             respond(['ok' => false, 'error' => 'Unknown action.'], 400);
     }
 } catch (Throwable $e) {
-    // This will print the exact SQL or PHP error to your screen
-    respond(['ok' => false, 'error' => 'Error: ' . $e->getMessage()], 500);
+    // Technical details (SQL errors, stack traces) go to the server log only;
+    // users get a plain message. Locally, see the XAMPP Apache error.log.
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    error_log('HarvestHub API error in action "' . $action . '": ' . $e);
+    respond(['ok' => false, 'error' => 'Something went wrong on our side. Please try again, and contact an administrator if it keeps happening.'], 500);
 }

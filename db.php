@@ -33,8 +33,9 @@ function getDb(): PDO {
         try {
             return new PDO($dsn, $user, $password, $options);
         } catch (PDOException $e) {
-            // Prints the exact technical error if it fails on Render
-            die("Render DB Error: " . $e->getMessage()); 
+            // Log the technical details for the server owner; callers show a friendly message.
+            error_log('HarvestHub: database connection failed (Render): ' . $e->getMessage());
+            throw new RuntimeException('Database connection failed.', 0, $e);
         }
         
     } else {
@@ -54,7 +55,8 @@ function getDb(): PDO {
             $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
             return $pdo;
         } catch (PDOException $e) {
-            die("Local DB Error: " . $e->getMessage());
+            error_log('HarvestHub: database connection failed (local): ' . $e->getMessage());
+            throw new RuntimeException('Database connection failed.', 0, $e);
         }
     }
 }

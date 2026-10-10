@@ -1,8 +1,4 @@
 <?php
-// Force PHP to show errors on the screen for debugging
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
 $email = $_GET['email'] ?? '';
 $token = $_GET['token'] ?? '';
