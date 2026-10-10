@@ -16,6 +16,7 @@ function showToast(message, type = 'success') {
 
 let applications = [];
 let resourceTransactions = [];
+let currentGardenerId = null;
 let plots = [];
 let resources = [];
 let activeRecordsTimeline = 'inventory';
@@ -51,7 +52,9 @@ function renderApplications() {
   const unassignmentRequests = applications.filter(app => app.RequestType === 'Unassign');
   const filterRequests = requests => requests.filter(app =>
     matchesSearch(app.GardenerName, query) || matchesSearch(app.Label, query));
-  const renderRows = (requests, type) => requests.map(app => `
+  const renderRows = (requests, type) => requests.map(app => {
+    const isSelfRequest = currentGardenerId !== null && String(app.GardenerID) === String(currentGardenerId);
+    return `
       <div class="action-row">
         <div class="action-row-details">
           <div class="action-row-title">${escapeHtml(app.GardenerName)}</div>
@@ -63,11 +66,14 @@ function renderApplications() {
           <time class="action-row-time" datetime="${escapeHtml(String(app.AppliedAt || '').replace(' ', 'T'))}">Requested ${escapeHtml(formatRecordDate(app.AppliedAt))}</time>
         </div>
         <div class="action-row-actions">
-          <button class="btn btn-accent btn-sm approve-app" data-id="${app.AppID}">${type === 'unassignment' ? 'Approve unassignment' : 'Approve assignment'}</button>
-          <button class="btn btn-ghost btn-sm reject-app" data-id="${app.AppID}">Reject</button>
+          ${isSelfRequest
+            ? '<span class="badge badge-neutral" title="Coordinators cannot review their own requests.">Cannot self-review</span>'
+            : `<button class="btn btn-accent btn-sm approve-app" data-id="${app.AppID}">${type === 'unassignment' ? 'Approve unassignment' : 'Approve assignment'}</button>
+              <button class="btn btn-ghost btn-sm reject-app" data-id="${app.AppID}">Reject</button>`}
         </div>
       </div>
-    `).join('');
+    `;
+  }).join('');
 
   const filteredAssignments = filterRequests(assignmentRequests);
   const filteredUnassignments = filterRequests(unassignmentRequests);
@@ -97,7 +103,9 @@ function renderResourceTransactions() {
   const filtered = resourceTransactions.filter(txn =>
     matchesSearch(txn.GardenerName, query) || matchesSearch(txn.ResourceName, query) || matchesSearch(txn.RequestNotes, query));
 
-  listEl.innerHTML = filtered.map(txn => `
+  listEl.innerHTML = filtered.map(txn => {
+    const isSelfRequest = currentGardenerId !== null && String(txn.GardenerID) === String(currentGardenerId);
+    return `
     <div class="action-row">
       <div>
         <div class="action-row-title">${escapeHtml(txn.GardenerName)}</div>
@@ -105,13 +113,16 @@ function renderResourceTransactions() {
         ${txn.RequestType === 'Donation' && txn.RequestNotes ? `<div class="action-row-sub donation-request-notes">Notes: ${escapeHtml(txn.RequestNotes)}</div>` : ''}
       </div>
       <div class="action-row-actions">
-        <label class="sr-only" for="approve-qty-${txn.TxnID}">Quantity to ${txn.RequestType === 'Donation' ? 'accept' : 'approve'} or reject</label>
-        <input type="number" class="qty-choice-input" id="approve-qty-${txn.TxnID}" min="1" max="${txn.Qty}" value="${txn.Qty}" title="Quantity for this decision">
-        <button class="btn btn-accent btn-sm approve-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Accept donation' : 'Approve'}</button>
-        <button class="btn btn-ghost btn-sm reject-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Reject donation' : 'Reject'}</button>
+        ${isSelfRequest
+          ? '<span class="badge badge-neutral" title="Coordinators cannot review their own requests.">Cannot self-review</span>'
+          : `<label class="sr-only" for="approve-qty-${txn.TxnID}">Quantity to ${txn.RequestType === 'Donation' ? 'accept' : 'approve'} or reject</label>
+            <input type="number" class="qty-choice-input" id="approve-qty-${txn.TxnID}" min="1" max="${txn.Qty}" value="${txn.Qty}" title="Quantity for this decision">
+            <button class="btn btn-accent btn-sm approve-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Accept donation' : 'Approve'}</button>
+            <button class="btn btn-ghost btn-sm reject-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Reject donation' : 'Reject'}</button>`}
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
   emptyEl.textContent = resourceTransactions.length && !filtered.length
     ? 'No resource requests match your search.'
     : 'No pending resource requests.';
@@ -143,6 +154,9 @@ async function loadApplications() {
   const data = await res.json();
   if (!data.ok) return;
   applications = data.applications;
+  currentGardenerId = data.current_gardener_id === null || data.current_gardener_id === undefined
+    ? null
+    : String(data.current_gardener_id);
   renderApplications();
   renderCoordinatorOverview();
 }
@@ -171,6 +185,9 @@ async function loadResourceTxns() {
   const data = await res.json();
   if (!data.ok) return;
   resourceTransactions = data.transactions;
+  currentGardenerId = data.current_gardener_id === null || data.current_gardener_id === undefined
+    ? null
+    : String(data.current_gardener_id);
   renderResourceTransactions();
   renderCoordinatorOverview();
 }

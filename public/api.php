@@ -1180,9 +1180,9 @@ try {
         // ---------------- STAFF ----------------
 
         case 'pending_applications': {
-            requireJsonRole('staff');
+            $user = requireJsonRole('staff');
             $rows = $pdo->query("
-                SELECT PA.AppID,
+                SELECT PA.AppID, PA.GardenerID,
                        G.Name AS GardenerName,
                       P.Label,
                       CASE
@@ -1197,7 +1197,11 @@ try {
                 JOIN PLOT P ON P.PltID = PA.PltID
                 WHERE PA.Status = 'Pending' ORDER BY PA.AppliedAt ASC
             ")->fetchAll(PDO::FETCH_ASSOC);
-            respond(['ok' => true, 'applications' => $rows]);
+            respond([
+                'ok' => true,
+                'applications' => $rows,
+                'current_gardener_id' => $user['ids']['customer'] ?? null,
+            ]);
         }
 
         case 'process_application': {
@@ -1236,6 +1240,10 @@ try {
                 if (!$row || $row['Status'] !== 'Pending') {
                     $pdo->rollBack();
                     respond(['ok' => false, 'error' => 'Application already processed.'], 409);
+                }
+                if (isset($user['ids']['customer']) && (int) $user['ids']['customer'] === (int) $row['GardenerID']) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'You cannot approve or reject your own plot request.'], 403);
                 }
 
                 $newStatus = $decision === 'approve' ? 'Approved' : 'Rejected';
@@ -1285,16 +1293,20 @@ try {
         }
 
         case 'pending_resource_txns': {
-            requireJsonRole('staff');
+            $user = requireJsonRole('staff');
             $rows = $pdo->query("
-                SELECT T.TxnID, G.Name AS GardenerName, R.Name AS ResourceName, T.Qty,
+                SELECT T.TxnID, T.GardenerID, G.Name AS GardenerName, R.Name AS ResourceName, T.Qty,
                        T.RequestType, T.RequestNotes, T.RequestedAt
                 FROM RESOURCE_TXN T
                 JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID
                 JOIN RESOURCE R ON R.ResourceID = T.ResourceID
                 WHERE T.Status = 'Requested' ORDER BY T.RequestedAt ASC
             ")->fetchAll(PDO::FETCH_ASSOC);
-            respond(['ok' => true, 'transactions' => $rows]);
+            respond([
+                'ok' => true,
+                'transactions' => $rows,
+                'current_gardener_id' => $user['ids']['customer'] ?? null,
+            ]);
         }
 
         case 'add_resource': {
@@ -1347,6 +1359,10 @@ try {
             if (!$row || $row['Status'] !== 'Requested') {
                 $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'Already processed.'], 409);
+            }
+            if (isset($user['ids']['customer']) && (int) $user['ids']['customer'] === (int) $row['GardenerID']) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'You cannot approve or reject your own resource or donation request.'], 403);
             }
 
             $requestedQty = (int) $row['Qty'];
