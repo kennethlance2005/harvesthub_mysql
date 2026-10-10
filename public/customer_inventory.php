@@ -12,7 +12,7 @@ $navTitle = 'Resource Inventory';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=39">
+<link rel="stylesheet" href="assets/style.css?v=40">
 </head>
 <body class="account-page">
 
@@ -64,6 +64,7 @@ $navTitle = 'Resource Inventory';
               </div>
               <input type="search" id="search-inventory" class="inv-search" placeholder="Search my items..." aria-label="Search my items">
             </div>
+            <button type="button" class="btn btn-ghost btn-sm inv-donate-open" id="open-donation-form">Donate an item</button>
 
             <!-- Add Personal Item Form -->
             <form id="add-personal-form" class="inv-add-form" novalidate>
@@ -103,8 +104,30 @@ $navTitle = 'Resource Inventory';
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-
+<dialog class="hh-dialog" id="donation-dialog" aria-labelledby="donation-title">
+  <form class="hh-dialog-box" id="donation-form">
+    <h3 id="donation-title">Donate an item</h3>
+    <p class="hh-dialog-message">Your donation will be reviewed by a coordinator before it is added to shared inventory.</p>
+    <input type="hidden" id="donation-source-item">
+    <div class="field hh-dialog-field">
+      <label for="donation-item-name">Item name <span class="required">*</span></label>
+      <input type="text" id="donation-item-name" maxlength="100" required>
+    </div>
+    <div class="field hh-dialog-field">
+      <label for="donation-item-qty">Quantity <span class="required">*</span></label>
+      <input type="number" id="donation-item-qty" min="1" max="100000" value="1" required>
+    </div>
+    <div class="field hh-dialog-field">
+      <label for="donation-item-notes">Notes <span class="field-optional">(optional)</span></label>
+      <textarea id="donation-item-notes" maxlength="1000" rows="3" placeholder="Condition, useful details, etc."></textarea>
+    </div>
+    <div class="hh-dialog-actions">
+      <button type="button" class="btn btn-ghost" id="donation-cancel">Cancel</button>
+      <button type="submit" class="btn btn-accent">Send donation request</button>
+    </div>
+  </form>
+</dialog>
 <script src="assets/app.js"></script>
-<script src="assets/inventory.js?v=13"></script>
+<script src="assets/inventory.js?v=14"></script>
 </body>
 </html>

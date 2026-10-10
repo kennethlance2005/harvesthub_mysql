@@ -95,19 +95,20 @@ function renderResourceTransactions() {
   if (!listEl || !emptyEl) return;
   const query = document.getElementById('resource-search').value.trim();
   const filtered = resourceTransactions.filter(txn =>
-    matchesSearch(txn.GardenerName, query) || matchesSearch(txn.ResourceName, query));
+    matchesSearch(txn.GardenerName, query) || matchesSearch(txn.ResourceName, query) || matchesSearch(txn.RequestNotes, query));
 
   listEl.innerHTML = filtered.map(txn => `
     <div class="action-row">
       <div>
         <div class="action-row-title">${escapeHtml(txn.GardenerName)}</div>
-        <div class="action-row-sub">${escapeHtml(String(txn.Qty))}x ${escapeHtml(txn.ResourceName)}</div>
+        <div class="action-row-sub">${txn.RequestType === 'Donation' ? 'Donation · ' : ''}${escapeHtml(String(txn.Qty))}x ${escapeHtml(txn.ResourceName)}</div>
+        ${txn.RequestType === 'Donation' && txn.RequestNotes ? `<div class="action-row-sub donation-request-notes">Notes: ${escapeHtml(txn.RequestNotes)}</div>` : ''}
       </div>
       <div class="action-row-actions">
-        <label class="sr-only" for="approve-qty-${txn.TxnID}">Quantity for this decision</label>
-        <input type="number" class="qty-choice-input" id="approve-qty-${txn.TxnID}" min="1" max="${txn.Qty}" value="${txn.Qty}" title="Quantity to approve or reject — the rest stays pending">
-        <button class="btn btn-accent btn-sm approve-txn" data-id="${txn.TxnID}">Approve</button>
-        <button class="btn btn-ghost btn-sm reject-txn" data-id="${txn.TxnID}">Reject</button>
+        <label class="sr-only" for="approve-qty-${txn.TxnID}">Quantity to ${txn.RequestType === 'Donation' ? 'accept' : 'approve'} or reject</label>
+        <input type="number" class="qty-choice-input" id="approve-qty-${txn.TxnID}" min="1" max="${txn.Qty}" value="${txn.Qty}" title="Quantity for this decision">
+        <button class="btn btn-accent btn-sm approve-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Accept donation' : 'Approve'}</button>
+        <button class="btn btn-ghost btn-sm reject-txn" data-id="${txn.TxnID}">${txn.RequestType === 'Donation' ? 'Reject donation' : 'Reject'}</button>
       </div>
     </div>
   `).join('');
@@ -196,15 +197,19 @@ async function processResourceTxn(txnId, decision, qty) {
     if (!params.reason) return;
   }
   if (decision === 'reject') {
-    params.reason = await hhPrompt({ title: 'Decline this resource request?', message: 'The gardener will see this reason.', label: 'Reason for declining', placeholder: 'e.g., Not enough stock this week.', confirmText: 'Decline request', tone: 'danger' });
+    const donation = request?.RequestType === 'Donation';
+    params.reason = await hhPrompt({ title: donation ? 'Reject this donation?' : 'Decline this resource request?', message: 'The gardener will see this reason.', label: donation ? 'Reason for rejecting donation' : 'Reason for declining', placeholder: donation ? 'Explain why this donation cannot be accepted.' : 'e.g., Not enough stock this week.', confirmText: donation ? 'Reject donation' : 'Decline request', tone: 'danger' });
     if (!params.reason) return;
   }
   if (qty !== undefined) params.qty = qty;
   const data = await postAction('process_resource_txn', params);
   if (data.ok) {
+    const donation = request?.RequestType === 'Donation';
     showToast(decision === 'approve' && request && chosenQty < Number(request.Qty)
-      ? `Request partially approved. The remaining ${Number(request.Qty) - chosenQty} units were rejected.`
-      : `Request ${decision === 'approve' ? 'approved' : 'rejected'}.`, 'success');
+      ? `${donation ? 'Donation' : 'Request'} partially approved. The remaining ${Number(request.Qty) - chosenQty} units were rejected.`
+      : donation
+        ? `Donation ${decision === 'approve' ? 'accepted' : 'rejected'}.`
+        : `Request ${decision === 'approve' ? 'approved' : 'rejected'}.`, 'success');
     loadResourceTxns();
     loadResources();
   } else {

@@ -840,12 +840,12 @@ try {
                        ), 0)) AS AvailableQty,
                        COALESCE((
                            SELECT SUM(T.Qty) FROM RESOURCE_TXN T
-                           WHERE T.ResourceID = R.ResourceID AND T.GardenerID = ? AND T.Status = 'Requested'
+                           WHERE T.ResourceID = R.ResourceID AND T.GardenerID = ? AND T.Status = 'Requested' AND T.RequestType = 'Borrow'
                        ), 0) AS MyPendingQty
                 FROM RESOURCE R ORDER BY R.Name
             ");
             $stmt->execute([$user['id']]);
-            $pending = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status = 'Requested'");
+            $pending = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status = 'Requested' AND RequestType = 'Borrow'");
             $pending->execute([$user['id']]);
             respond([
                 'ok' => true,
@@ -870,14 +870,14 @@ try {
             $pdo->prepare('SELECT GardenerID FROM COMMUNITY_GARDENER WHERE GardenerID = ? FOR UPDATE')
                 ->execute([$user['id']]);
 
-            $pendingCount = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status = 'Requested'");
+            $pendingCount = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status = 'Requested' AND RequestType = 'Borrow'");
             $pendingCount->execute([$user['id']]);
             if ((int) $pendingCount->fetchColumn() >= MAX_PENDING_RESOURCE_REQUESTS) {
                 $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'You already have ' . MAX_PENDING_RESOURCE_REQUESTS . ' pending requests. Cancel one or wait for a coordinator to review them before requesting more.'], 429);
             }
 
-            $recentCount = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE GardenerID = ? AND Status IN ('Requested', 'Cancelled') AND RequestedAt >= NOW() - INTERVAL " . RESOURCE_REQUEST_RATE_WINDOW_MINUTES . " MINUTE");
+            $recentCount = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE GardenerID = ? AND RequestType = 'Borrow' AND Status IN ('Requested', 'Cancelled') AND RequestedAt >= NOW() - INTERVAL " . RESOURCE_REQUEST_RATE_WINDOW_MINUTES . " MINUTE");
             $recentCount->execute([$user['id']]);
             if ((int) $recentCount->fetchColumn() >= RESOURCE_REQUEST_RATE_LIMIT) {
                 $pdo->rollBack();
@@ -900,7 +900,7 @@ try {
 
             // Only one pending request per resource: the gardener must cancel the
             // existing one before asking for a different quantity.
-            $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Requested' FOR UPDATE");
+            $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Requested' AND RequestType = 'Borrow' FOR UPDATE");
             $existing->execute([$user['id'], (int) $resourceId]);
             if ($existing->fetchColumn()) {
                 $pdo->rollBack();
@@ -931,7 +931,9 @@ try {
         case 'my_resource_requests': {
             $user = requireJsonRole('customer');
             $stmt = $pdo->prepare("
-                SELECT T.TxnID, R.Name, T.Qty, T.Status, T.RejectionReason, T.RequestedAt, T.ApprovedAt, T.ReturnRequestedAt
+                SELECT T.TxnID, R.Name, T.Qty, T.Status, T.RequestType, T.RequestNotes,
+                       T.SourcePersonalItemID, T.ProcessedQty, T.RejectionReason,
+                       T.RequestedAt, T.ApprovedAt, T.ReturnRequestedAt
                 FROM RESOURCE_TXN T JOIN RESOURCE R ON R.ResourceID = T.ResourceID
                 WHERE T.GardenerID = ? ORDER BY T.RequestedAt DESC
             ");
@@ -989,9 +991,84 @@ try {
         
         case 'get_personal_inventory': {
             $user = requireJsonRole('customer');
-            $stmt = $pdo->prepare("SELECT ItemID, ItemName, Qty, AddedAt FROM PERSONAL_INVENTORY WHERE GardenerID = ? ORDER BY AddedAt DESC");
+            $stmt = $pdo->prepare("
+                SELECT I.ItemID, I.ItemName, I.Qty, I.AddedAt,
+                       EXISTS (
+                           SELECT 1 FROM RESOURCE_TXN T
+                           WHERE T.SourcePersonalItemID = I.ItemID
+                             AND T.Status = 'Requested' AND T.RequestType = 'Donation'
+                       ) AS HasPendingDonation
+                FROM PERSONAL_INVENTORY I
+                WHERE I.GardenerID = ? ORDER BY I.AddedAt DESC
+            ");
             $stmt->execute([$user['id']]);
             respond(['ok' => true, 'items' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        }
+
+        case 'request_resource_donation': {
+            $user = requireJsonRole('customer');
+            $name = trim($_POST['item_name'] ?? '');
+            $qtyRaw = $_POST['qty'] ?? '';
+            $notes = trim($_POST['notes'] ?? '');
+            $sourceItemId = $_POST['source_item_id'] ?? '';
+
+            if (!ctype_digit((string) $qtyRaw) || (int) $qtyRaw < 1 || (int) $qtyRaw > 100000) {
+                respond(['ok' => false, 'error' => 'Enter a quantity from 1 to 100,000.'], 422);
+            }
+            if (mb_strlen($notes) > 1000) {
+                respond(['ok' => false, 'error' => 'Donation notes cannot exceed 1,000 characters.'], 422);
+            }
+            if ($sourceItemId !== '' && !ctype_digit((string) $sourceItemId)) {
+                respond(['ok' => false, 'error' => 'Invalid personal inventory item.'], 422);
+            }
+
+            $qty = (int) $qtyRaw;
+            $sourceItemId = $sourceItemId === '' ? null : (int) $sourceItemId;
+            $pdo->beginTransaction();
+            try {
+                if ($sourceItemId !== null) {
+                    $itemStmt = $pdo->prepare('SELECT ItemName, Qty FROM PERSONAL_INVENTORY WHERE ItemID = ? AND GardenerID = ? FOR UPDATE');
+                    $itemStmt->execute([$sourceItemId, $user['id']]);
+                    $personalItem = $itemStmt->fetch(PDO::FETCH_ASSOC);
+                    if (!$personalItem || $qty > (int) $personalItem['Qty']) {
+                        $pdo->rollBack();
+                        respond(['ok' => false, 'error' => 'The donation quantity exceeds the item in your inventory.'], 422);
+                    }
+                    $pendingStmt = $pdo->prepare("SELECT 1 FROM RESOURCE_TXN WHERE SourcePersonalItemID = ? AND Status = 'Requested' AND RequestType = 'Donation' LIMIT 1");
+                    $pendingStmt->execute([$sourceItemId]);
+                    if ($pendingStmt->fetchColumn()) {
+                        $pdo->rollBack();
+                        respond(['ok' => false, 'error' => 'A donation request for this item is already pending.'], 409);
+                    }
+                    $name = $personalItem['ItemName'];
+                }
+                if ($name === '' || mb_strlen($name) > 80) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Donation item names must be between 1 and 80 characters.'], 422);
+                }
+
+                $resourceStmt = $pdo->prepare('SELECT ResourceID FROM RESOURCE WHERE LOWER(Name) = LOWER(?) LIMIT 1 FOR UPDATE');
+                $resourceStmt->execute([$name]);
+                $resourceId = $resourceStmt->fetchColumn();
+                if ($resourceId === false) {
+                    $pdo->prepare('INSERT INTO RESOURCE (Name, TotalQty, AvailableQty) VALUES (?, 0, 0)')
+                        ->execute([$name]);
+                    $resourceId = (int) $pdo->lastInsertId();
+                } else {
+                    $resourceId = (int) $resourceId;
+                }
+
+                $pdo->prepare("
+                    INSERT INTO RESOURCE_TXN
+                        (GardenerID, ResourceID, Qty, RequestType, RequestNotes, SourcePersonalItemID, Status)
+                    VALUES (?, ?, ?, 'Donation', ?, ?, 'Requested')
+                ")->execute([$user['id'], $resourceId, $qty, $notes === '' ? null : $notes, $sourceItemId]);
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
+            respond(['ok' => true]);
         }
 
         case 'add_personal_item': {
@@ -1010,8 +1087,27 @@ try {
             $user = requireJsonRole('customer');
             $itemId = (int)($_POST['item_id'] ?? 0);
 
-            $stmt = $pdo->prepare("DELETE FROM PERSONAL_INVENTORY WHERE ItemID = ? AND GardenerID = ?");
-            $stmt->execute([$itemId, $user['id']]);
+            $pdo->beginTransaction();
+            try {
+                $item = $pdo->prepare('SELECT ItemID FROM PERSONAL_INVENTORY WHERE ItemID = ? AND GardenerID = ? FOR UPDATE');
+                $item->execute([$itemId, $user['id']]);
+                if (!$item->fetchColumn()) {
+                    $pdo->commit();
+                    respond(['ok' => true]);
+                }
+                $pending = $pdo->prepare("SELECT 1 FROM RESOURCE_TXN WHERE SourcePersonalItemID = ? AND GardenerID = ? AND Status = 'Requested' AND RequestType = 'Donation' LIMIT 1 FOR UPDATE");
+                $pending->execute([$itemId, $user['id']]);
+                if ($pending->fetchColumn()) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'This item has a pending donation request and cannot be removed yet.'], 409);
+                }
+                $pdo->prepare('DELETE FROM PERSONAL_INVENTORY WHERE ItemID = ? AND GardenerID = ?')
+                    ->execute([$itemId, $user['id']]);
+                $pdo->commit();
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
             respond(['ok' => true]);
         }
 
@@ -1191,7 +1287,8 @@ try {
         case 'pending_resource_txns': {
             requireJsonRole('staff');
             $rows = $pdo->query("
-                SELECT T.TxnID, G.Name AS GardenerName, R.Name AS ResourceName, T.Qty, T.RequestedAt
+                SELECT T.TxnID, G.Name AS GardenerName, R.Name AS ResourceName, T.Qty,
+                       T.RequestType, T.RequestNotes, T.RequestedAt
                 FROM RESOURCE_TXN T
                 JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID
                 JOIN RESOURCE R ON R.ResourceID = T.ResourceID
@@ -1238,7 +1335,13 @@ try {
             }
 
             $pdo->beginTransaction();
-            $txn = $pdo->prepare("SELECT T.GardenerID, G.Name AS GardenerName, T.ResourceID, T.Qty, T.Status FROM RESOURCE_TXN T JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID WHERE T.TxnID = ? FOR UPDATE");
+            $txn = $pdo->prepare("
+                SELECT T.GardenerID, G.Name AS GardenerName, T.ResourceID, T.Qty, T.Status,
+                       T.RequestType, T.RequestNotes, T.SourcePersonalItemID
+                FROM RESOURCE_TXN T
+                JOIN COMMUNITY_GARDENER G ON G.GardenerID = T.GardenerID
+                WHERE T.TxnID = ? FOR UPDATE
+            ");
             $txn->execute([(int) $txnId]);
             $row = $txn->fetch(PDO::FETCH_ASSOC);
             if (!$row || $row['Status'] !== 'Requested') {
@@ -1281,6 +1384,44 @@ try {
                     $pdo->rollBack();
                     respond(['ok' => false, 'error' => 'Resource not found.'], 404);
                 }
+
+                if ($row['RequestType'] === 'Donation') {
+                    if ($row['SourcePersonalItemID'] !== null) {
+                        $personal = $pdo->prepare('SELECT Qty FROM PERSONAL_INVENTORY WHERE ItemID = ? AND GardenerID = ? FOR UPDATE');
+                        $personal->execute([(int) $row['SourcePersonalItemID'], (int) $row['GardenerID']]);
+                        $personalQty = $personal->fetchColumn();
+                        if ($personalQty === false || (int) $personalQty < $chosenQty) {
+                            $pdo->rollBack();
+                            respond(['ok' => false, 'error' => 'The gardener no longer has enough of this personal item to approve the donation.'], 409);
+                        }
+                    }
+
+                    $pdo->prepare('UPDATE RESOURCE SET TotalQty = TotalQty + ?, AvailableQty = AvailableQty + ? WHERE ResourceID = ?')
+                        ->execute([$chosenQty, $chosenQty, (int) $row['ResourceID']]);
+
+                    if ($row['SourcePersonalItemID'] !== null) {
+                        $remainingPersonalQty = (int) $personalQty - $chosenQty;
+                        if ($remainingPersonalQty === 0) {
+                            $pdo->prepare('DELETE FROM PERSONAL_INVENTORY WHERE ItemID = ? AND GardenerID = ?')
+                                ->execute([(int) $row['SourcePersonalItemID'], (int) $row['GardenerID']]);
+                        } else {
+                            $pdo->prepare('UPDATE PERSONAL_INVENTORY SET Qty = ? WHERE ItemID = ? AND GardenerID = ?')
+                                ->execute([$remainingPersonalQty, (int) $row['SourcePersonalItemID'], (int) $row['GardenerID']]);
+                        }
+                    }
+
+                    recordResourceEvent($pdo, (int) $row['ResourceID'], 'Added', $chosenQty, 'staff', $user['name'], (int) $row['GardenerID'], $row['GardenerName'], (int) $user['id']);
+                    if ($remainder > 0) {
+                        $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = ?, ProcessedQty = ?, Status = 'Rejected', CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
+                            ->execute([$remainder, $chosenQty, $user['id'], $rejectionReason, (int) $txnId]);
+                    } else {
+                        $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Donated', ProcessedQty = ?, CoordID = ?, ApprovedAt = NOW() WHERE TxnID = ?")
+                            ->execute([$chosenQty, $user['id'], (int) $txnId]);
+                    }
+                    $pdo->commit();
+                    respond(['ok' => true]);
+                }
+
                 $active = $pdo->prepare("SELECT COALESCE(SUM(Qty), 0) FROM RESOURCE_TXN WHERE ResourceID = ? AND Status IN ('Approved', 'Return Requested')");
                 $active->execute([(int) $row['ResourceID']]);
                 $availableQty = max(0, (int) $totalQty - (int) $active->fetchColumn());
@@ -1303,8 +1444,8 @@ try {
                 if ($remainder > 0) {
                     // The approved amount is recorded as borrowed; close the
                     // remainder as rejected so it does not remain in the queue.
-                    $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = ?, Status = 'Rejected', CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
-                        ->execute([$remainder, $user['id'], $rejectionReason, (int) $txnId]);
+                    $pdo->prepare("UPDATE RESOURCE_TXN SET Qty = ?, ProcessedQty = ?, Status = 'Rejected', CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
+                        ->execute([$remainder, $chosenQty, $user['id'], $rejectionReason, (int) $txnId]);
                 } else {
                     // Nothing left over — the original "Requested" row has been
                     // fully folded into the approval above and is no longer needed.
@@ -1320,8 +1461,14 @@ try {
                     // Leave the rest of the request pending — don't approve it.
                     $pdo->prepare('UPDATE RESOURCE_TXN SET Qty = ? WHERE TxnID = ?')
                         ->execute([$remainder, (int) $txnId]);
-                    $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, CoordID, ResourceID, Qty, Status, RejectionReason) VALUES (?, ?, ?, ?, 'Rejected', ?)")
-                        ->execute([(int) $row['GardenerID'], (int) $user['id'], (int) $row['ResourceID'], $chosenQty, $rejectionReason]);
+                    $pdo->prepare("
+                        INSERT INTO RESOURCE_TXN
+                            (GardenerID, CoordID, ResourceID, Qty, RequestType, RequestNotes, SourcePersonalItemID, ProcessedQty, Status, RejectionReason)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'Rejected', ?)
+                    ")->execute([
+                        (int) $row['GardenerID'], (int) $user['id'], (int) $row['ResourceID'],
+                        $chosenQty, $row['RequestType'], $row['RequestNotes'], $row['SourcePersonalItemID'], $rejectionReason,
+                    ]);
                 } else {
                     $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Rejected', CoordID = ?, RejectionReason = ? WHERE TxnID = ?")
                         ->execute([$user['id'], $rejectionReason, (int) $txnId]);

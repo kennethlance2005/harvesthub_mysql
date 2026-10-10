@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateLimitText() {
         const sub = document.getElementById('my-requests-sub');
-        if (sub) sub.textContent = `${pendingLimit.count} of ${pendingLimit.max} pending requests are waiting for a coordinator.`;
+        if (sub) sub.textContent = `${pendingLimit.count} of ${pendingLimit.max} pending borrowing requests. Donations are reviewed separately.`;
 
         const note = document.getElementById('inv-limit-note');
         if (note) {
@@ -204,38 +204,42 @@ document.addEventListener('DOMContentLoaded', () => {
             const invList = document.getElementById('my-inventory-list');
 
             const activeRequests = dataReq.requests.filter(r => r.Status === 'Requested');
-            const historyRequests = dataReq.requests.filter(r => ['Rejected', 'Approved', 'Return Requested'].includes(r.Status));
+            const borrowRequests = activeRequests.filter(r => r.RequestType !== 'Donation');
+            const historyRequests = dataReq.requests.filter(r => ['Rejected', 'Approved', 'Return Requested', 'Donated'].includes(r.Status));
             const borrowedItems = dataReq.requests.filter(r => ['Approved', 'Return Requested'].includes(r.Status));
+            const donationRequests = dataReq.requests.filter(r => r.RequestType === 'Donation' && r.Status === 'Requested');
+            const rejectedRequests = dataReq.requests.filter(r => r.Status === 'Rejected');
             const personalItems = dataPers.items;
 
-            pendingLimit.count = activeRequests.length;
+            pendingLimit.count = borrowRequests.length;
             updateLimitText();
 
             // Render Request Tracker: pending requests first, older decisions behind a toggle
-            const badgeClass = { Requested: 'badge-brown', Rejected: 'badge-neutral', Approved: 'badge-green', 'Return Requested': 'badge-brown' };
-            const badgeLabel = { Requested: 'Pending' };
+            const badgeClass = { Requested: 'badge-brown', Rejected: 'badge-neutral', Approved: 'badge-green', 'Return Requested': 'badge-brown', Donated: 'badge-green' };
+            const badgeLabel = { Requested: 'Pending', Donated: 'Donation approved' };
             const renderRequest = r => {
                 // The badge already names the status, so the date stands on its own.
-                const dateLabel = r.Status === 'Approved' || r.Status === 'Return Requested'
+                const dateLabel = r.Status === 'Approved' || r.Status === 'Return Requested' || r.Status === 'Donated'
                     ? formatInvDate(r.ApprovedAt || r.RequestedAt)
                     : formatInvDate(r.RequestedAt);
                 return `
                 <div class="inv-req">
                     <div class="inv-req-main">
-                        <strong class="inv-row-title">${escapeHtml(String(r.Qty))}× ${escapeHtml(r.Name)}</strong>
+                        <strong class="inv-row-title">${r.RequestType === 'Donation' ? 'Donation · ' : ''}${escapeHtml(String(r.Qty))}× ${escapeHtml(r.Name)}</strong>
                         <div class="inv-req-meta">
                             <span class="badge ${badgeClass[r.Status] || 'badge-neutral'}">${escapeHtml(badgeLabel[r.Status] || r.Status)}</span>
                             <span>${dateLabel}</span>
                         </div>
+                        ${r.RequestType === 'Donation' && r.RequestNotes ? `<p class="inv-req-reason">Notes: ${escapeHtml(r.RequestNotes)}</p>` : ''}
                         ${r.Status === 'Rejected' && r.RejectionReason ? `<p class="inv-req-reason">Reason: ${escapeHtml(r.RejectionReason)}</p>` : ''}
                         ${r.Status === 'Return Requested' && r.RejectionReason ? `<p class="inv-req-reason">Return requested by the coordinator: ${escapeHtml(r.RejectionReason)}</p>` : ''}
                     </div>
-                    ${r.Status === 'Requested' ? `<button type="button" class="btn btn-ghost btn-sm cancel-request-btn" data-txn="${r.TxnID}" data-name="${escapeHtml(r.Name)}">Cancel</button>` : ''}
+                    ${r.Status === 'Requested' ? `<button type="button" class="btn btn-ghost btn-sm cancel-request-btn" data-txn="${r.TxnID}" data-name="${escapeHtml(r.Name)}">${r.RequestType === 'Donation' ? 'Withdraw' : 'Cancel'}</button>` : ''}
                 </div>`;
             };
 
             let requestsHTML = activeRequests.length === 0
-                ? '<p class="inv-empty">No pending requests. Request an item from the catalog to get started.</p>'
+                ? '<p class="inv-empty">No pending requests.</p>'
                 : activeRequests.map(renderRequest).join('');
             if (historyRequests.length > 0) {
                 requestsHTML += `
@@ -278,6 +282,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 `).join('');
             }
 
+            if (donationRequests.length > 0) {
+                inventoryHTML += donationRequests.map(r => `
+                    <div class="inv-row inventory-item" data-search="${escapeHtml(r.Name).toLowerCase()}">
+                        <div class="inv-row-main">
+                            <div class="inv-row-title-line">
+                                <strong class="inv-row-title">${escapeHtml(String(r.Qty))}× ${escapeHtml(r.Name)}</strong>
+                                <span class="badge badge-brown">Donation pending</span>
+                            </div>
+                            <span class="inv-row-meta">Waiting for coordinator review${r.RequestNotes ? ` · ${escapeHtml(r.RequestNotes)}` : ''}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            let dismissedNotices = {};
+            try {
+                const savedDismissals = JSON.parse(localStorage.getItem('harvesthub:resource-rejection-dismissed') || '{}');
+                dismissedNotices = savedDismissals && typeof savedDismissals === 'object' ? savedDismissals : {};
+            } catch (error) {
+                console.warn('Could not load dismissed resource notices.', error);
+            }
+            const visibleRejections = rejectedRequests.filter(r => !dismissedNotices[String(r.TxnID)]);
+            if (visibleRejections.length > 0) {
+                inventoryHTML += visibleRejections.map(r => {
+                    const processedQty = Number(r.ProcessedQty) || 0;
+                    const outcome = processedQty > 0
+                        ? `Partial approval: ${processedQty} approved; ${Number(r.Qty)} not approved.`
+                        : `${r.RequestType === 'Donation' ? 'Donation' : 'Request'} rejected.`;
+                    return `
+                    <div class="inv-row inventory-item inv-rejected-row" data-search="${escapeHtml(r.Name).toLowerCase()}">
+                        <div class="inv-row-main">
+                            <div class="inv-row-title-line">
+                                <strong class="inv-row-title">${escapeHtml(String(r.Qty))}× ${escapeHtml(r.Name)}</strong>
+                                <span class="badge badge-neutral">${r.RequestType === 'Donation' ? 'Donation' : 'Request'} resolved</span>
+                            </div>
+                            <div class="inv-rejection-notice" id="rejection-notice-${r.TxnID}">
+                                <span><strong>${outcome}</strong> ${escapeHtml(r.RejectionReason || 'No reason was provided.')}</span>
+                                <button type="button" class="inv-notice-dismiss" aria-label="Dismiss notice for ${escapeHtml(r.Name)}" data-txn="${r.TxnID}">×</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+
             if (personalItems.length > 0) {
                 inventoryHTML += personalItems.map(p => `
                     <div class="inv-row inventory-item" data-search="${escapeHtml(p.ItemName).toLowerCase()}">
@@ -286,16 +334,35 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <strong class="inv-row-title">${escapeHtml(String(p.Qty))}× ${escapeHtml(p.ItemName)}</strong>
                                 <span class="badge badge-neutral">Personal</span>
                             </div>
-                            <span class="inv-row-meta">Added ${formatInvDate(p.AddedAt)}</span>
+                            <span class="inv-row-meta">${Number(p.HasPendingDonation) ? 'A donation request is pending coordinator review.' : `Added ${formatInvDate(p.AddedAt)}`}</span>
                         </div>
                         <div class="inv-row-actions">
-                            <button class="btn btn-ghost btn-sm inv-btn remove-personal-btn" data-id="${p.ItemID}">Remove</button>
+                            <button class="btn btn-accent btn-sm inv-btn donate-personal-btn" type="button" data-id="${p.ItemID}" data-name="${escapeHtml(p.ItemName)}" data-qty="${p.Qty}" ${Number(p.HasPendingDonation) ? 'disabled' : ''}>Donate</button>
+                            <button class="btn btn-ghost btn-sm inv-btn remove-personal-btn" data-id="${p.ItemID}" ${Number(p.HasPendingDonation) ? 'disabled' : ''}>Remove</button>
                         </div>
                     </div>
                 `).join('');
             }
 
             invList.innerHTML = inventoryHTML === '' ? '<p class="inv-empty">Your inventory is empty. Borrowed items and your own tools will show up here.</p>' : inventoryHTML;
+
+            document.querySelectorAll('.inv-notice-dismiss').forEach(button => {
+                button.addEventListener('click', () => {
+                    try {
+                        const savedDismissals = JSON.parse(localStorage.getItem('harvesthub:resource-rejection-dismissed') || '{}');
+                        const dismissed = savedDismissals && typeof savedDismissals === 'object' ? savedDismissals : {};
+                        dismissed[String(button.dataset.txn)] = true;
+                        localStorage.setItem('harvesthub:resource-rejection-dismissed', JSON.stringify(dismissed));
+                    } catch (error) {
+                        console.warn('Could not save dismissed resource notice.', error);
+                    }
+                    button.closest('.inv-rejected-row')?.remove();
+                });
+            });
+
+            document.querySelectorAll('.donate-personal-btn').forEach(button => {
+                button.addEventListener('click', () => openDonationDialog(button.dataset.name, button.dataset.qty, button.dataset.id));
+            });
 
             // Attach Cancel Listeners (pending requests only)
             document.querySelectorAll('.cancel-request-btn').forEach(btn => {
@@ -423,6 +490,65 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.disabled = false;
                 busyCount--;
             }
+        });
+    }
+
+    const donationDialog = document.getElementById('donation-dialog');
+    const donationForm = document.getElementById('donation-form');
+    const donationName = document.getElementById('donation-item-name');
+    const donationQty = document.getElementById('donation-item-qty');
+    const donationNotes = document.getElementById('donation-item-notes');
+    const donationSource = document.getElementById('donation-source-item');
+
+    function openDonationDialog(name = '', qty = '1', sourceItemId = '') {
+        if (!donationDialog || !donationForm || !donationName || !donationQty || !donationSource) return;
+        donationForm.reset();
+        donationName.value = name;
+        donationName.readOnly = Boolean(sourceItemId);
+        donationQty.value = qty;
+        donationQty.max = sourceItemId ? String(qty) : '100000';
+        donationSource.value = sourceItemId;
+        donationDialog.showModal();
+        donationName.focus();
+    }
+
+    document.getElementById('open-donation-form')?.addEventListener('click', () => openDonationDialog());
+    document.getElementById('donation-cancel')?.addEventListener('click', () => donationDialog?.close());
+
+    if (donationForm) {
+        donationForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const submitButton = donationForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            await whileBusy(async () => {
+                try {
+                    const response = await fetch('api.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            action: 'request_resource_donation',
+                            item_name: donationName.value.trim(),
+                            qty: donationQty.value,
+                            notes: donationNotes.value.trim(),
+                            source_item_id: donationSource.value,
+                        })
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.ok) {
+                        if (typeof showToast === 'function') showToast(result.error || 'Could not submit donation request.', 'danger');
+                        return;
+                    }
+                    donationDialog.close();
+                    donationForm.reset();
+                    if (typeof showToast === 'function') showToast('Donation request sent to the coordinator.', 'success');
+                    await Promise.all([loadResources(), loadMyRequests()]);
+                } catch (error) {
+                    console.error('Error submitting donation request:', error);
+                    if (typeof showToast === 'function') showToast('Network error. Please try again.', 'danger');
+                } finally {
+                    submitButton.disabled = false;
+                }
+            });
         });
     }
 

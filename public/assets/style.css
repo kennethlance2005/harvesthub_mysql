@@ -1968,7 +1968,33 @@ table.data-table {
 .inv-row-meta { color: var(--ink-600); font-size: 0.82rem; }
 .inv-stock-ok { color: var(--green-700); }
 .inv-stock-out { color: var(--danger); }
-.inv-row-actions { display: flex; align-items: center; flex-shrink: 0; }
+.inv-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.inv-rejected-row { align-items: flex-start; }
+.inv-rejection-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 9px 10px;
+  border: 1px solid #e6c9b3;
+  border-radius: var(--radius);
+  background: #fbf3ee;
+  color: var(--brown-700);
+  font-size: 0.82rem;
+}
+.inv-notice-dismiss {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.inv-donate-open { margin: 8px 0 2px; }
+.donation-request-notes { margin-top: 4px; overflow-wrap: anywhere; }
 
 .inv-request-form { display: flex; align-items: center; gap: 10px; margin: 0; }
 .inv-qty { display: flex; align-items: center; gap: 6px; color: var(--ink-600); font-size: 0.8rem; font-weight: 600; }
