@@ -90,6 +90,7 @@ CREATE TABLE PASSWORD_RESET (
     Email VARCHAR(255) NOT NULL,
     TokenHash VARCHAR(64) NOT NULL,
     ExpiresAt DATETIME NOT NULL,
+    LastSentAt DATETIME NULL,
     PRIMARY KEY (Email)
 );
 
@@ -436,6 +437,21 @@ CREATE TABLE SIGNUP_REQUEST (
     ReviewedBy   INT          NULL,
     RejectionReason VARCHAR(1000) NULL,
     StatusToken  CHAR(64)     NULL UNIQUE
+) ENGINE=InnoDB;
+
+CREATE TABLE SIGNUP_EMAIL_VERIFICATION (
+    Email        VARCHAR(190)  NOT NULL PRIMARY KEY,
+    FirstName    VARCHAR(60)   NOT NULL,
+    LastName     VARCHAR(60)   NOT NULL,
+    Age          INT           NOT NULL,
+    Location     VARCHAR(60)   NOT NULL,
+    PasswordHash VARCHAR(255)  NOT NULL,
+    CodeHash     VARCHAR(255)  NOT NULL,
+    ExpiresAt    DATETIME      NOT NULL,
+    Attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    LastSentAt   DATETIME      NOT NULL,
+    RequestedAt  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_signup_email_verification_expiry (ExpiresAt)
 ) ENGINE=InnoDB;
 
 -- =========================================================

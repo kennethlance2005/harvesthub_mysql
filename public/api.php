@@ -45,78 +45,16 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/audit.php';
+require_once __DIR__ . '/email.php';
 
-// The Bird email API key is a secret, so it never lives in the code. Set the
-// BIRD_API_KEY environment variable on the server (e.g. Render), or for local
-// XAMPP copy secrets.local.example.php to secrets.local.php (git-ignored).
-function birdApiKey(): string {
-    $key = getenv('BIRD_API_KEY');
-    if ($key) return $key;
-    $localFile = __DIR__ . '/../secrets.local.php';
-    if (is_file($localFile)) {
-        $secrets = require $localFile;
-        return (string) ($secrets['bird_api_key'] ?? '');
-    }
-    return '';
-}
-
-// Returns true when Bird accepted the email. Failures are logged on the server
-// only; the details are never shown to the person resetting their password.
 function sendResetEmail(string $toEmail, string $resetLink): bool {
-    $apiKey = birdApiKey();
-    if ($apiKey === '') {
-        error_log('HarvestHub: BIRD_API_KEY is not configured, so the password reset email was not sent.');
-        return false;
-    }
-
-    // Bird requires you to use the regional host that matches your key prefix (eu1)
-    $apiUrl = 'https://eu1.platform.bird.com/v1/email/messages';
-
-    $htmlContent = "
-        <h2>HarvestHub Password Reset</h2>
-        <p>You requested a password reset. Click the link below to set a new password:</p>
-        <p><a href='{$resetLink}'>Reset Password</a></p>
-        <p>If you did not request this, please ignore this email.</p>
-    ";
-
-    $payload = [
-        'from' => [
-            // During onboarding, you must use this exact testing email address
-            'email' => 'onboarding@messagebird.dev', 
-            'name' => 'HarvestHub'
-        ],
-        'to' => [$toEmail],
-        'subject' => 'Reset your HarvestHub password',
-        'html' => $htmlContent
-    ];
-
-    $ch = curl_init($apiUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $apiKey,
-        'Content-Type: application/json',
-        'Accept: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
-
-    // 1. Check if the server failed to connect entirely
-    if ($curlError) {
-        error_log('HarvestHub: password reset email connection error: ' . $curlError);
-        return false;
-    }
-
-    // 2. Check if Bird rejected the email (HTTP codes 400 and above are errors)
-    if ($httpCode >= 400) {
-        error_log("HarvestHub: Bird rejected the password reset email (HTTP $httpCode): " . $response);
-        return false;
-    }
-    return true;
+    $escapedLink = htmlspecialchars($resetLink, ENT_QUOTES, 'UTF-8');
+    return sendHarvestHubEmail(
+        $toEmail,
+        'Reset your HarvestHub password',
+        "<h2>HarvestHub Password Reset</h2><p>You requested a password reset. Click the link below to set a new password:</p><p><a href=\"{$escapedLink}\">Reset Password</a></p><p>If you did not request this, please ignore this email.</p>",
+        "You requested a password reset. Open this link to set a new password: {$resetLink}\n\nIf you did not request this, please ignore this email."
+    );
 }
 
 header('Content-Type: application/json');
@@ -424,7 +362,14 @@ try {
             session_destroy();
             respond(['ok' => true, 'redirect' => 'login.php']);
 
-        case 'signup_request': {
+        case 'signup_send_otp': {
+            $pdo->exec('DELETE FROM SIGNUP_EMAIL_VERIFICATION WHERE ExpiresAt <= NOW()');
+            foreach (['first_name', 'last_name', 'age', 'location', 'email', 'password', 'confirm_password', 'accept_terms'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Registration details must be text values.'], 422);
+                }
+            }
+
             $firstName = trim($_POST['first_name'] ?? '');
             $lastName = trim($_POST['last_name'] ?? '');
             $age = $_POST['age'] ?? '';
@@ -432,38 +377,30 @@ try {
             $email = trim($_POST['email'] ?? '');
             $password = $_POST['password'] ?? '';
             $confirmPassword = $_POST['confirm_password'] ?? '';
-            
             $errors = [];
-            
+
             if ($firstName === '' || mb_strlen($firstName) > 60) {
                 $errors[] = 'First name is required.';
             } elseif (!preg_match("/^[A-Za-z\s\-']+$/u", $firstName)) {
                 $errors[] = 'First name must contain only letters.';
             }
-
             if ($lastName === '' || mb_strlen($lastName) > 60) {
                 $errors[] = 'Last name is required.';
             } elseif (!preg_match("/^[A-Za-z\s\-']+$/u", $lastName)) {
                 $errors[] = 'Last name must contain only letters.';
             }
-
             if (!ctype_digit((string) $age) || (int) $age < 18 || (int) $age > 120) {
                 $errors[] = 'You must be at least 18 years old to register.';
             }
-
             if (!in_array($location, NCR_CITIES, true)) $errors[] = 'Please choose a valid NCR city.';
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'A valid email is required.';
-            // Enforce password complexity: 8+ chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) $errors[] = 'A valid email is required.';
             if (!preg_match('/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,}$/', $password)) {
-                respond(['ok' => false, 'error' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.'], 422);
+                $errors[] = 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.';
             }
             if ($password !== $confirmPassword) $errors[] = 'Passwords do not match.';
             if (($_POST['accept_terms'] ?? '') !== '1') $errors[] = 'You must agree to the Terms of Service.';
-            
             if ($errors) respond(['ok' => false, 'errors' => $errors], 422);
 
-            // An email already active as any account, or already sitting
-            // in the queue as a pending request, can't submit another one.
             $inUse = $pdo->prepare("
                 SELECT 1 FROM COMMUNITY_GARDENER WHERE Email = ?
                 UNION SELECT 1 FROM GARDEN_COORDINATOR WHERE Email = ?
@@ -475,25 +412,164 @@ try {
                 respond(['ok' => false, 'error' => 'That email already has an account or a pending request.'], 409);
             }
 
-            $statusToken = bin2hex(random_bytes(32));
+            $existing = $pdo->prepare('SELECT LastSentAt FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?');
+            $existing->execute([$email]);
+            $lastSentAt = $existing->fetchColumn();
+            if ($lastSentAt && strtotime($lastSentAt) > time() - 60) {
+                respond(['ok' => false, 'error' => 'Please wait one minute before requesting another code.'], 429);
+            }
+            $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $codeHash = password_hash($code, PASSWORD_DEFAULT);
+            $sentAt = date('Y-m-d H:i:s');
+            $expiresAt = date('Y-m-d H:i:s', time() + 600);
             $pdo->prepare("
-                INSERT INTO SIGNUP_REQUEST (FirstName, LastName, Age, Location, Email, PasswordHash, Role, Shift, StatusToken)
-                VALUES (?, ?, ?, ?, ?, ?, 'customer', 'Morning', ?)
+                INSERT INTO SIGNUP_EMAIL_VERIFICATION
+                    (Email, FirstName, LastName, Age, Location, PasswordHash, CodeHash, ExpiresAt, Attempts, LastSentAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+                ON DUPLICATE KEY UPDATE FirstName = VALUES(FirstName), LastName = VALUES(LastName),
+                    Age = VALUES(Age), Location = VALUES(Location), PasswordHash = VALUES(PasswordHash),
+                    CodeHash = VALUES(CodeHash), ExpiresAt = VALUES(ExpiresAt), Attempts = 0,
+                    LastSentAt = VALUES(LastSentAt)
             ")->execute([
+                $email,
                 htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8'),
                 htmlspecialchars($lastName, ENT_QUOTES, 'UTF-8'),
                 (int) $age,
                 htmlspecialchars($location, ENT_QUOTES, 'UTF-8'),
+                password_hash($password, PASSWORD_DEFAULT),
+                $codeHash,
+                $expiresAt,
+                $sentAt,
+            ]);
+
+            $escapedCode = htmlspecialchars($code, ENT_QUOTES, 'UTF-8');
+            $emailSent = sendHarvestHubEmail(
                 $email,
-                password_hash($password, PASSWORD_BCRYPT),
-                hash('sha256', $statusToken),
-            ]);
-            $applicantName = trim("$firstName $lastName");
-            logAudit($pdo, 'accounts', 'registration_submitted', "$applicantName ($email) asked to join HarvestHub as a gardener.", [
-                'actor' => ['type' => 'guest', 'id' => null, 'name' => $applicantName],
-                'target' => ['registration', (int) $pdo->lastInsertId(), $applicantName],
-            ]);
-            respond(['ok' => true, 'status_token' => $statusToken]);
+                'Verify your HarvestHub email',
+                "<h2>Verify your email address</h2><p>Enter this code in HarvestHub to continue creating your account:</p><p style=\"font-size:28px;font-weight:bold;letter-spacing:6px\">{$escapedCode}</p><p>This code expires in 10 minutes. If you did not request it, you can ignore this email.</p>",
+                "Your HarvestHub email verification code is {$code}. It expires in 10 minutes. If you did not request it, ignore this email."
+            );
+            if (!$emailSent) {
+                $pdo->prepare('DELETE FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ? AND CodeHash = ?')->execute([$email, $codeHash]);
+                respond(['ok' => false, 'error' => 'We could not send a verification code right now. Please try again later.'], 503);
+            }
+
+            respond(['ok' => true, 'email' => $email]);
+        }
+
+        case 'signup_resend_otp': {
+            if (isset($_POST['email']) && !is_string($_POST['email'])) {
+                respond(['ok' => false, 'error' => 'Email must be a text value.'], 422);
+            }
+            $email = trim($_POST['email'] ?? '');
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                respond(['ok' => false, 'error' => 'Enter a valid email address.'], 422);
+            }
+            $stmt = $pdo->prepare('SELECT FirstName, LastName, Age, Location, PasswordHash, LastSentAt FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?');
+            $stmt->execute([$email]);
+            $pending = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$pending) respond(['ok' => false, 'error' => 'Start registration again to request a new code.'], 404);
+            if (strtotime($pending['LastSentAt']) > time() - 60) {
+                respond(['ok' => false, 'error' => 'Please wait one minute before requesting another code.'], 429);
+            }
+            $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $codeHash = password_hash($code, PASSWORD_DEFAULT);
+            $sentAt = date('Y-m-d H:i:s');
+            $expiresAt = date('Y-m-d H:i:s', time() + 600);
+            $pdo->prepare("
+                UPDATE SIGNUP_EMAIL_VERIFICATION
+                SET CodeHash = ?, ExpiresAt = ?, Attempts = 0, LastSentAt = ?
+                WHERE Email = ?
+            ")->execute([$codeHash, $expiresAt, $sentAt, $email]);
+
+            $escapedCode = htmlspecialchars($code, ENT_QUOTES, 'UTF-8');
+            $emailSent = sendHarvestHubEmail(
+                $email,
+                'Your HarvestHub verification code',
+                "<h2>Verify your email address</h2><p>Your new HarvestHub verification code is:</p><p style=\"font-size:28px;font-weight:bold;letter-spacing:6px\">{$escapedCode}</p><p>This code expires in 10 minutes.</p>",
+                "Your new HarvestHub email verification code is {$code}. It expires in 10 minutes."
+            );
+            if (!$emailSent) {
+                respond(['ok' => false, 'error' => 'We could not send a verification code right now. Please try again later.'], 503);
+            }
+            respond(['ok' => true]);
+        }
+
+        case 'signup_verify_email': {
+            foreach (['email', 'code'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) {
+                    respond(['ok' => false, 'error' => 'Verification details must be text values.'], 422);
+                }
+            }
+            $email = trim($_POST['email'] ?? '');
+            $code = trim($_POST['code'] ?? '');
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match('/^\d{6}$/', $code)) {
+                respond(['ok' => false, 'error' => 'Enter the six-digit code sent to your email.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare('SELECT * FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ? FOR UPDATE');
+                $stmt->execute([$email]);
+                $pending = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$pending) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'The verification code is invalid or expired. Request a new code.'], 422);
+                }
+                if (strtotime($pending['ExpiresAt']) <= time()) {
+                    $pdo->prepare('DELETE FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?')->execute([$email]);
+                    $pdo->commit();
+                    respond(['ok' => false, 'error' => 'The verification code expired. Start registration again to request a new code.'], 410);
+                }
+                if ((int) $pending['Attempts'] >= 5) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Too many incorrect codes. Request a new code and try again.'], 429);
+                }
+                if (!password_verify($code, $pending['CodeHash'])) {
+                    $pdo->prepare('UPDATE SIGNUP_EMAIL_VERIFICATION SET Attempts = Attempts + 1 WHERE Email = ?')->execute([$email]);
+                    $pdo->commit();
+                    respond(['ok' => false, 'error' => 'That code is incorrect. Please check it and try again.'], 422);
+                }
+
+                $inUse = $pdo->prepare("
+                    SELECT 1 FROM COMMUNITY_GARDENER WHERE Email = ?
+                    UNION SELECT 1 FROM GARDEN_COORDINATOR WHERE Email = ?
+                    UNION SELECT 1 FROM SYSTEM_ADMINISTRATOR WHERE Email = ?
+                    UNION SELECT 1 FROM SIGNUP_REQUEST WHERE Email = ? AND Status = 'Pending'
+                ");
+                $inUse->execute([$email, $email, $email, $email]);
+                if ($inUse->fetchColumn()) {
+                    $pdo->prepare('DELETE FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?')->execute([$email]);
+                    $pdo->commit();
+                    respond(['ok' => false, 'error' => 'That email already has an account or a pending request.'], 409);
+                }
+
+                $statusToken = bin2hex(random_bytes(32));
+                $pdo->prepare("
+                    INSERT INTO SIGNUP_REQUEST (FirstName, LastName, Age, Location, Email, PasswordHash, Role, Shift, StatusToken)
+                    VALUES (?, ?, ?, ?, ?, ?, 'customer', 'Morning', ?)
+                ")->execute([
+                    $pending['FirstName'],
+                    $pending['LastName'],
+                    (int) $pending['Age'],
+                    $pending['Location'],
+                    $email,
+                    $pending['PasswordHash'],
+                    hash('sha256', $statusToken),
+                ]);
+                $requestId = (int) $pdo->lastInsertId();
+                $pdo->prepare('DELETE FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?')->execute([$email]);
+                $applicantName = trim($pending['FirstName'] . ' ' . $pending['LastName']);
+                logAudit($pdo, 'accounts', 'registration_submitted', "$applicantName ($email) asked to join HarvestHub as a gardener.", [
+                    'actor' => ['type' => 'guest', 'id' => null, 'name' => $applicantName],
+                    'target' => ['registration', $requestId, $applicantName],
+                ]);
+                $pdo->commit();
+                respond(['ok' => true, 'status_token' => $statusToken]);
+            } catch (Throwable $error) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $error;
+            }
         }
 
         case 'application_status': {
@@ -533,17 +609,26 @@ try {
                 respond(['ok' => true]);
             }
 
+            $lastReset = $pdo->prepare('SELECT LastSentAt FROM PASSWORD_RESET WHERE Email = ?');
+            $lastReset->execute([$email]);
+            $lastSentAt = $lastReset->fetchColumn();
+            if ($lastSentAt && strtotime($lastSentAt) > time() - 60) {
+                respond(['ok' => true]);
+            }
+
             // 2. Generate a secure random token
             $token = bin2hex(random_bytes(32));
             $tokenHash = hash('sha256', $token);
             $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1 hour expiration
+            $sentAt = date('Y-m-d H:i:s');
 
             // 3. Store the hashed token (Upsert so old tokens are overwritten)
             $pdo->prepare("
-                INSERT INTO PASSWORD_RESET (Email, TokenHash, ExpiresAt) 
-                VALUES (?, ?, ?) 
-                ON DUPLICATE KEY UPDATE TokenHash = VALUES(TokenHash), ExpiresAt = VALUES(ExpiresAt)
-            ")->execute([$email, $tokenHash, $expiresAt]);
+                INSERT INTO PASSWORD_RESET (Email, TokenHash, ExpiresAt, LastSentAt)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE TokenHash = VALUES(TokenHash), ExpiresAt = VALUES(ExpiresAt),
+                    LastSentAt = VALUES(LastSentAt)
+            ")->execute([$email, $tokenHash, $expiresAt, $sentAt]);
 
             // 4. Send the email using a cURL helper function
             // Make sure to change 'localhost...' to your actual domain when deploying

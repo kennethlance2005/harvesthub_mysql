@@ -119,6 +119,17 @@ if ($user = currentUser()) {
       <p class="register-hint" id="register-hint">Fill in all fields and agree to the Terms of Service to request an account.</p>
     </form>
 
+    <form id="verify-email-form" hidden novalidate>
+      <p class="register-hint">Enter the six-digit code sent to <strong id="verification-email"></strong>. The code expires in 10 minutes.</p>
+      <div class="field field-underline">
+        <label for="verification-code">Email verification code <span class="required">*</span></label>
+        <input type="text" id="verification-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+      </div>
+      <button type="submit" class="btn btn-light btn-block">Verify Email and Request Account</button>
+      <button type="button" id="resend-code" class="btn btn-light btn-block" style="margin-top: 8px;">Resend Code</button>
+      <button type="button" id="restart-registration" class="btn btn-light btn-block" style="margin-top: 8px;">Change Details</button>
+    </form>
+
     <p class="form-alert" id="register-alert" role="alert" hidden></p>
     <p class="form-success" id="register-success" role="status" hidden></p>
 
@@ -129,6 +140,6 @@ if ($user = currentUser()) {
 </div>
 
 <script src="assets/password-toggle.js?v=1"></script>
-<script src="assets/register.js?v=7"></script>
+<script src="assets/register.js?v=8"></script>
 </body>
 </html>

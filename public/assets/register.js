@@ -1,6 +1,7 @@
 // register.js — "Create an Account" form: submits a pending request
 
 const form = document.getElementById('register-form');
+const verifyForm = document.getElementById('verify-email-form');
 const alertEl = document.getElementById('register-alert');
 const successEl = document.getElementById('register-success');
 const firstNameInput = document.getElementById('first-name');
@@ -11,6 +12,11 @@ const emailReq = document.getElementById('email-req');
 const ageInput = document.getElementById('age');
 const ageReqs = document.getElementById('age-reqs');
 const ageReq = document.getElementById('age-req');
+const verificationEmail = document.getElementById('verification-email');
+const verificationCode = document.getElementById('verification-code');
+const resendCodeButton = document.getElementById('resend-code');
+const restartRegistrationButton = document.getElementById('restart-registration');
+let pendingVerificationEmail = '';
 
 const updateAgeRequirement = () => {
   const digits = ageInput.value.replace(/\D/g, '');
@@ -123,8 +129,8 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
-  if (password.length < 6) {
-    alertEl.textContent = 'Password must be at least 6 characters.';
+  if (!/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,}$/.test(password)) {
+    alertEl.textContent = 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.';
     alertEl.hidden = false;
     return;
   }
@@ -143,7 +149,7 @@ form.addEventListener('submit', async (e) => {
   }
 
   const formData = new URLSearchParams({
-    action: 'signup_request',
+    action: 'signup_send_otp',
     first_name: firstName,
     last_name: lastName,
     age: age,
@@ -166,10 +172,11 @@ form.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (data.ok) {
-      form.reset();
+      pendingVerificationEmail = data.email;
+      verificationEmail.textContent = data.email;
       form.hidden = true;
-      successEl.innerHTML = `Gardener account request submitted. An administrator will review it. <a href="application_status.php?token=${encodeURIComponent(data.status_token)}">Check your request status</a>.`;
-      successEl.hidden = false;
+      verifyForm.hidden = false;
+      verificationCode.focus();
     } else {
       alertEl.textContent = (data.errors || [data.error]).filter(Boolean).join(' ') || 'Could not submit request.';
       alertEl.hidden = false;
@@ -182,6 +189,83 @@ form.addEventListener('submit', async (e) => {
     isSubmitting = false;
     updateSubmitState();
   }
+});
+
+verificationCode.addEventListener('input', () => {
+  verificationCode.value = verificationCode.value.replace(/\D/g, '').slice(0, 6);
+});
+
+verifyForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  alertEl.hidden = true;
+  if (!/^\d{6}$/.test(verificationCode.value)) {
+    alertEl.textContent = 'Enter the six-digit code sent to your email.';
+    alertEl.hidden = false;
+    verificationCode.focus();
+    return;
+  }
+
+  const submitButton = verifyForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        action: 'signup_verify_email',
+        email: pendingVerificationEmail,
+        code: verificationCode.value,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      verifyForm.hidden = true;
+      successEl.innerHTML = `Email verified and gardener account request submitted. An administrator will review it. <a href="application_status.php?token=${encodeURIComponent(data.status_token)}">Check your request status</a>.`;
+      successEl.hidden = false;
+    } else {
+      alertEl.textContent = data.error || 'Could not verify your email.';
+      alertEl.hidden = false;
+    }
+  } catch (err) {
+    alertEl.textContent = 'Network error. Please try again.';
+    alertEl.hidden = false;
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+resendCodeButton.addEventListener('click', async () => {
+  alertEl.hidden = true;
+  resendCodeButton.disabled = true;
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        action: 'signup_resend_otp',
+        email: pendingVerificationEmail,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      alertEl.textContent = data.error || 'Could not resend the verification code.';
+      alertEl.hidden = false;
+    }
+  } catch (err) {
+    alertEl.textContent = 'Network error. Please try again.';
+    alertEl.hidden = false;
+  } finally {
+    resendCodeButton.disabled = false;
+  }
+});
+
+restartRegistrationButton.addEventListener('click', () => {
+  pendingVerificationEmail = '';
+  verificationCode.value = '';
+  verifyForm.hidden = true;
+  form.hidden = false;
+  isSubmitting = false;
+  updateSubmitState();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
