@@ -44,6 +44,7 @@
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/audit.php';
 
 // The Bird email API key is a secret, so it never lives in the code. Set the
 // BIRD_API_KEY environment variable on the server (e.g. Render), or for local
@@ -156,6 +157,30 @@ function requireInventoryManager(): array {
     return $user;
 }
 
+/**
+ * The most recent time an administrator removed this gardener's coordinator
+ * role, with the reason and the date they may apply again; null if never.
+ */
+function latestCoordinatorDemotion(PDO $pdo, int $gardenerId): ?array {
+    $stmt = $pdo->prepare("
+        SELECT ReasonCategory, ReasonDetails, ChangedAt
+        FROM ROLE_HISTORY
+        WHERE AccountType = 'gardener' AND AccountID = ? AND ChangeType = 'demoted'
+        ORDER BY ChangedAt DESC, HistoryID DESC LIMIT 1
+    ");
+    $stmt->execute([$gardenerId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) return null;
+    $reapplyOn = date('Y-m-d H:i:s', strtotime($row['ChangedAt'] . ' +' . COORDINATOR_REAPPLY_WAIT_DAYS . ' days'));
+    return [
+        'reason' => $row['ReasonCategory'],
+        'details' => $row['ReasonDetails'],
+        'removed_at' => $row['ChangedAt'],
+        'reapply_on' => $reapplyOn,
+        'can_reapply' => strtotime($reapplyOn) <= time(),
+    ];
+}
+
 function syncLegacyCommunityPlots(PDO $pdo): void {
     $pdo->beginTransaction();
     try {
@@ -236,6 +261,11 @@ const MAX_PENDING_RESOURCE_REQUESTS = 5;
 const RESOURCE_REQUEST_RATE_LIMIT = 10;
 const RESOURCE_REQUEST_RATE_WINDOW_MINUTES = 10;
 
+// Removing someone's coordinator role (admin): the reason they must pick, and
+// how long they wait before they may apply to be a coordinator again.
+const COORDINATOR_DEMOTION_REASONS = ['Inactive', 'Policy violation', 'Performance', 'Requested by user', 'Other'];
+const COORDINATOR_REAPPLY_WAIT_DAYS = 30;
+
 // Whitelisted sort options for the Exchange Board
 const SORT_OPTIONS = [
     'newest'   => 'L.CreatedAt DESC',
@@ -303,20 +333,44 @@ try {
                 }
             }
 
+            $loginAccount = $userRecord ? auditAccount($role, (int) $userRecord['id'], $userRecord['Name']) : null;
+            $loginTarget = $loginAccount ? [$loginAccount['type'], $loginAccount['id'], $loginAccount['name']] : null;
+
             if ($userRecord && $userRecord['Status'] === 'Disabled') {
+                logAudit($pdo, 'accounts', 'login_failed', "Login blocked for {$userRecord['Name']}: the account is locked.", [
+                    'actor' => $loginAccount, 'target' => $loginTarget, 'reason' => 'Account is locked',
+                ]);
                 respond(['ok' => false, 'error' => 'Your account has been disabled due to multiple failed login attempts. Please contact the administrator to have your account enabled.'], 403);
             }
             $passwordValid = $userRecord && $userRecord['Status'] === 'Active'
                 ? password_verify($password, $userRecord['PasswordHash'])
                 : false;
             if (!$userRecord || !$passwordValid) {
+                if (!$userRecord) {
+                    logAudit($pdo, 'accounts', 'login_failed', "Failed login attempt with an email that has no account ($email).", [
+                        'actor' => auditActor(null), 'reason' => 'Unknown email',
+                    ]);
+                } elseif ($userRecord['Status'] !== 'Active') {
+                    logAudit($pdo, 'accounts', 'login_failed', "Login blocked for {$userRecord['Name']}: the account is " . strtolower($userRecord['Status']) . '.', [
+                        'actor' => $loginAccount, 'target' => $loginTarget, 'reason' => "Account is {$userRecord['Status']}",
+                    ]);
+                }
                 if ($userRecord && $userRecord['Status'] === 'Active') {
                     // Check the old count before incrementing. MySQL evaluates
                     // UPDATE assignments from left to right, so this order makes
                     // the third failed attempt (old count = 2) disable the account.
                     $update = $pdo->prepare("UPDATE $accountTable SET Status = IF(FailedLoginAttempts >= 2, 'Disabled', COALESCE(NULLIF(Status, ''), 'Active')), FailedLoginAttempts = LEAST(FailedLoginAttempts + 1, 3) WHERE $attemptColumn = ?");
                     $update->execute([(int) $userRecord['id']]);
+                    $attempt = (int) $userRecord['FailedLoginAttempts'] + 1;
+                    logAudit($pdo, 'accounts', 'login_failed', "Failed login attempt for {$userRecord['Name']} (wrong password, attempt $attempt of 3).", [
+                        'actor' => $loginAccount, 'target' => $loginTarget, 'reason' => 'Wrong password',
+                    ]);
                     if ((int) $userRecord['FailedLoginAttempts'] >= 2) {
+                        logAudit($pdo, 'accounts', 'account_locked', possessive($userRecord['Name']) . ' account was locked after 3 failed login attempts.', [
+                            'actor' => ['type' => 'system', 'id' => null, 'name' => 'HarvestHub'],
+                            'target' => $loginTarget,
+                            'before' => ['Status' => 'Active'], 'after' => ['Status' => 'Disabled'],
+                        ]);
                         respond(['ok' => false, 'error' => 'Your account has been disabled due to multiple failed login attempts. Please contact the administrator to have your account enabled.'], 403);
                     }
                 }
@@ -345,6 +399,10 @@ try {
                 'ids' => $ids,
             ];
 
+            logAudit($pdo, 'accounts', 'login', "{$userRecord['Name']} logged in.", [
+                'actor' => $loginAccount, 'target' => $loginTarget,
+            ]);
+
             // If checked, save the email. If unchecked, delete the cookie.
             if (($_POST['remember'] ?? '0') === '1') {
                 setcookie('remembered_email', $email, time() + (86400 * 30), '/');
@@ -358,7 +416,10 @@ try {
         case 'logout':
             // Destroy the remember me cookie by setting its expiration to the past
             setcookie('remember_me', '', time() - 3600, '/');
-            
+            if ($leaving = currentUser()) {
+                logAudit($pdo, 'accounts', 'logout', "{$leaving['name']} logged out.", ['target' => [AUDIT_ACCOUNT_TYPES[$leaving['role']] ?? $leaving['role'], $leaving['id'], $leaving['name']]]);
+            }
+
             $_SESSION = [];
             session_destroy();
             respond(['ok' => true, 'redirect' => 'login.php']);
@@ -427,6 +488,11 @@ try {
                 password_hash($password, PASSWORD_BCRYPT),
                 hash('sha256', $statusToken),
             ]);
+            $applicantName = trim("$firstName $lastName");
+            logAudit($pdo, 'accounts', 'registration_submitted', "$applicantName ($email) asked to join HarvestHub as a gardener.", [
+                'actor' => ['type' => 'guest', 'id' => null, 'name' => $applicantName],
+                'target' => ['registration', (int) $pdo->lastInsertId(), $applicantName],
+            ]);
             respond(['ok' => true, 'status_token' => $statusToken]);
         }
 
@@ -461,6 +527,9 @@ try {
             // Unknown emails get the same answer as known ones, so this form
             // can't be used to find out who has an account.
             if (!$stmt->fetchColumn()) {
+                logAudit($pdo, 'accounts', 'password_reset_requested', "A password reset was requested for an email that has no account ($email).", [
+                    'actor' => auditActor(null), 'reason' => 'Unknown email',
+                ]);
                 respond(['ok' => true]);
             }
 
@@ -483,7 +552,14 @@ try {
             $baseDir = dirname($_SERVER['REQUEST_URI']);
             $resetLink = $protocol . $_SERVER['HTTP_HOST'] . $baseDir . "/reset_password.php?email=" . urlencode($email) . "&token=" . $token;
             
-            if (!sendResetEmail($email, $resetLink)) {
+            $emailSent = sendResetEmail($email, $resetLink);
+            $resetTarget = auditAccountByEmail($pdo, $email);
+            logAudit($pdo, 'accounts', 'password_reset_requested',
+                'A password reset link was requested for ' . ($resetTarget[2] ?? $email) . ($emailSent ? '.' : ', but the email could not be sent.'), [
+                    'actor' => auditActor(null), 'target' => $resetTarget,
+                    'reason' => $emailSent ? null : 'Email service unavailable',
+                ]);
+            if (!$emailSent) {
                 respond(['ok' => false, 'error' => 'We could not send the reset email right now. Please try again later or contact an administrator.'], 503);
             }
 
@@ -649,6 +725,14 @@ try {
 
             // 3. Delete the used token
             $pdo->prepare("DELETE FROM PASSWORD_RESET WHERE Email = ?")->execute([$email]);
+
+            $resetTarget = auditAccountByEmail($pdo, $email);
+            if ($resetTarget) {
+                logAudit($pdo, 'accounts', 'password_reset', "{$resetTarget[2]} set a new password using an emailed reset link.", [
+                    'actor' => ['type' => $resetTarget[0], 'id' => $resetTarget[1], 'name' => $resetTarget[2]],
+                    'target' => $resetTarget,
+                ]);
+            }
 
             respond(['ok' => true]);
         }
@@ -2445,7 +2529,7 @@ try {
         case 'accounts': {
             $user = requireJsonRole('admin');
             $gardeners = $pdo->query("SELECT GardenerID AS id, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM COMMUNITY_GARDENER WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
-            $coordinators = $pdo->query("SELECT CoordID AS id, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, Shift, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM GARDEN_COORDINATOR WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
+            $coordinators = $pdo->query("SELECT CoordID AS id, GardenerID, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, Shift, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM GARDEN_COORDINATOR WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
             $admins = $pdo->query("SELECT AdminID AS id, Name, Email, COALESCE(NULLIF(Status, ''), 'Active') AS Status, COALESCE(NULLIF(Location, ''), 'Not provided') AS Location FROM SYSTEM_ADMINISTRATOR WHERE COALESCE(NULLIF(Status, ''), 'Active') IN ('Active', 'Disabled') ORDER BY Name")->fetchAll(PDO::FETCH_ASSOC);
             
             respond(['ok' => true, 'current_user_id' => $user['id'], 'gardeners' => $gardeners, 'coordinators' => $coordinators, 'admins' => $admins]);
@@ -2525,11 +2609,18 @@ try {
             }
             $_SESSION['user']['roles'] = $user['roles'];
             $_SESSION['user']['ids'] = $user['ids'];
+            // If an administrator removed their coordinator role, explain why and when they may re-apply.
+            $demotion = null;
+            if ($coordinatorRecord && $coordinatorRecord['Status'] === 'Demoted') {
+                $demotion = latestCoordinatorDemotion($pdo, (int) $user['id']);
+            }
             respond([
                 'ok' => true,
                 'application' => $application,
                 'approved' => $coordinatorRecord && $coordinatorRecord['Status'] === 'Active',
-                'has_coordinator' => $coordinatorRecord !== false,
+                // A demoted record doesn't block re-applying; Disabled/Archived ones still do.
+                'has_coordinator' => $coordinatorRecord !== false && $coordinatorRecord['Status'] !== 'Demoted',
+                'demotion' => $demotion,
             ]);
         }
 
@@ -2573,11 +2664,20 @@ try {
 
             $pdo->beginTransaction();
             try {
-                $coordinator = $pdo->prepare('SELECT CoordID FROM GARDEN_COORDINATOR WHERE GardenerID = ? FOR UPDATE');
+                $coordinator = $pdo->prepare("SELECT CoordID, COALESCE(NULLIF(Status, ''), 'Active') AS Status FROM GARDEN_COORDINATOR WHERE GardenerID = ? FOR UPDATE");
                 $coordinator->execute([$user['id']]);
-                if ($coordinator->fetchColumn() !== false) {
+                $existingCoordinator = $coordinator->fetch(PDO::FETCH_ASSOC);
+                if ($existingCoordinator && $existingCoordinator['Status'] !== 'Demoted') {
                     $pdo->rollBack();
                     respond(['ok' => false, 'error' => 'You already have coordinator access.'], 409);
+                }
+                // After a removed coordinator role there is a waiting period before re-applying.
+                if ($existingCoordinator) {
+                    $demotion = latestCoordinatorDemotion($pdo, (int) $user['id']);
+                    if ($demotion && !$demotion['can_reapply']) {
+                        $pdo->rollBack();
+                        respond(['ok' => false, 'error' => 'You can apply to be a coordinator again from ' . date('F j, Y', strtotime($demotion['reapply_on'])) . '.'], 409);
+                    }
                 }
                 $pending = $pdo->prepare("SELECT ApplicationID FROM COORDINATOR_APPLICATION WHERE GardenerID = ? AND Status = 'Pending' FOR UPDATE");
                 $pending->execute([$user['id']]);
@@ -2597,12 +2697,134 @@ try {
                     $gardeningExperience,
                     $leadershipExperience === '' ? null : $leadershipExperience,
                 ]);
+                logAudit($pdo, 'roles', 'coordinator_application_submitted', "{$user['name']} applied to become a coordinator for the $shift shift.", [
+                    'actor' => auditActor($user),
+                    'target' => ['gardener', (int) $user['id'], $user['name']],
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 throw $error;
             }
             respond(['ok' => true]);
+        }
+
+        // ---------------- ADMIN: Remove a coordinator role ----------------
+
+        // What removing this coordinator's role will mean, for the confirm dialog.
+        case 'coordinator_demotion_preview': {
+            requireJsonRole('admin');
+            $coordId = $_GET['coord_id'] ?? '';
+            if (!ctype_digit((string) $coordId)) respond(['ok' => false, 'error' => 'Invalid request.'], 422);
+
+            $stmt = $pdo->prepare("SELECT CoordID, GardenerID, Name, Email, Shift, COALESCE(NULLIF(Status, ''), 'Active') AS Status FROM GARDEN_COORDINATOR WHERE CoordID = ?");
+            $stmt->execute([(int) $coordId]);
+            $coordinator = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$coordinator || !in_array($coordinator['Status'], ['Active', 'Disabled'], true)) {
+                respond(['ok' => false, 'error' => 'This person no longer has an active coordinator role.'], 404);
+            }
+
+            $otherActive = $pdo->prepare("SELECT COUNT(*) FROM GARDEN_COORDINATOR WHERE CoordID <> ? AND COALESCE(NULLIF(Status, ''), 'Active') = 'Active'");
+            $otherActive->execute([(int) $coordId]);
+            $plotReturns = $pdo->prepare("SELECT COUNT(*) FROM PLOT_APPLICATION WHERE CoordID = ? AND RequestType = 'Return' AND Status = 'Pending'");
+            $plotReturns->execute([(int) $coordId]);
+            $resourceReturns = $pdo->prepare("SELECT COUNT(*) FROM RESOURCE_TXN WHERE CoordID = ? AND Status = 'Return Requested'");
+            $resourceReturns->execute([(int) $coordId]);
+
+            respond([
+                'ok' => true,
+                'coordinator' => [
+                    'name' => $coordinator['Name'],
+                    'email' => $coordinator['Email'],
+                    'shift' => $coordinator['Shift'],
+                    'has_gardener_account' => $coordinator['GardenerID'] !== null,
+                ],
+                'other_active_coordinators' => (int) $otherActive->fetchColumn(),
+                'open_return_requests' => (int) $plotReturns->fetchColumn() + (int) $resourceReturns->fetchColumn(),
+                'queue' => [
+                    'plot_requests' => (int) $pdo->query("SELECT COUNT(*) FROM PLOT_APPLICATION WHERE Status = 'Pending'")->fetchColumn(),
+                    'resource_requests' => (int) $pdo->query("SELECT COUNT(*) FROM RESOURCE_TXN WHERE Status = 'Requested'")->fetchColumn(),
+                ],
+                'reasons' => COORDINATOR_DEMOTION_REASONS,
+                'reapply_wait_days' => COORDINATOR_REAPPLY_WAIT_DAYS,
+            ]);
+        }
+
+        // Takes coordinator tools away. Records are kept (status "Demoted") so
+        // plot/resource history that points at this coordinator stays intact.
+        case 'demote_coordinator': {
+            $admin = requireJsonRole('admin');
+            $coordId = $_POST['coord_id'] ?? '';
+            $category = $_POST['reason'] ?? '';
+            $details = trim((string) ($_POST['details'] ?? ''));
+            $outcome = $_POST['outcome'] ?? ''; // only for coordinator-only accounts: gardener | archive
+            if (!ctype_digit((string) $coordId)) respond(['ok' => false, 'error' => 'Invalid request.'], 422);
+            if (!in_array($category, COORDINATOR_DEMOTION_REASONS, true)) {
+                respond(['ok' => false, 'error' => 'Choose a reason for removing the coordinator role.'], 422);
+            }
+            if ($details === '' || mb_strlen($details) > 1000) {
+                respond(['ok' => false, 'error' => 'Explain the reason in 1,000 characters or fewer.'], 422);
+            }
+
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("SELECT CoordID, GardenerID, Name, Email, PasswordHash, Location, Shift, COALESCE(NULLIF(Status, ''), 'Active') AS Status FROM GARDEN_COORDINATOR WHERE CoordID = ? FOR UPDATE");
+            $stmt->execute([(int) $coordId]);
+            $coordinator = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$coordinator || !in_array($coordinator['Status'], ['Active', 'Disabled'], true)) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'This person no longer has an active coordinator role.'], 409);
+            }
+            // Administrators can't take a role away from themselves.
+            $selfCheck = $pdo->prepare('SELECT Email FROM SYSTEM_ADMINISTRATOR WHERE AdminID = ?');
+            $selfCheck->execute([(int) $admin['id']]);
+            if (strcasecmp((string) $selfCheck->fetchColumn(), $coordinator['Email']) === 0) {
+                $pdo->rollBack();
+                respond(['ok' => false, 'error' => 'You cannot remove your own coordinator role.'], 403);
+            }
+
+            $gardenerId = $coordinator['GardenerID'] === null ? null : (int) $coordinator['GardenerID'];
+            $newStatus = 'Demoted';
+            $outcomeText = 'They keep their gardener account and lose coordinator tools.';
+            if ($gardenerId === null) {
+                if (!in_array($outcome, ['gardener', 'archive'], true)) {
+                    $pdo->rollBack();
+                    respond(['ok' => false, 'error' => 'Choose whether to convert this account to a gardener account or archive it.'], 422);
+                }
+                if ($outcome === 'gardener') {
+                    // Reuse a gardener account with the same email if one exists, otherwise create one.
+                    $existing = $pdo->prepare('SELECT GardenerID FROM COMMUNITY_GARDENER WHERE Email = ?');
+                    $existing->execute([$coordinator['Email']]);
+                    $gardenerId = $existing->fetchColumn();
+                    if ($gardenerId === false) {
+                        $pdo->prepare("INSERT INTO COMMUNITY_GARDENER (Name, Email, PasswordHash, Location, Status) VALUES (?, ?, ?, ?, 'Active')")
+                            ->execute([$coordinator['Name'], $coordinator['Email'], $coordinator['PasswordHash'], $coordinator['Location']]);
+                        $gardenerId = (int) $pdo->lastInsertId();
+                    }
+                    $gardenerId = (int) $gardenerId;
+                    $pdo->prepare('UPDATE GARDEN_COORDINATOR SET GardenerID = ? WHERE CoordID = ?')->execute([$gardenerId, (int) $coordId]);
+                    $outcomeText = 'Their account was converted to a gardener account; they log in with the same email and password.';
+                } else {
+                    $newStatus = 'Archived';
+                    $outcomeText = 'Their account was archived and can no longer log in.';
+                }
+            }
+            $pdo->prepare('UPDATE GARDEN_COORDINATOR SET Status = ? WHERE CoordID = ?')->execute([$newStatus, (int) $coordId]);
+
+            [$historyType, $historyId] = $gardenerId !== null ? ['gardener', $gardenerId] : ['coordinator', (int) $coordId];
+            $pdo->prepare("
+                INSERT INTO ROLE_HISTORY (AccountType, AccountID, AccountName, RoleID, RoleName, ChangeType, ReasonCategory, ReasonDetails, ChangedBy, ChangedByName)
+                SELECT ?, ?, ?, RoleID, Name, 'demoted', ?, ?, ?, ? FROM ROLE WHERE Code = 'coordinator'
+            ")->execute([$historyType, $historyId, $coordinator['Name'], $category, $details, (int) $admin['id'], $admin['name']]);
+
+            logAudit($pdo, 'roles', 'coordinator_demoted', "{$admin['name']} removed " . possessive($coordinator['Name']) . " coordinator role. $outcomeText", [
+                'actor' => auditActor($admin),
+                'target' => [$historyType, $historyId, $coordinator['Name']],
+                'reason' => "$category: $details",
+                'before' => ['Roles' => $coordinator['GardenerID'] !== null ? ['Gardener', 'Coordinator'] : ['Coordinator'], 'Coordinator status' => $coordinator['Status']],
+                'after' => ['Roles' => $gardenerId !== null ? ['Gardener'] : [], 'Coordinator status' => $newStatus],
+            ]);
+            $pdo->commit();
+            respond(['ok' => true, 'outcome' => $outcomeText]);
         }
 
         case 'pending_coordinator_applications': {
@@ -2744,17 +2966,27 @@ try {
                         $pdo->rollBack();
                         respond(['ok' => false, 'error' => 'Coordinator access cannot be granted to an inactive gardener account.'], 409);
                     }
-                    $pdo->prepare("
-                        INSERT INTO GARDEN_COORDINATOR (GardenerID, Name, Email, PasswordHash, Shift, Location)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ")->execute([
-                        (int) $application['GardenerID'],
-                        $application['Name'],
-                        $application['Email'],
-                        $application['PasswordHash'],
-                        $application['Shift'],
-                        $application['Location'],
-                    ]);
+                    // A former coordinator (role removed earlier) already has a record:
+                    // reactivate it rather than creating a second one.
+                    $previousRecord = $pdo->prepare('SELECT CoordID FROM GARDEN_COORDINATOR WHERE GardenerID = ? FOR UPDATE');
+                    $previousRecord->execute([(int) $application['GardenerID']]);
+                    $previousCoordId = $previousRecord->fetchColumn();
+                    if ($previousCoordId !== false) {
+                        $pdo->prepare("UPDATE GARDEN_COORDINATOR SET Status = 'Active', Shift = ?, FailedLoginAttempts = 0 WHERE CoordID = ?")
+                            ->execute([$application['Shift'], (int) $previousCoordId]);
+                    } else {
+                        $pdo->prepare("
+                            INSERT INTO GARDEN_COORDINATOR (GardenerID, Name, Email, PasswordHash, Shift, Location)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ")->execute([
+                            (int) $application['GardenerID'],
+                            $application['Name'],
+                            $application['Email'],
+                            $application['PasswordHash'],
+                            $application['Shift'],
+                            $application['Location'],
+                        ]);
+                    }
                 }
                 $pdo->prepare("
                     UPDATE COORDINATOR_APPLICATION
@@ -2766,6 +2998,24 @@ try {
                     $admin['id'],
                     (int) $applicationId,
                 ]);
+                $applicantId = (int) $application['GardenerID'];
+                if ($decision === 'approve') {
+                    $pdo->prepare("
+                        INSERT INTO ROLE_HISTORY (AccountType, AccountID, AccountName, RoleID, RoleName, ChangeType, ChangedBy, ChangedByName)
+                        SELECT 'gardener', ?, ?, RoleID, Name, 'granted', ?, ? FROM ROLE WHERE Code = 'coordinator'
+                    ")->execute([$applicantId, $application['Name'], (int) $admin['id'], $admin['name']]);
+                    logAudit($pdo, 'roles', 'coordinator_application_approved', "{$admin['name']} approved " . possessive($application['Name']) . " coordinator application. They now have coordinator tools for the {$application['Shift']} shift.", [
+                        'actor' => auditActor($admin),
+                        'target' => ['gardener', $applicantId, $application['Name']],
+                        'before' => ['Roles' => ['Gardener']], 'after' => ['Roles' => ['Gardener', 'Coordinator'], 'Shift' => $application['Shift']],
+                    ]);
+                } else {
+                    logAudit($pdo, 'roles', 'coordinator_application_rejected', "{$admin['name']} rejected " . possessive($application['Name']) . ' coordinator application.', [
+                        'actor' => auditActor($admin),
+                        'target' => ['gardener', $applicantId, $application['Name']],
+                        'reason' => $reason,
+                    ]);
+                }
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -2789,6 +3039,7 @@ try {
                 respond(['ok' => false, 'error' => 'Please provide a rejection reason of no more than 1,000 characters.'], 422);
             }
 
+            $newGardenerId = null;
             $pdo->beginTransaction();
             try {
                 $stmt = $pdo->prepare("SELECT * FROM SIGNUP_REQUEST WHERE RequestID = ? FOR UPDATE");
@@ -2812,6 +3063,22 @@ try {
                     $name = trim($row['FirstName'] . ' ' . $row['LastName']);
                     $pdo->prepare("INSERT INTO COMMUNITY_GARDENER (Name, Email, PasswordHash, Age, Location) VALUES (?, ?, ?, ?, ?)")
                         ->execute([$name, $row['Email'], $row['PasswordHash'], $row['Age'], $row['Location']]);
+                    $newGardenerId = (int) $pdo->lastInsertId();
+                }
+                $applicantName = trim($row['FirstName'] . ' ' . $row['LastName']);
+                if ($decision === 'approve') {
+                    logAudit($pdo, 'accounts', 'registration_approved', "{$user['name']} approved " . possessive($applicantName) . ' registration. Their gardener account is now active.', [
+                        'actor' => auditActor($user),
+                        'target' => ['gardener', $newGardenerId, $applicantName],
+                        'before' => ['Status' => 'Pending'], 'after' => ['Status' => 'Approved'],
+                    ]);
+                } else {
+                    logAudit($pdo, 'accounts', 'registration_rejected', "{$user['name']} rejected " . possessive($applicantName) . ' registration.', [
+                        'actor' => auditActor($user),
+                        'target' => ['registration', (int) $requestId, $applicantName],
+                        'reason' => $reason,
+                        'before' => ['Status' => 'Pending'], 'after' => ['Status' => 'Rejected'],
+                    ]);
                 }
                 $pdo->prepare("UPDATE SIGNUP_REQUEST SET Status = ?, RejectionReason = ?, ReviewedAt = NOW(), ReviewedBy = ? WHERE RequestID = ?")
                     ->execute([
@@ -2833,7 +3100,7 @@ try {
         }
 
         case 'create_admin': {
-            requireJsonRole('admin');
+            $user = requireJsonRole('admin');
             $firstName = trim($_POST['first_name'] ?? '');
             $lastName = trim($_POST['last_name'] ?? '');
             $name = trim($firstName . ' ' . $lastName);
@@ -2866,6 +3133,10 @@ try {
                         (int)$age,
                         htmlspecialchars($location, ENT_QUOTES, 'UTF-8')
                     ]);
+                logAudit($pdo, 'accounts', 'admin_created', "{$user['name']} created an administrator account for $name ($email).", [
+                    'actor' => auditActor($user),
+                    'target' => ['admin', (int) $pdo->lastInsertId(), $name],
+                ]);
                 respond(['ok' => true]);
             } catch (PDOException $e) {
                 if ((int)($e->errorInfo[1] ?? 0) === 1062) {
@@ -2893,12 +3164,22 @@ try {
             if ($table === 'admin' && $idNum === $user['id']) {
                 respond(['ok' => false, 'error' => 'You cannot archive your own account.'], 403);
             }
+            // HarvestHub must always keep at least one administrator who can log in.
+            if ($table === 'admin') {
+                $otherAdmins = $pdo->prepare("SELECT COUNT(*) FROM SYSTEM_ADMINISTRATOR WHERE AdminID <> ? AND COALESCE(NULLIF(Status, ''), 'Active') = 'Active'");
+                $otherAdmins->execute([$idNum]);
+                if ((int) $otherAdmins->fetchColumn() === 0) {
+                    respond(['ok' => false, 'error' => 'This is the last active administrator. Add another administrator before archiving this one.'], 409);
+                }
+            }
 
             [$tbl, $col] = $map[$table];
             $pdo->beginTransaction();
             try {
                 $gardenerName = null;
                 $assignedPlots = [];
+                $reason = null;
+                $details = null;
                 if ($table === 'gardener') {
                     $reason = trim($_POST['reason'] ?? '');
                     $details = trim($_POST['details'] ?? '');
@@ -2941,7 +3222,18 @@ try {
                     $assignedPlots = $plotsStmt->fetchAll(PDO::FETCH_ASSOC);
                 }
 
+                $accountStmt = $pdo->prepare("SELECT Name, COALESCE(NULLIF(Status, ''), 'Active') AS Status FROM $tbl WHERE $col = ?");
+                $accountStmt->execute([$idNum]);
+                $archivedAccount = $accountStmt->fetch(PDO::FETCH_ASSOC) ?: ['Name' => "Account #$idNum", 'Status' => null];
                 $pdo->prepare("UPDATE $tbl SET Status = 'Archived' WHERE $col = ?")->execute([$idNum]);
+                $roleLabel = ['gardener' => 'gardener', 'coordinator' => 'coordinator', 'admin' => 'administrator'][$table];
+                logAudit($pdo, 'accounts', 'account_archived', "{$user['name']} archived " . possessive($archivedAccount['Name']) . " $roleLabel account"
+                    . ($assignedPlots ? ' and released ' . implode(', ', array_column($assignedPlots, 'Label')) : '') . '.', [
+                    'actor' => auditActor($user),
+                    'target' => [$table, $idNum, $archivedAccount['Name']],
+                    'reason' => $table === 'gardener' ? "$reason: $details" : null,
+                    'before' => ['Status' => $archivedAccount['Status']], 'after' => ['Status' => 'Archived'],
+                ]);
                 if ($table === 'gardener') {
                     $pdo->prepare("UPDATE PLOT SET GardenerID = NULL, Status = 'Available' WHERE GardenerID = ?")->execute([$idNum]);
                     foreach ($assignedPlots as $plot) {
@@ -2973,9 +3265,10 @@ try {
             $gardenerId = (int) $id;
             $pdo->beginTransaction();
             try {
-                $gardenerStmt = $pdo->prepare("SELECT 1 FROM COMMUNITY_GARDENER WHERE GardenerID = ? AND Status <> 'Archived' FOR UPDATE");
+                $gardenerStmt = $pdo->prepare("SELECT Name FROM COMMUNITY_GARDENER WHERE GardenerID = ? AND Status <> 'Archived' FOR UPDATE");
                 $gardenerStmt->execute([$gardenerId]);
-                if (!$gardenerStmt->fetchColumn()) {
+                $noticeGardenerName = $gardenerStmt->fetchColumn();
+                if ($noticeGardenerName === false) {
                     $pdo->rollBack();
                     respond(['ok' => false, 'error' => 'Gardener not found or already archived.'], 404);
                 }
@@ -2984,6 +3277,11 @@ try {
                     INSERT INTO ACCOUNT_ARCHIVE_NOTICE (GardenerID, AdminID, Reason, Details)
                     VALUES (?, ?, ?, ?)
                 ")->execute([$gardenerId, (int) $user['id'], $reason, $details]);
+                logAudit($pdo, 'accounts', 'archive_notice_sent', "{$user['name']} warned $noticeGardenerName that their account will be archived unless the issue is resolved.", [
+                    'actor' => auditActor($user),
+                    'target' => ['gardener', $gardenerId, $noticeGardenerName],
+                    'reason' => "$reason: $details",
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -2994,7 +3292,7 @@ try {
         }
 
         case 'enable_account': {
-            requireJsonRole('admin');
+            $user = requireJsonRole('admin');
             $table = $_POST['table'] ?? '';
             $id = $_POST['id'] ?? '';
             $map = [
@@ -3007,6 +3305,14 @@ try {
             $stmt = $pdo->prepare("UPDATE $tbl SET Status = 'Active', FailedLoginAttempts = 0 WHERE $col = ? AND Status = 'Disabled'");
             $stmt->execute([(int)$id]);
             if ($stmt->rowCount() === 0) respond(['ok' => false, 'error' => 'This account is not locked.'], 409);
+            $enabledName = $pdo->prepare("SELECT Name FROM $tbl WHERE $col = ?");
+            $enabledName->execute([(int) $id]);
+            $enabledName = $enabledName->fetchColumn() ?: "Account #$id";
+            logAudit($pdo, 'accounts', 'account_enabled', "{$user['name']} unlocked " . possessive($enabledName) . ' account and reset its failed login attempts.', [
+                'actor' => auditActor($user),
+                'target' => [$table, (int) $id, $enabledName],
+                'before' => ['Status' => 'Disabled'], 'after' => ['Status' => 'Active'],
+            ]);
             respond(['ok' => true]);
         }
 
@@ -3091,7 +3397,7 @@ try {
         }
 
         case 'unarchive_account': {
-            requireJsonRole('admin');
+            $user = requireJsonRole('admin');
             $role = $_POST['role'] ?? '';
             $id = (int)($_POST['id'] ?? 0);
             
@@ -3111,8 +3417,89 @@ try {
             if ($tbl === 'COMMUNITY_GARDENER') {
                 $pdo->prepare('DELETE FROM ACCOUNT_ARCHIVE_NOTICE WHERE GardenerID = ?')->execute([$id]);
             }
+            $restoredName = $pdo->prepare("SELECT Name FROM $tbl WHERE $col = ?");
+            $restoredName->execute([$id]);
+            $restoredName = $restoredName->fetchColumn() ?: "Account #$id";
+            [$restoredType, $restoredLabel] = ['Customer' => ['gardener', 'gardener'], 'Staff' => ['coordinator', 'coordinator'], 'Admin' => ['admin', 'administrator']][$role];
+            logAudit($pdo, 'accounts', 'account_unarchived', "{$user['name']} restored " . possessive($restoredName) . " $restoredLabel account. They can log in again.", [
+                'actor' => auditActor($user),
+                'target' => [$restoredType, $id, $restoredName],
+                'before' => ['Status' => 'Archived'], 'after' => ['Status' => 'Active'],
+            ]);
             $pdo->commit();
             respond(['ok' => true]);
+        }
+
+        // ---------------- ADMIN: Audit log ----------------
+
+        // Filtered, paged list of audit entries (newest first).
+        case 'audit_log': {
+            requireJsonRole('admin');
+            [$where, $params] = auditLogFilters($_GET);
+            $perPage = 50;
+            $page = max(1, (int) ($_GET['page'] ?? 1));
+
+            $count = $pdo->prepare("SELECT COUNT(*) FROM AUDIT_LOG $where");
+            $count->execute($params);
+            $total = (int) $count->fetchColumn();
+
+            $offset = ($page - 1) * $perPage;
+            $rows = $pdo->prepare("
+                SELECT LogID, OccurredAt, ActorType, ActorName, Module, Action, TargetType, TargetName,
+                       Summary, Reason, BeforeData, AfterData, IpAddress
+                FROM AUDIT_LOG $where
+                ORDER BY OccurredAt DESC, LogID DESC
+                LIMIT $perPage OFFSET $offset
+            ");
+            $rows->execute($params);
+
+            // Action types that exist, so the filter only offers real choices.
+            $actions = $pdo->query('SELECT DISTINCT Module, Action FROM AUDIT_LOG ORDER BY Module, Action')->fetchAll(PDO::FETCH_ASSOC);
+
+            respond([
+                'ok' => true,
+                'entries' => $rows->fetchAll(PDO::FETCH_ASSOC),
+                'total' => $total,
+                'page' => $page,
+                'per_page' => $perPage,
+                'actions' => $actions,
+            ]);
+        }
+
+        // Same filters as audit_log, downloaded as a CSV file.
+        case 'audit_log_export': {
+            $user = requireJsonRole('admin');
+            [$where, $params] = auditLogFilters($_GET);
+            $rows = $pdo->prepare("
+                SELECT OccurredAt, ActorName, ActorType, Module, Action, TargetName, Summary, Reason, IpAddress
+                FROM AUDIT_LOG $where
+                ORDER BY OccurredAt DESC, LogID DESC
+                LIMIT 10000
+            ");
+            $rows->execute($params);
+            $entries = $rows->fetchAll(PDO::FETCH_ASSOC);
+
+            logAudit($pdo, 'admin', 'audit_exported', "{$user['name']} downloaded the audit log (" . count($entries) . ' entries).', [
+                'actor' => auditActor($user),
+                'after' => array_filter([
+                    'search' => $_GET['q'] ?? '', 'area' => $_GET['module'] ?? '', 'who' => $_GET['actor_type'] ?? '',
+                    'action' => $_GET['action_type'] ?? '', 'from' => $_GET['from'] ?? '', 'to' => $_GET['to'] ?? '',
+                ]),
+            ]);
+
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="harvesthub-audit-log-' . date('Y-m-d') . '.csv"');
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // lets Excel read names with accents correctly
+            fputcsv($out, ['Date and time', 'Who', 'Role', 'Area', 'Action', 'About', 'What happened', 'Reason', 'IP address']);
+            foreach ($entries as $e) {
+                fputcsv($out, array_map('csvSafe', [
+                    $e['OccurredAt'], $e['ActorName'] ?? '', $e['ActorType'] ?? '', $e['Module'], $e['Action'],
+                    $e['TargetName'] ?? '', $e['Summary'], $e['Reason'] ?? '', $e['IpAddress'] ?? '',
+                ]));
+            }
+            fclose($out);
+            exit;
         }
 
         case 'dashboard_charts': {

@@ -54,6 +54,9 @@ $isManageActive = in_array($currentPage, $managePages);
     <a href="admin_archived_accounts.php" class="sidebar-link <?= $currentPage === 'admin_archived_accounts.php' ? 'active' : '' ?>">
       Archived Accounts
     </a>
+    <a href="admin_audit_log.php" class="sidebar-link <?= $currentPage === 'admin_audit_log.php' ? 'active' : '' ?>">
+      Audit Log
+    </a>
   </nav>
 
   <div class="sidebar-footer" id="adminSidebarLogout">

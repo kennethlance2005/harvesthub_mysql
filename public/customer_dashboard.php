@@ -13,7 +13,7 @@ $firstName = explode(' ', trim($user['name']))[0];
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=38">
+<link rel="stylesheet" href="assets/style.css?v=44">
 </head>
 <body class="account-page">
 
@@ -173,6 +173,6 @@ $firstName = explode(' ', trim($user['name']))[0];
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 <script src="assets/app.js"></script>
-<script src="assets/customer.js?v=16"></script>
+<script src="assets/customer.js?v=20"></script>
 </body>
 </html>

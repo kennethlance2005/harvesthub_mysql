@@ -418,6 +418,19 @@ async function loadCoordinatorApplication() {
     } else if (data.application?.Status === 'Pending') {
       status.innerHTML = '<p>Your coordinator application is awaiting administrator review.</p>';
       form.hidden = true;
+    } else if (data.demotion) {
+      // An administrator removed their coordinator role: say why, and when they may re-apply.
+      const d = data.demotion;
+      status.innerHTML = `
+        <div class="review-alert review-alert-warn dash-demotion-notice">
+          <p><strong>Your coordinator role was removed on ${escapeHtml(formatShortDate(d.removed_at))}.</strong>
+          You still have your gardener account, plots, crops and borrowed items.</p>
+          <p>Reason: ${escapeHtml(d.reason)}${d.details ? ` — ${escapeHtml(d.details)}` : ''}</p>
+        </div>
+        <p>${d.can_reapply
+          ? 'You may apply to be a coordinator again below.'
+          : `You can apply to be a coordinator again from ${escapeHtml(formatShortDate(d.reapply_on))}.`}</p>`;
+      form.hidden = !d.can_reapply;
     } else {
       if (data.application?.Status === 'Rejected') {
         status.innerHTML = `<p class="form-alert dash-status-alert" style="display:block;">Your previous application was declined. Reason: ${escapeHtml(data.application.RejectionReason || 'No reason was provided.')}</p><p>You may submit a new application below.</p>`;

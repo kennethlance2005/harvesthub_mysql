@@ -122,13 +122,14 @@ async function loadAccounts() {
   if (coordsTable) {
     coordsTable.innerHTML = data.coordinators.map(c => `
       <tr data-name="${escapeHtml(c.Name)}" data-location="${escapeHtml(c.Location || '')}" data-status="${escapeHtml(c.Status)}">
-        <td data-label="Name">${escapeHtml(c.Name)}</td>
+        <td data-label="Name">${escapeHtml(c.Name)}${c.GardenerID ? ' <span class="badge badge-neutral admin-you-badge" title="This person also has a gardener account, which they keep if the coordinator role is removed.">Also a gardener</span>' : ''}</td>
         <td data-label="Email">${escapeHtml(c.Email)}</td>
         <td data-label="Shift">${escapeHtml(c.Shift)}</td>
         <td data-label="Location">${escapeHtml(c.Location || 'Not provided')}</td>
         <td data-label="Status">${accountStatusBadge(c.Status)}</td>
         <td data-label="Actions">
-          <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Archive</button>
+          <div class="account-action-buttons"><button type="button" class="btn btn-ghost btn-sm demote-coordinator-btn" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Remove role</button>
+          <button type="button" class="btn btn-ghost btn-sm delete-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}">Archive</button>
           <button type="button" class="btn btn-accent btn-sm enable-account-btn" data-table="coordinator" data-id="${c.id}" data-name="${escapeHtml(c.Name)}" ${c.Status !== 'Disabled' ? 'disabled' : ''}>Enable Account</button></div>
         </td>
       </tr>
@@ -151,6 +152,10 @@ async function loadAccounts() {
       </tr>
     `).join('') || '<tr class="admin-empty-row"><td colspan="5" class="text-muted">No administrators yet.</td></tr>';
   }
+
+  document.querySelectorAll('.demote-coordinator-btn').forEach(btn => {
+    btn.onclick = () => removeCoordinatorRole(btn.dataset.id, btn);
+  });
 
   document.querySelectorAll('.delete-btn').forEach(btn => {
     btn.onclick = () => {
@@ -184,6 +189,92 @@ async function loadAccounts() {
   });
 
   reapplyAccountFilters();
+}
+
+// ---------- Remove a coordinator role (demote) ----------
+
+async function removeCoordinatorRole(coordId, button) {
+  button.disabled = true;
+  const label = button.textContent;
+  button.textContent = 'Loading…';
+  let preview;
+  try {
+    preview = await (await fetch(`api.php?action=coordinator_demotion_preview&coord_id=${encodeURIComponent(coordId)}`)).json();
+  } catch (error) {
+    preview = { ok: false };
+  }
+  button.disabled = false;
+  button.textContent = label;
+  if (!preview.ok) {
+    showToast(preview.error || 'Could not load this coordinator.', 'danger');
+    return;
+  }
+
+  const c = preview.coordinator;
+  const name = escapeHtml(c.name);
+  const queued = preview.queue.plot_requests + preview.queue.resource_requests;
+  const warnings = [];
+  if (preview.other_active_coordinators === 0) {
+    warnings.push(`<p class="review-alert review-alert-danger">${name} is the <strong>only active coordinator</strong>. Until another coordinator is approved, nobody will be able to review plot and resource requests${queued ? ` (${queued} waiting right now)` : ''}.</p>`);
+  }
+  if (preview.open_return_requests > 0) {
+    warnings.push(`<p class="review-alert review-alert-warn">${name} asked for ${preview.open_return_requests} ${preview.open_return_requests === 1 ? 'item or plot' : 'items or plots'} to be returned. Those requests stay open so another coordinator can follow them up.</p>`);
+  }
+
+  const effect = c.has_gardener_account
+    ? `<p class="hh-dialog-message"><strong>${name} stays a gardener</strong>: their plots, crops, borrowed items and exchange listings don't change. They lose coordinator tools straight away, even if they are logged in right now.</p>`
+    : `<p class="hh-dialog-message">${name} only has a coordinator account, with no gardener account. Choose what happens to it:</p>
+       <fieldset class="demote-outcome">
+         <legend class="sr-only">What happens to the account</legend>
+         <label class="demote-choice"><input type="radio" name="outcome" value="gardener">
+           <span><strong>Convert to a gardener account</strong><small>They keep logging in with the same email and password, as a gardener.</small></span></label>
+         <label class="demote-choice"><input type="radio" name="outcome" value="archive">
+           <span><strong>Archive the account</strong><small>They can no longer log in. You can restore it later from Archived Accounts.</small></span></label>
+       </fieldset>`;
+
+  const result = await hhForm({
+    title: `Remove ${c.name}'s coordinator role?`,
+    tone: 'danger',
+    confirmText: 'Remove coordinator role',
+    bodyHtml: `
+      ${effect}
+      ${warnings.join('')}
+      <div class="field">
+        <label for="demote-reason">Reason <span class="required">*</span></label>
+        <select id="demote-reason" name="reason" aria-required="true">
+          <option value="">Choose a reason</option>
+          ${preview.reasons.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label for="demote-details">Details <span class="required">*</span></label>
+        <textarea id="demote-details" name="details" rows="3" maxlength="1000" aria-required="true" placeholder="What happened? ${name} will see this on their dashboard."></textarea>
+      </div>
+      <p class="review-muted">They can apply to be a coordinator again after ${preview.reapply_wait_days} days. This is saved in their role history and the audit log.</p>`,
+    isValid: form => form.reason.value !== ''
+      && form.details.value.trim() !== ''
+      && (c.has_gardener_account || form.querySelector('input[name="outcome"]:checked') !== null),
+    collect: form => ({
+      reason: form.reason.value,
+      details: form.details.value.trim(),
+      outcome: form.querySelector('input[name="outcome"]:checked')?.value || '',
+    }),
+  });
+  if (!result) return;
+
+  const res = await fetch('api.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'demote_coordinator', coord_id: coordId, ...result }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showToast(`${c.name} is no longer a coordinator. ${data.outcome}`, 'success');
+    loadAccounts();
+    loadStats();
+  } else {
+    showToast(data.error || 'Could not remove the coordinator role.', 'danger');
+  }
 }
 
 async function loadArchivedAccounts() {

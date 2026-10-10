@@ -147,6 +147,54 @@
     return open({ title, message, confirmText: buttonText, cancelText: null, tone: 'default', cancelValue: undefined });
   };
 
+  // A dialog with form fields. The confirm button stays off until isValid(form)
+  // returns true; resolves to collect(form), or null when cancelled.
+  //   const result = await hhForm({ title, bodyHtml, confirmText: 'Save', tone: 'danger',
+  //     isValid: form => form.reason.value !== '', collect: form => ({ reason: form.reason.value }) });
+  // bodyHtml is inserted as HTML, so callers must escape any user data in it.
+  window.hhForm = function ({ title, bodyHtml, confirmText = 'Confirm', cancelText = 'Cancel', tone = 'default', isValid = () => true, collect = () => true }) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'hh-dialog hh-dialog-wide';
+    dialog.setAttribute('aria-labelledby', 'hh-dialog-title');
+    dialog.innerHTML = `
+      <form class="hh-dialog-box" method="dialog" novalidate>
+        <h3 id="hh-dialog-title"></h3>
+        <div class="hh-dialog-body">${bodyHtml}</div>
+        <div class="hh-dialog-actions">
+          <button type="button" class="btn btn-ghost" data-hh-cancel></button>
+          <button type="submit" class="btn ${tone === 'danger' ? 'btn-danger' : 'btn-accent'}" data-hh-confirm></button>
+        </div>
+      </form>`;
+    const form = dialog.querySelector('form');
+    dialog.querySelector('#hh-dialog-title').textContent = title;
+    const cancelBtn = dialog.querySelector('[data-hh-cancel]');
+    const confirmBtn = dialog.querySelector('[data-hh-confirm]');
+    cancelBtn.textContent = cancelText;
+    confirmBtn.textContent = confirmText;
+    document.body.appendChild(dialog);
+
+    return new Promise(resolve => {
+      const finish = value => {
+        if (dialog.open) dialog.close();
+        dialog.remove();
+        resolve(value);
+      };
+      const sync = () => { confirmBtn.disabled = !isValid(form); };
+      form.addEventListener('input', sync);
+      form.addEventListener('change', sync);
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        if (isValid(form)) finish(collect(form));
+      });
+      cancelBtn.addEventListener('click', () => finish(null));
+      dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
+      dialog.addEventListener('click', event => { if (event.target === dialog) finish(null); });
+      sync();
+      dialog.showModal();
+      (form.querySelector('input, select, textarea') || cancelBtn).focus();
+    });
+  };
+
   // A wider dialog for reviewing details before a decision.
   //   const choice = await hhDetails({ title, bodyHtml, actions: [{ label: 'Reject', value: 'reject', tone: 'danger' }, { label: 'Approve', value: 'approve' }] });
   // Resolves to the clicked action's value, or null when closed.

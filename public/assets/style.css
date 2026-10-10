@@ -2711,3 +2711,86 @@ input[type="image"]:disabled,
 
 /* Forces elements with the hidden attribute to actually disappear, overriding grid/flex layouts */
 [hidden] { display: none !important; }
+
+/* ---------- Admin: Audit Log ---------- */
+.audit-filters { margin-bottom: 20px; padding: 18px 22px; }
+.audit-filter-grid { display: grid; grid-template-columns: minmax(200px, 2fr) repeat(4, minmax(140px, 1fr)); gap: 12px 14px; align-items: end; }
+.audit-filter-grid .field { margin: 0; min-width: 0; }
+.audit-filter-grid label { color: var(--ink-600); font-size: 0.8rem; }
+.audit-filter-grid input,
+.audit-filter-grid select {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--cream-100);
+  color: var(--ink-900);
+  font: inherit;
+  font-size: 0.9rem;
+}
+.audit-filter-grid input:focus,
+.audit-filter-grid select:focus { outline: none; border-color: var(--brown-600); background: var(--white); }
+.audit-filter-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
+
+.audit-results { padding: 20px 22px; }
+.audit-results-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; }
+.audit-results-head .panel-title { margin: 0; }
+.audit-results-head .text-muted { margin: 0; font-size: 0.85rem; }
+
+.audit-table th:nth-child(1) { width: 170px; }
+.audit-table th:nth-child(2) { width: 190px; }
+.audit-table th:nth-child(4) { width: 22%; }
+.audit-row { cursor: pointer; }
+.audit-row:hover td { background: var(--cream-100); }
+.audit-row:focus-visible { outline: 2px solid var(--brown-600); outline-offset: -2px; }
+.audit-when { display: block; font-size: 0.88rem; }
+.audit-ago { display: block; color: var(--ink-600); font-size: 0.76rem; }
+.audit-who { display: block; margin-bottom: 4px; font-weight: 600; overflow-wrap: anywhere; }
+.audit-action-label { display: block; margin-bottom: 2px; color: var(--ink-600); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+.audit-summary { display: block; line-height: 1.45; overflow-wrap: anywhere; }
+.audit-reason { display: -webkit-box; overflow: hidden; color: var(--ink-600); font-size: 0.86rem; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow-wrap: anywhere; }
+
+.audit-pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 16px; font-size: 0.85rem; }
+
+.audit-changes { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.audit-changes th,
+.audit-changes td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; overflow-wrap: anywhere; }
+.audit-changes th { color: var(--ink-600); font-size: 0.74rem; text-transform: uppercase; }
+
+@media (max-width: 1000px) {
+  .audit-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .audit-filter-search { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .audit-filter-grid { grid-template-columns: minmax(0, 1fr); }
+  .audit-filter-actions .btn { flex: 1 1 0; }
+}
+/* Phone cards: give the audit summary the full card width */
+@media (max-width: 767px) {
+  table.audit-table tbody > tr:not(.admin-empty-row):not(.admin-filter-empty) > td:nth-child(3) { grid-column: 1 / -1; }
+}
+
+/* ---------- Remove coordinator role dialog ---------- */
+.hh-dialog .field { margin-bottom: 14px; }
+.hh-dialog .field label { color: var(--ink-600); font-size: 0.82rem; }
+.hh-dialog .field select,
+.hh-dialog .field textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--cream-100);
+  color: var(--ink-900);
+  font: inherit;
+  font-size: 0.92rem;
+}
+.hh-dialog .field select:focus,
+.hh-dialog .field textarea:focus { outline: none; border-color: var(--brown-600); background: var(--white); }
+.demote-outcome { display: grid; gap: 8px; margin: 0 0 16px; padding: 0; border: 0; }
+.demote-choice { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
+.demote-choice:has(input:checked) { border-color: var(--brown-600); background: #fbf3ee; }
+.demote-choice input { margin-top: 3px; accent-color: var(--brown-600); }
+.demote-choice strong { display: block; font-size: 0.92rem; }
+.demote-choice small { display: block; margin-top: 2px; color: var(--ink-600); font-size: 0.82rem; line-height: 1.4; }
+.dash-demotion-notice p { margin: 0 0 6px; }
+.dash-demotion-notice p:last-child { margin-bottom: 0; }
