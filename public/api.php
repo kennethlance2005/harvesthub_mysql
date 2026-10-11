@@ -211,6 +211,18 @@ function mergeOrCreateReturnRequestRow(PDO $pdo, int $gardenerId, int $resourceI
     }
 }
 
+/**
+ * A person's name as typed, tidied: tabs and line breaks become spaces, other
+ * invisible control characters are removed, repeated spaces collapse.
+ * Returns null when the text isn't valid UTF-8 (never silently drops it).
+ * Names are stored like this and encoded only when a page shows them.
+ */
+function cleanPersonName(string $value): ?string {
+    if (!mb_check_encoding($value, 'UTF-8')) return null;
+    $value = preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/u', '', $value);
+    return trim(preg_replace('/\s+/u', ' ', $value));
+}
+
 /** A resource's name for audit summaries ("Rake"), or "a resource" if it is gone. */
 function resourceName(PDO $pdo, int $resourceId): string {
     $stmt = $pdo->prepare('SELECT Name FROM RESOURCE WHERE ResourceID = ?');
@@ -406,8 +418,9 @@ try {
                 }
             }
 
-            $firstName = trim($_POST['first_name'] ?? '');
-            $lastName = trim($_POST['last_name'] ?? '');
+            // Names are stored as typed (see cleanPersonName); null means unreadable text.
+            $firstName = cleanPersonName($_POST['first_name'] ?? '');
+            $lastName = cleanPersonName($_POST['last_name'] ?? '');
             $age = $_POST['age'] ?? '';
             $location = trim($_POST['location'] ?? '');
             $email = trim($_POST['email'] ?? '');
@@ -415,12 +428,16 @@ try {
             $confirmPassword = $_POST['confirm_password'] ?? '';
             $errors = [];
 
-            if ($firstName === '' || mb_strlen($firstName) > 60) {
+            if ($firstName === null) {
+                $errors[] = 'First name contains unsupported characters.';
+            } elseif ($firstName === '' || mb_strlen($firstName) > 60) {
                 $errors[] = 'First name is required.';
             } elseif (!preg_match("/^[\p{L}\p{N}\p{M}\p{P}\p{S}\s]+$/u", $firstName)) {
                 $errors[] = 'First name contains unsupported characters.';
             }
-            if ($lastName === '' || mb_strlen($lastName) > 60) {
+            if ($lastName === null) {
+                $errors[] = 'Last name contains unsupported characters.';
+            } elseif ($lastName === '' || mb_strlen($lastName) > 60) {
                 $errors[] = 'Last name is required.';
             } elseif (!preg_match("/^[\p{L}\p{N}\p{M}\p{P}\p{S}\s]+$/u", $lastName)) {
                 $errors[] = 'Last name contains unsupported characters.';
@@ -448,34 +465,31 @@ try {
                 respond(['ok' => false, 'error' => 'That email already has an account or a pending request.'], 409);
             }
 
-            $existing = $pdo->prepare('SELECT LastSentAt FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?');
+            // Times come from the database clock, like the clean-up above, so PHP and
+            // MySQL being set to different time zones can't expire codes early.
+            $existing = $pdo->prepare('SELECT LastSentAt > NOW() - INTERVAL 1 MINUTE FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?');
             $existing->execute([$email]);
-            $lastSentAt = $existing->fetchColumn();
-            if ($lastSentAt && strtotime($lastSentAt) > time() - 60) {
+            if ((int) $existing->fetchColumn() === 1) {
                 respond(['ok' => false, 'error' => 'Please wait one minute before requesting another code.'], 429);
             }
             $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
             $codeHash = password_hash($code, PASSWORD_DEFAULT);
-            $sentAt = date('Y-m-d H:i:s');
-            $expiresAt = date('Y-m-d H:i:s', time() + 600);
             $pdo->prepare("
                 INSERT INTO SIGNUP_EMAIL_VERIFICATION
                     (Email, FirstName, LastName, Age, Location, PasswordHash, CodeHash, ExpiresAt, Attempts, LastSentAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW() + INTERVAL 10 MINUTE, 0, NOW())
                 ON DUPLICATE KEY UPDATE FirstName = VALUES(FirstName), LastName = VALUES(LastName),
                     Age = VALUES(Age), Location = VALUES(Location), PasswordHash = VALUES(PasswordHash),
                     CodeHash = VALUES(CodeHash), ExpiresAt = VALUES(ExpiresAt), Attempts = 0,
                     LastSentAt = VALUES(LastSentAt)
             ")->execute([
                 $email,
-                htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($lastName, ENT_QUOTES, 'UTF-8'),
+                $firstName,
+                $lastName,
                 (int) $age,
-                htmlspecialchars($location, ENT_QUOTES, 'UTF-8'),
+                $location,
                 password_hash($password, PASSWORD_DEFAULT),
                 $codeHash,
-                $expiresAt,
-                $sentAt,
             ]);
 
             $escapedCode = htmlspecialchars($code, ENT_QUOTES, 'UTF-8');
@@ -501,22 +515,20 @@ try {
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 respond(['ok' => false, 'error' => 'Enter a valid email address.'], 422);
             }
-            $stmt = $pdo->prepare('SELECT FirstName, LastName, Age, Location, PasswordHash, LastSentAt FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?');
+            $stmt = $pdo->prepare('SELECT LastSentAt > NOW() - INTERVAL 1 MINUTE AS TooSoon FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?');
             $stmt->execute([$email]);
             $pending = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$pending) respond(['ok' => false, 'error' => 'Start registration again to request a new code.'], 404);
-            if (strtotime($pending['LastSentAt']) > time() - 60) {
+            if ((int) $pending['TooSoon'] === 1) {
                 respond(['ok' => false, 'error' => 'Please wait one minute before requesting another code.'], 429);
             }
             $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
             $codeHash = password_hash($code, PASSWORD_DEFAULT);
-            $sentAt = date('Y-m-d H:i:s');
-            $expiresAt = date('Y-m-d H:i:s', time() + 600);
             $pdo->prepare("
                 UPDATE SIGNUP_EMAIL_VERIFICATION
-                SET CodeHash = ?, ExpiresAt = ?, Attempts = 0, LastSentAt = ?
+                SET CodeHash = ?, ExpiresAt = NOW() + INTERVAL 10 MINUTE, Attempts = 0, LastSentAt = NOW()
                 WHERE Email = ?
-            ")->execute([$codeHash, $expiresAt, $sentAt, $email]);
+            ")->execute([$codeHash, $email]);
 
             $escapedCode = htmlspecialchars($code, ENT_QUOTES, 'UTF-8');
             $emailSent = sendHarvestHubEmail(
@@ -545,14 +557,14 @@ try {
 
             $pdo->beginTransaction();
             try {
-                $stmt = $pdo->prepare('SELECT * FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ? FOR UPDATE');
+                $stmt = $pdo->prepare('SELECT *, ExpiresAt <= NOW() AS IsExpired FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ? FOR UPDATE');
                 $stmt->execute([$email]);
                 $pending = $stmt->fetch(PDO::FETCH_ASSOC);
                 if (!$pending) {
                     $pdo->rollBack();
                     respond(['ok' => false, 'error' => 'The verification code is invalid or expired. Request a new code.'], 422);
                 }
-                if (strtotime($pending['ExpiresAt']) <= time()) {
+                if ((int) $pending['IsExpired'] === 1) {
                     $pdo->prepare('DELETE FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ?')->execute([$email]);
                     $pdo->commit();
                     respond(['ok' => false, 'error' => 'The verification code expired. Start registration again to request a new code.'], 410);
@@ -3420,20 +3432,23 @@ try {
 
         case 'create_admin': {
             $user = requireJsonPermission('accounts.create_admin');
-            $firstName = trim($_POST['first_name'] ?? '');
-            $lastName = trim($_POST['last_name'] ?? '');
+            $firstName = cleanPersonName($_POST['first_name'] ?? '');
+            $lastName = cleanPersonName($_POST['last_name'] ?? '');
+            if ($firstName === null || $lastName === null) {
+                respond(['ok' => false, 'error' => 'The name contains characters HarvestHub cannot read. Please retype it.'], 422);
+            }
             $name = trim($firstName . ' ' . $lastName);
             $email = trim($_POST['email'] ?? '');
             $age = $_POST['age'] ?? '';
             $location = trim($_POST['location'] ?? '');
             $password = $_POST['password'] ?? '';
 
-            if (trim($name) === '' || $email === '' || trim((string)$age) === '' || $location === '' || $password === '') {
+            if ($firstName === '' || $lastName === '' || $email === '' || trim((string)$age) === '' || $location === '' || $password === '') {
                 respond(['ok' => false, 'error' => 'Please fill in all required fields.'], 422);
             }
 
             $errors = [];
-            if (empty($name)) $errors[] = 'Name is required.';
+            if (mb_strlen($name) > 120) $errors[] = 'The name is too long.';
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Valid email required.';
             if (!ctype_digit((string)$age) || (int)$age < 18 || (int)$age > 122) $errors[] = 'Age must be between 18 and 122.';
             if (!in_array($location, NCR_CITIES, true)) $errors[] = 'Please select a valid NCR city.';
@@ -3446,11 +3461,11 @@ try {
             try {
                 $pdo->prepare("INSERT INTO SYSTEM_ADMINISTRATOR (Name, Email, PasswordHash, Age, Location, Status) VALUES (?, ?, ?, ?, ?, 'Active')")
                     ->execute([
-                        htmlspecialchars($name, ENT_QUOTES, 'UTF-8'), 
-                        $email, 
+                        $name, // stored as typed; pages encode names when showing them
+                        $email,
                         password_hash($password, PASSWORD_BCRYPT),
                         (int)$age,
-                        htmlspecialchars($location, ENT_QUOTES, 'UTF-8')
+                        $location,
                     ]);
                 logAudit($pdo, 'accounts', 'admin_created', "{$user['name']} created an administrator account for $name ($email).", [
                     'actor' => auditActor($user),

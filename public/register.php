@@ -140,6 +140,6 @@ if ($user = currentUser()) {
 </div>
 
 <script src="assets/password-toggle.js?v=1"></script>
-<script src="assets/register.js?v=8"></script>
+<script src="assets/register.js?v=9"></script>
 </body>
 </html>
