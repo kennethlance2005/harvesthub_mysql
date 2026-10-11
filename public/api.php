@@ -48,6 +48,7 @@ require_once __DIR__ . '/audit.php';
 require_once __DIR__ . '/roles.php';
 require_once __DIR__ . '/activity.php';
 require_once __DIR__ . '/dashboard_data.php';
+require_once __DIR__ . '/reports.php';
 require_once __DIR__ . '/email.php';
 
 function sendResetEmail(string $toEmail, string $resetLink): bool {
@@ -4178,6 +4179,45 @@ try {
             requireJsonPermission('overview.view');
             requirePermissionFor('plots.view');
             respond(['ok' => true] + overviewPlotHistory($pdo, (int) ($_GET['plot_id'] ?? 0)));
+        }
+
+        // ---------- Reports (section 7) ----------
+
+        // One report for the Reports page.
+        case 'report': {
+            requireJsonPermission('reports.view');
+            $key = (string) ($_GET['report'] ?? '');
+            if (!isset(REPORTS[$key])) respond(['ok' => false, 'error' => 'Unknown report.'], 422);
+            requirePermissionFor(REPORTS[$key][2]);
+            $range = dashboardRange($pdo, $_GET['from'] ?? null, $_GET['to'] ?? null);
+            $report = reportBuild($pdo, $key, $range, ['person' => $_GET['person'] ?? '', 'module' => $_GET['module'] ?? '']);
+            if ($key === 'user_activity') {
+                $report['people'] = array_map(static fn ($p) => ['key' => $p['key'], 'name' => $p['name']], activityPeople($pdo));
+            }
+            respond(['ok' => true, 'report' => $report]);
+        }
+
+        // The same report downloaded as a CSV file (recorded in the audit log).
+        case 'report_export': {
+            $user = requireJsonPermission('reports.view');
+            requirePermissionFor('reports.export');
+            $key = (string) ($_GET['report'] ?? '');
+            if (!isset(REPORTS[$key])) respond(['ok' => false, 'error' => 'Unknown report.'], 422);
+            requirePermissionFor(REPORTS[$key][2]);
+            $range = dashboardRange($pdo, $_GET['from'] ?? null, $_GET['to'] ?? null);
+            $report = reportBuild($pdo, $key, $range, ['person' => $_GET['person'] ?? '', 'module' => $_GET['module'] ?? '']);
+            logAudit($pdo, 'admin', 'report_exported', "{$user['name']} downloaded the {$report['title']} report for {$report['period']} (CSV).", [
+                'actor' => auditActor($user), 'after' => ['Report' => $report['title'], 'Period' => $report['period'], 'Format' => 'CSV'],
+            ]);
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="harvesthub-' . str_replace('_', '-', $key) . '-' . $range['from'] . '-to-' . $range['to'] . '.csv"');
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // lets Excel read accented names correctly
+            foreach (reportCsvLines($report) as $line) {
+                fputcsv($out, array_map('csvSafe', $line));
+            }
+            fclose($out);
+            exit;
         }
 
         // Everything on the admin dashboard for one date range (section 1).

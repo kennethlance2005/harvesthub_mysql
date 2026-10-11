@@ -5,7 +5,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 // Links grouped into dropdowns. Each link only shows when the person's roles
 // allow them to open that page (see PAGE_PERMISSIONS in auth.php).
 $gardenPages = ['admin_overview.php' => 'Overview', 'staff_plots.php' => 'Plots', 'staff_inventory.php' => 'Resource Inventory', 'staff_records.php' => 'Records'];
-$managePages = ['admin_manage_gardeners.php' => 'Gardeners', 'admin_manage_coordinators.php' => 'Coordinators', 'admin_manage_admins.php' => 'Administrators', 'admin_activity.php' => 'User Activity'];
+$managePages = ['admin_manage_gardeners.php' => 'Gardeners', 'admin_manage_coordinators.php' => 'Coordinators', 'admin_manage_admins.php' => 'Administrators', 'admin_activity.php' => 'User Activity', 'admin_archived_accounts.php' => 'Archived Accounts'];
 $visible = static fn (array $pages) => array_filter($pages, 'canOpen', ARRAY_FILTER_USE_KEY);
 $gardenLinks = $visible($gardenPages);
 $manageLinks = $visible($managePages);
@@ -42,9 +42,9 @@ $sidebarDropdown = static function (string $id, string $label, array $links) use
 
   <nav class="sidebar-nav" id="adminSidebarNav" aria-label="Administrator navigation">
     <?= $sidebarLink('admin_dashboard.php', 'Dashboard') ?>
+    <?= $sidebarLink('admin_reports.php', 'Reports') ?>
     <?= $sidebarDropdown('garden', 'Garden', $gardenLinks) ?>
     <?= $sidebarDropdown('manageAccounts', 'Manage Accounts', $manageLinks) ?>
-    <?= $sidebarLink('admin_archived_accounts.php', 'Archived Accounts') ?>
     <?= $sidebarLink('admin_roles.php', 'Roles') ?>
     <?= $sidebarLink('admin_audit_log.php', 'Audit Log') ?>
     <?php if (!hasRole('admin') && hasRole('customer')): ?>

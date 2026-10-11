@@ -210,8 +210,11 @@ function userProfile(PDO $pdo, array $person): array {
     ];
 }
 
-/** Newest-first list of what a person did or what happened to them (max 200 items). */
-function userTimeline(PDO $pdo, array $person): array {
+/**
+ * Newest-first list of what a person did or what happened to them (max $limit items),
+ * optionally only from $from (inclusive) up to $toExclusive (Y-m-d).
+ */
+function userTimeline(PDO $pdo, array $person, ?string $from = null, ?string $toExclusive = null, int $limit = 200): array {
     $parts = [];
     $params = [];
 
@@ -241,7 +244,12 @@ function userTimeline(PDO $pdo, array $person): array {
                 FROM CROP_LOG L WHERE L.GardenerID = ?";
     $params[] = $g;
 
-    $stmt = $pdo->prepare('SELECT * FROM (' . implode("\nUNION ALL\n", $parts) . ') T ORDER BY OccurredAt DESC LIMIT 200');
+    $where = '';
+    if ($from !== null && $toExclusive !== null) {
+        $where = ' WHERE T.OccurredAt >= ? AND T.OccurredAt < ?';
+        array_push($params, $from, $toExclusive);
+    }
+    $stmt = $pdo->prepare('SELECT * FROM (' . implode("\nUNION ALL\n", $parts) . ") T$where ORDER BY OccurredAt DESC LIMIT " . max(1, $limit));
     $stmt->execute($params);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
