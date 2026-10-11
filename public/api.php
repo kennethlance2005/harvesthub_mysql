@@ -416,12 +416,12 @@ try {
 
             if ($firstName === '' || mb_strlen($firstName) > 60) {
                 $errors[] = 'First name is required.';
-            } elseif (!preg_match("/^[\p{L}\p{M}\s'’.-]+$/u", $firstName)) {
+            } elseif (!preg_match("/^[\p{L}\p{N}\p{M}\p{P}\p{S}\s]+$/u", $firstName)) {
                 $errors[] = 'First name contains unsupported characters.';
             }
             if ($lastName === '' || mb_strlen($lastName) > 60) {
                 $errors[] = 'Last name is required.';
-            } elseif (!preg_match("/^[\p{L}\p{M}\s'’.-]+$/u", $lastName)) {
+            } elseif (!preg_match("/^[\p{L}\p{N}\p{M}\p{P}\p{S}\s]+$/u", $lastName)) {
                 $errors[] = 'Last name contains unsupported characters.';
             }
             if (!ctype_digit((string) $age) || (int) $age < 18 || (int) $age > 122) {

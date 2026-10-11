@@ -46,11 +46,11 @@ if ($user = currentUser()) {
       <div class="field-row">
         <div class="field">
           <label for="first-name">First Name <span class="required">*</span></label>
-          <input type="text" id="first-name" name="first_name" autocomplete="given-name" pattern="^[A-Za-zÀ-ÖØ-öø-ÿ\s'’.-]+$" title="Letters and common name punctuation" required maxlength="25">
+          <input type="text" id="first-name" name="first_name" autocomplete="given-name" pattern=".*" title="Use letters, numbers, or symbols as needed" required maxlength="25">
         </div>
         <div class="field">
           <label for="last-name">Last Name <span class="required">*</span></label>
-          <input type="text" id="last-name" name="last_name" autocomplete="family-name" pattern="^[A-Za-zÀ-ÖØ-öø-ÿ\s'’.-]+$" title="Letters and common name punctuation" required maxlength="25">
+          <input type="text" id="last-name" name="last_name" autocomplete="family-name" pattern=".*" title="Use letters, numbers, or symbols as needed" required maxlength="25">
         </div>
       </div>
 

@@ -41,10 +41,10 @@ emailInput.addEventListener('input', updateEmailRequirement);
 emailInput.addEventListener('focus', () => emailReqs.classList.add('active'));
 emailInput.addEventListener('blur', () => emailReqs.classList.remove('active'));
 
-// Allow letters plus common name punctuation while still blocking digits and other symbols.
+// Allow all printable symbols, while stripping only control characters.
 [firstNameInput, lastNameInput].forEach((input) => {
   input.addEventListener('input', () => {
-    input.value = input.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s'’.-]/g, '');
+    input.value = input.value.replace(/[\u0000-\u001F\u007F]/g, '');
   });
 });
 
@@ -94,7 +94,7 @@ form.addEventListener('submit', async (e) => {
   const password = document.getElementById('password').value;
   const confirmPassword = document.getElementById('confirm-password').value;
 
-  const namePattern = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'’.-]+$/u;
+  const namePattern = /^[\p{L}\p{N}\p{M}\p{P}\p{S}\s]+$/u;
   if (!firstName || !namePattern.test(firstName)) {
     alertEl.textContent = 'First name contains unsupported characters.';
     alertEl.hidden = false;
