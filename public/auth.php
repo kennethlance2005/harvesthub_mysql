@@ -80,6 +80,7 @@ const PAGE_PERMISSIONS = [
     'admin_manage_admins.php' => ['accounts.view', 'accounts.create_admin'],
     'admin_archived_accounts.php' => ['accounts.view'],
     'admin_audit_log.php' => ['audit.view'],
+    'admin_audit_print.php' => ['audit.view'],
     'admin_roles.php' => ['roles.manage'],
     'admin_overview.php' => ['overview.view'],
     'admin_activity.php' => ['accounts.view'],
@@ -173,7 +174,7 @@ function showNoAccessPage(array $user): void {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — No access</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=50">
+<link rel="stylesheet" href="assets/style.css?v=52">
 </head>
 <body class="account-page no-access-page">
   <main class="panel no-access-box">
