@@ -22,7 +22,8 @@ const ACTIVE_STATUS_SQL = "COALESCE(NULLIF(Status, ''), 'Active')";
 
 /** The date of the first audit log entry (when sign-in tracking began), or null. */
 function auditTrackingSince(PDO $pdo): ?string {
-    return $pdo->query('SELECT MIN(OccurredAt) FROM AUDIT_LOG')->fetchColumn() ?: null;
+    // Entries copied in from older history (the backfill) don't count: sign-ins weren't tracked then.
+    return $pdo->query("SELECT MIN(OccurredAt) FROM AUDIT_LOG WHERE AfterData IS NULL OR AfterData NOT LIKE '%Copied from%'")->fetchColumn() ?: null;
 }
 
 /**

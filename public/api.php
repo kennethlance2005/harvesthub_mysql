@@ -47,6 +47,7 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/audit.php';
 require_once __DIR__ . '/roles.php';
 require_once __DIR__ . '/activity.php';
+require_once __DIR__ . '/dashboard_data.php';
 require_once __DIR__ . '/email.php';
 
 function sendResetEmail(string $toEmail, string $resetLink): bool {
@@ -4164,45 +4165,16 @@ try {
             respond(['ok' => true] + overviewPlotHistory($pdo, (int) ($_GET['plot_id'] ?? 0)));
         }
 
-        case 'dashboard_charts': {
+        // Everything on the admin dashboard for one date range (section 1).
+        case 'dashboard': {
             requireJsonPermission('reports.view');
-            
-            // 1. Plot Utilization
-            $plots = [
-                'Occupied' => (int) $pdo->query("SELECT COUNT(*) FROM PLOT WHERE Status = 'Occupied'")->fetchColumn(),
-                'Available' => (int) $pdo->query("SELECT COUNT(*) FROM PLOT WHERE Status = 'Available'")->fetchColumn(),
-                'Pending' => (int) $pdo->query("SELECT COUNT(*) FROM PLOT_APPLICATION WHERE Status = 'Pending'")->fetchColumn()
-            ];
-
-            // 2. Exchange Market
-            $exchange = [
-                'Active' => (int) $pdo->query("SELECT COUNT(*) FROM EXCHANGE_BOARD WHERE Status = 'Active'")->fetchColumn(),
-                'Completed' => (int) $pdo->query("SELECT COUNT(*) FROM EXCHANGE_CLAIMS WHERE Status = 'Accepted'")->fetchColumn()
-            ];
-
-            // 3. Resource Inventory (Per Item)
-            $resourcesRaw = $pdo->query("
-                SELECT R.ResourceID, R.Name, R.TotalQty,
-                       GREATEST(0, R.TotalQty - COALESCE(SUM(CASE
-                           WHEN T.Status IN ('Approved', 'Return Requested') THEN T.Qty
-                           ELSE 0
-                       END), 0)) AS AvailableQty
-                FROM RESOURCE R
-                LEFT JOIN RESOURCE_TXN T ON T.ResourceID = R.ResourceID
-                GROUP BY R.ResourceID, R.Name, R.TotalQty
-                ORDER BY R.Name
-            ")->fetchAll(PDO::FETCH_ASSOC);
-            $resources = [ 'labels' => [], 'available' => [], 'borrowed' => [] ];
-            
-            foreach ($resourcesRaw as $r) {
-                $resources['labels'][] = $r['Name'];
-                $resources['available'][] = (int)$r['AvailableQty'];
-                // Borrowed is Total minus Available
-                $resources['borrowed'][] = (int)$r['TotalQty'] - (int)$r['AvailableQty'];
-            }
-
-            respond(['ok' => true, 'plots' => $plots, 'exchange' => $exchange, 'resources' => $resources]);
+            $range = dashboardRange($pdo, $_GET['from'] ?? null, $_GET['to'] ?? null);
+            $data = dashboardData($pdo, $range);
+            // Only list things this person can act on
+            $data['attention'] = array_values(array_filter($data['attention'], static fn ($item) => can($item['permission'])));
+            respond(['ok' => true] + $data);
         }
+
 
         default:
             respond(['ok' => false, 'error' => 'Unknown action.'], 400);
