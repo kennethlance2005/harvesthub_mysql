@@ -40,6 +40,44 @@ document.addEventListener('DOMContentLoaded', () => {
     role_deleted: 'Role deleted',
     role_assigned: 'Role given',
     role_removed: 'Role taken away',
+    report_exported: 'Report exported',
+    // Plots
+    plot_added: 'Plot added',
+    plot_updated: 'Plot details changed',
+    plot_deleted: 'Plot deleted',
+    plot_requested: 'Plot requested',
+    plot_unassign_requested: 'Asked to give up a plot',
+    plot_request_approved: 'Plot given',
+    plot_request_rejected: 'Plot request declined',
+    plot_unassigned: 'Plot given up',
+    plot_return_requested: 'Asked to return a plot',
+    plot_returned: 'Plot returned',
+    plot_return_declined: 'Plot return declined',
+    // Resources
+    resource_added: 'Stock added',
+    resource_stock_changed: 'Stock total changed',
+    resource_requested: 'Resource requested',
+    resource_request_cancelled: 'Request cancelled',
+    resource_request_approved: 'Resource lent',
+    resource_request_rejected: 'Resource request declined',
+    donation_offered: 'Donation offered',
+    donation_accepted: 'Donation accepted',
+    donation_rejected: 'Donation declined',
+    resource_return_requested: 'Asked to return an item',
+    resource_returned: 'Item returned',
+    // Exchange
+    listing_posted: 'Listing posted',
+    listing_closed: 'Listing closed',
+    listing_claimed: 'Produce requested',
+    claim_accepted: 'Exchange request accepted',
+    claim_rejected: 'Exchange request declined',
+    // Crops
+    crop_logged: 'Crop planted',
+    crop_status_changed: 'Crop status changed',
+    maintenance_logged: 'Maintenance logged',
+    crop_catalog_requested: 'Crop catalog request',
+    crop_catalog_approved: 'Crop added to catalog',
+    crop_catalog_rejected: 'Crop catalog request declined',
   };
   // Who did it, in words: visitors and automatic actions have no account name.
   const actorName = e => e.ActorName
@@ -235,6 +273,11 @@ document.addEventListener('DOMContentLoaded', () => {
     params.set('action', 'audit_log_export');
     window.location.href = `api.php?${params}`;
     showToast('Preparing your download...', 'success');
+  });
+
+  // Opens a printable copy with the same filters; the print window saves it as a PDF.
+  document.getElementById('audit-pdf')?.addEventListener('click', () => {
+    window.open(`admin_audit_print.php?${filterParams()}`, '_blank', 'noopener');
   });
 
   els.prev.addEventListener('click', () => { if (page > 1) { page--; load(); } });

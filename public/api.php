@@ -210,6 +210,13 @@ function mergeOrCreateReturnRequestRow(PDO $pdo, int $gardenerId, int $resourceI
     }
 }
 
+/** A resource's name for audit summaries ("Rake"), or "a resource" if it is gone. */
+function resourceName(PDO $pdo, int $resourceId): string {
+    $stmt = $pdo->prepare('SELECT Name FROM RESOURCE WHERE ResourceID = ?');
+    $stmt->execute([$resourceId]);
+    return $stmt->fetchColumn() ?: 'a resource';
+}
+
 function recordResourceEvent(PDO $pdo, int $resourceId, string $eventType, int $qty, string $actorType, string $actorName, ?int $gardenerId = null, ?string $gardenerName = null, ?int $coordId = null, ?int $pltId = null, ?string $plotLabel = null): void {
     $stmt = $pdo->prepare("INSERT INTO RESOURCE_EVENT (ResourceID, EventType, Qty, ActorType, ActorName, GardenerID, GardenerName, CoordID, PltID, PlotLabel, OccurredAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
     $stmt->execute([$resourceId, $eventType, $qty, $actorType, $actorName, $gardenerId, $gardenerName, $coordId, $pltId, $plotLabel]);
@@ -732,6 +739,9 @@ try {
                 ");
                 $insert->execute([(int) $plot['GardenerID'], $user['coord_id'], (int) $plotId, $reason]);
                 recordPlotEvent($pdo, 'Request Unassign', 'staff', $user['name'], $plot['Label'], (int) $plotId, (int) $plot['GardenerID'], $plot['GardenerName'], $user['coord_id'], (int) $pdo->lastInsertId());
+                logAudit($pdo, 'plots', 'plot_return_requested', "{$user['name']} asked {$plot['GardenerName']} to give back {$plot['Label']}.", [
+                    'actor' => auditActor($user), 'target' => ['plot', (int) $plotId, $plot['Label']], 'reason' => $reason,
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -801,6 +811,15 @@ try {
                     ")->execute([$responseReason, (int) $appId]);
                     recordPlotEvent($pdo, 'Request Rejected', 'customer', $user['name'], $request['Label'], (int) $request['PltID'], (int) $user['id'], $user['name'], null, (int) $appId);
                 }
+                logAudit($pdo, 'plots', $decision === 'return' ? 'plot_returned' : 'plot_return_declined',
+                    $decision === 'return'
+                        ? "{$user['name']} gave back {$request['Label']} after a coordinator asked for it."
+                        : "{$user['name']} declined to give back {$request['Label']}.", [
+                    'actor' => auditActor($user), 'target' => ['plot', (int) $request['PltID'], $request['Label']],
+                    'reason' => $decision === 'decline' ? $responseReason : null,
+                    'before' => $decision === 'return' ? ['Held by' => $user['name']] : null,
+                    'after' => $decision === 'return' ? ['Held by' => 'Nobody'] : null,
+                ]);
 
                 $pdo->commit();
             } catch (Throwable $error) {
@@ -966,6 +985,9 @@ try {
             $pdo->prepare("INSERT INTO PLOT_APPLICATION (GardenerID, PltID, Status, RequestType) VALUES (?, ?, 'Pending', 'Unassign')")
                 ->execute([$user['id'], (int) $plotId]);
             recordPlotEvent($pdo, 'Request Unassign', 'customer', $user['name'], $plotRow['Label'], (int) $plotId, (int) $user['id'], $user['name'], null, (int) $pdo->lastInsertId());
+            logAudit($pdo, 'plots', 'plot_unassign_requested', "{$user['name']} asked to give up {$plotRow['Label']}.", [
+                'actor' => auditActor($user), 'target' => ['plot', (int) $plotId, $plotRow['Label']],
+            ]);
             $pdo->commit();
             respond(['ok' => true]);
         }
@@ -996,6 +1018,9 @@ try {
                     ->execute([$user['id'], (int) $pltId]);
                 $appId = (int) $pdo->lastInsertId();
                 recordPlotEvent($pdo, 'Request Assignment', 'customer', $user['name'], $row['Label'], (int) $pltId, (int) $user['id'], $user['name'], null, $appId);
+                logAudit($pdo, 'plots', 'plot_requested', "{$user['name']} asked to be given {$row['Label']}.", [
+                    'actor' => auditActor($user), 'target' => ['plot', (int) $pltId, $row['Label']],
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -1041,6 +1066,9 @@ try {
 
             $pdo->prepare("INSERT INTO CROP_LOG (GardenerID, GardenPlotID, PltID, CropName, MaintenanceNotes, HarvestYield) VALUES (?, ?, ?, ?, ?, ?)")
                 ->execute([$user['id'], (int) $gardenPlotId, $pltId, htmlspecialchars($crop, ENT_QUOTES, 'UTF-8'), htmlspecialchars($notes, ENT_QUOTES, 'UTF-8'), htmlspecialchars($yield, ENT_QUOTES, 'UTF-8')]);
+            logAudit($pdo, 'crops', 'maintenance_logged', "{$user['name']} logged maintenance for their $crop" . ($yield !== '' ? " (yield: $yield)." : '.'), [
+                'actor' => auditActor($user), 'target' => ['crop', (int) $gardenPlotId, $crop], 'reason' => $notes !== '' ? $notes : null,
+            ]);
             respond(['ok' => true]);
         }
 
@@ -1131,6 +1159,17 @@ try {
                     $yield === '' ? null : $yield,
                     $loggedDate,
                 ]);
+                if ($statusChanged) {
+                    logAudit($pdo, 'crops', 'crop_status_changed', "{$user['name']} marked their {$crop['CropName']} as $status.", [
+                        'actor' => auditActor($user), 'target' => ['crop', (int) $plotId, $crop['CropName']],
+                        'reason' => $notes !== '' ? $notes : null,
+                        'before' => ['Status' => $crop['Status']], 'after' => ['Status' => $status] + ($yield !== '' ? ['Yield' => $yield] : []),
+                    ]);
+                } else {
+                    logAudit($pdo, 'crops', 'maintenance_logged', "{$user['name']} logged maintenance for their {$crop['CropName']}" . ($yield !== '' ? " (yield: $yield)." : '.'), [
+                        'actor' => auditActor($user), 'target' => ['crop', (int) $plotId, $crop['CropName']], 'reason' => $notes !== '' ? $notes : null,
+                    ]);
+                }
 
                 $pdo->commit();
                 respond(['ok' => true, 'status' => $status, 'status_changed' => $statusChanged]);
@@ -1183,6 +1222,9 @@ try {
                 $stmt = $pdo->prepare("INSERT INTO EXCHANGE_BOARD (GardenerID, ProduceName, Qty, Description) VALUES (?, ?, ?, ?)");
                 $stmt->execute([$user['id'], $crop['CropName'], $qty, $desc]);
                 $postId = (int) $pdo->lastInsertId();
+                logAudit($pdo, 'exchange', 'listing_posted', "{$user['name']} offered $qty of {$crop['CropName']} on the exchange board.", [
+                    'actor' => auditActor($user), 'target' => ['listing', $postId, $crop['CropName']],
+                ]);
                 $pdo->commit();
                 respond(['ok' => true, 'post_id' => $postId]);
             } catch (Throwable $error) {
@@ -1195,8 +1237,16 @@ try {
             $user = requireJsonRole('customer');
             $postId = (int)($_POST['post_id'] ?? 0);
 
-            $stmt = $pdo->prepare("UPDATE EXCHANGE_BOARD SET Status = 'Completed' WHERE PostID = ? AND GardenerID = ?");
+            $stmt = $pdo->prepare("UPDATE EXCHANGE_BOARD SET Status = 'Completed' WHERE PostID = ? AND GardenerID = ? AND Status <> 'Completed'");
             $stmt->execute([$postId, $user['id']]);
+            if ($stmt->rowCount() > 0) {
+                $closed = $pdo->prepare('SELECT ProduceName FROM EXCHANGE_BOARD WHERE PostID = ?');
+                $closed->execute([$postId]);
+                $produce = $closed->fetchColumn() ?: 'a listing';
+                logAudit($pdo, 'exchange', 'listing_closed', "{$user['name']} closed their $produce listing on the exchange board.", [
+                    'actor' => auditActor($user), 'target' => ['listing', $postId, $produce],
+                ]);
+            }
             respond(['ok' => true]);
         }
 
@@ -1216,6 +1266,12 @@ try {
             
             $stmt = $pdo->prepare("INSERT INTO EXCHANGE_CLAIMS (PostID, RequesterID, QtyWanted, PickupDetails) VALUES (?, ?, ?, ?)");
             $stmt->execute([$postId, $user['id'], $qty, $pickup]);
+            $listing = $pdo->prepare('SELECT B.ProduceName, G.Name AS OwnerName FROM EXCHANGE_BOARD B LEFT JOIN COMMUNITY_GARDENER G ON G.GardenerID = B.GardenerID WHERE B.PostID = ?');
+            $listing->execute([$postId]);
+            $listingRow = $listing->fetch(PDO::FETCH_ASSOC) ?: ['ProduceName' => 'a listing', 'OwnerName' => 'another gardener'];
+            logAudit($pdo, 'exchange', 'listing_claimed', "{$user['name']} asked for $qty of " . possessive((string) $listingRow['OwnerName']) . " {$listingRow['ProduceName']}.", [
+                'actor' => auditActor($user), 'target' => ['listing', $postId, $listingRow['ProduceName']],
+            ]);
             respond(['ok' => true]);
         }
 
@@ -1244,9 +1300,10 @@ try {
 
             // 1. Fetch the claim and board data to verify ownership and check quantities
             $stmt = $pdo->prepare("
-                SELECT c.QtyWanted, b.Qty as CurrentQty, b.PostID 
-                FROM EXCHANGE_CLAIMS c 
-                JOIN EXCHANGE_BOARD b ON c.PostID = b.PostID 
+                SELECT c.QtyWanted, b.Qty as CurrentQty, b.PostID, b.ProduceName, g.Name AS RequesterName
+                FROM EXCHANGE_CLAIMS c
+                JOIN EXCHANGE_BOARD b ON c.PostID = b.PostID
+                LEFT JOIN COMMUNITY_GARDENER g ON g.GardenerID = c.RequesterID
                 WHERE c.ClaimID = ? AND b.GardenerID = ?
             ");
             $stmt->execute([$claimId, $user['id']]);
@@ -1257,6 +1314,7 @@ try {
             }
 
             // 2. If accepted, do the math to reduce the quantity
+            $newQtyStr = $postData['CurrentQty'];
             if ($status === 'Accepted') {
                 // Extract numbers from strings (e.g., pulls "2" from "2 pcs" and "5" from "5 pcs")
                 preg_match('/[0-9]+(\.[0-9]+)?/', $postData['QtyWanted'], $reqMatches);
@@ -1284,7 +1342,16 @@ try {
             // 3. Finally, update the claim's status
             $stmt = $pdo->prepare("UPDATE EXCHANGE_CLAIMS SET Status = ? WHERE ClaimID = ?");
             $stmt->execute([$status, $claimId]);
-            
+            $requester = $postData['RequesterName'] ?: 'another gardener';
+            logAudit($pdo, 'exchange', $status === 'Accepted' ? 'claim_accepted' : 'claim_rejected',
+                $status === 'Accepted'
+                    ? "{$user['name']} agreed to give {$postData['QtyWanted']} of {$postData['ProduceName']} to $requester."
+                    : "{$user['name']} declined " . possessive($requester) . " request for {$postData['ProduceName']}.", [
+                'actor' => auditActor($user), 'target' => ['listing', (int) $postData['PostID'], $postData['ProduceName']],
+                'before' => $status === 'Accepted' ? ['Quantity listed' => $postData['CurrentQty']] : null,
+                'after' => $status === 'Accepted' ? ['Quantity listed' => $newQtyStr] : null,
+            ]);
+
             respond(['ok' => true]);
         }
         // ---------------- CUSTOMER: Resources ----------------
@@ -1368,6 +1435,10 @@ try {
 
             $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, ResourceID, Qty, Status) VALUES (?, ?, ?, 'Requested')")
                 ->execute([$user['id'], (int) $resourceId, (int) $qty]);
+            $requestedName = resourceName($pdo, (int) $resourceId);
+            logAudit($pdo, 'resources', 'resource_requested', "{$user['name']} asked to borrow {$qty}x $requestedName.", [
+                'actor' => auditActor($user), 'target' => ['resource', (int) $resourceId, $requestedName],
+            ]);
             $pdo->commit();
             respond(['ok' => true]);
         }
@@ -1383,6 +1454,13 @@ try {
             $stmt->execute([(int) $txnId, $user['id']]);
             if ($stmt->rowCount() === 0) {
                 respond(['ok' => false, 'error' => 'This request can no longer be cancelled. It may have already been processed.'], 409);
+            }
+            $cancelled = $pdo->prepare('SELECT T.ResourceID, T.Qty, T.RequestType, R.Name FROM RESOURCE_TXN T JOIN RESOURCE R ON R.ResourceID = T.ResourceID WHERE T.TxnID = ?');
+            $cancelled->execute([(int) $txnId]);
+            if ($row = $cancelled->fetch(PDO::FETCH_ASSOC)) {
+                logAudit($pdo, 'resources', 'resource_request_cancelled', "{$user['name']} cancelled their request to " . ($row['RequestType'] === 'Donation' ? 'donate' : 'borrow') . " {$row['Qty']}x {$row['Name']}.", [
+                    'actor' => auditActor($user), 'target' => ['resource', (int) $row['ResourceID'], $row['Name']],
+                ]);
             }
             respond(['ok' => true]);
         }
@@ -1440,6 +1518,10 @@ try {
             $availableQty = max(0, (int) $totalQty - (int) $active->fetchColumn());
             $pdo->prepare('UPDATE RESOURCE SET AvailableQty = ? WHERE ResourceID = ?')
                 ->execute([$availableQty, (int) $row['ResourceID']]);
+            $returnedName = resourceName($pdo, (int) $row['ResourceID']);
+            logAudit($pdo, 'resources', 'resource_returned', "{$user['name']} returned {$row['Qty']}x $returnedName" . ($row['Status'] === 'Return Requested' ? ' after a coordinator asked for it.' : '.'), [
+                'actor' => auditActor($user), 'target' => ['resource', (int) $row['ResourceID'], $returnedName],
+            ]);
             $pdo->commit();
             respond(['ok' => true]);
         }
@@ -1522,6 +1604,9 @@ try {
                         (GardenerID, ResourceID, Qty, RequestType, RequestNotes, SourcePersonalItemID, Status)
                     VALUES (?, ?, ?, 'Donation', ?, ?, 'Requested')
                 ")->execute([$user['id'], $resourceId, $qty, $notes === '' ? null : $notes, $sourceItemId]);
+                logAudit($pdo, 'resources', 'donation_offered', "{$user['name']} offered to donate {$qty}x $name to the shared stock.", [
+                    'actor' => auditActor($user), 'target' => ['resource', $resourceId, $name], 'reason' => $notes !== '' ? $notes : null,
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -1746,6 +1831,10 @@ try {
                             $rejectOthers->execute([$user['coord_id'], 'Another gardener was approved for this plot.', $row['PltID'], (int) $appId]);
                             foreach ($rejectedRequests as $rejectedRequest) {
                                 recordPlotEvent($pdo, 'Request Rejected', 'staff', $user['name'], $plot['Label'], (int) $row['PltID'], (int) $rejectedRequest['GardenerID'], $rejectedRequest['GardenerName'], $user['coord_id'], (int) $rejectedRequest['AppID']);
+                                logAudit($pdo, 'plots', 'plot_request_rejected', possessive($rejectedRequest['GardenerName']) . " request for {$plot['Label']} was declined automatically because {$row['GardenerName']} was given the plot.", [
+                                    'actor' => auditActor($user), 'target' => ['plot', (int) $row['PltID'], $plot['Label']],
+                                    'reason' => 'Another gardener was approved for this plot.',
+                                ]);
                             }
                         }
                         $autoRejected = count($rejectedRequests);
@@ -1754,6 +1843,22 @@ try {
 
                 $eventType = $decision === 'approve' ? 'Request Accepted' : 'Request Rejected';
                 recordPlotEvent($pdo, $eventType, 'staff', $user['name'], $plot['Label'], (int) $row['PltID'], (int) $row['GardenerID'], $row['GardenerName'], $user['coord_id'], (int) $appId);
+
+                $isUnassign = $row['RequestType'] === 'Unassign';
+                $gardenerPossessive = possessive($row['GardenerName']);
+                if ($decision === 'approve') {
+                    [$auditAction, $summary] = $isUnassign
+                        ? ['plot_unassigned', "{$user['name']} approved $gardenerPossessive request to give up {$plot['Label']}. The plot is now available."]
+                        : ['plot_request_approved', "{$user['name']} gave {$plot['Label']} to {$row['GardenerName']}."];
+                } else {
+                    [$auditAction, $summary] = ['plot_request_rejected', "{$user['name']} declined $gardenerPossessive request " . ($isUnassign ? "to give up {$plot['Label']}." : "for {$plot['Label']}.")];
+                }
+                logAudit($pdo, 'plots', $auditAction, $summary, [
+                    'actor' => auditActor($user), 'target' => ['plot', (int) $row['PltID'], $plot['Label']],
+                    'reason' => $decision === 'reject' ? $rejectionReason : null,
+                    'before' => $decision === 'approve' ? ['Held by' => $isUnassign ? $row['GardenerName'] : 'Nobody'] : null,
+                    'after' => $decision === 'approve' ? ['Held by' => $isUnassign ? 'Nobody' : $row['GardenerName']] : null,
+                ]);
 
                 $pdo->commit();
             } catch (Throwable $error) {
@@ -1853,6 +1958,16 @@ try {
                     $user['coord_id'],
                     (int) $requestId,
                 ]);
+                $requesterStmt = $pdo->prepare('SELECT Name FROM COMMUNITY_GARDENER WHERE GardenerID = ?');
+                $requesterStmt->execute([(int) $request['GardenerID']]);
+                $requester = possessive($requesterStmt->fetchColumn() ?: 'a gardener');
+                logAudit($pdo, 'crops', $decision === 'approve' ? 'crop_catalog_approved' : 'crop_catalog_rejected',
+                    $decision === 'approve'
+                        ? "{$user['name']} approved $requester request and added {$request['CropName']} to the crop catalog."
+                        : "{$user['name']} declined $requester request to add {$request['CropName']} to the crop catalog.", [
+                    'actor' => auditActor($user), 'target' => ['crop_request', (int) $requestId, $request['CropName']],
+                    'reason' => $decision === 'reject' ? $reason : null,
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -1886,6 +2001,12 @@ try {
                 $resourceId = (int) $pdo->lastInsertId();
             }
             recordResourceEvent($pdo, $resourceId, 'Added', (int) $qty, 'staff', $user['name'], null, null, $user['coord_id']);
+            if ($existingId) $name = resourceName($pdo, $resourceId); // the stored spelling, not what was typed
+            logAudit($pdo, 'resources', 'resource_added', $existingId
+                ? "{$user['name']} added {$qty} more $name to the shared stock."
+                : "{$user['name']} added a new resource: {$qty}x $name.", [
+                'actor' => auditActor($user), 'target' => ['resource', $resourceId, $name],
+            ]);
             $pdo->commit();
             respond(['ok' => true]);
         }
@@ -1944,6 +2065,27 @@ try {
                 $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'A reason for partial approval of no more than 1,000 characters is required.'], 422);
             }
+            // Audit entry for this decision, written just before each commit below.
+            $auditDecision = static function () use ($pdo, $user, $row, $decision, $chosenQty, $remainder, $requestedQty, $rejectionReason): void {
+                $item = resourceName($pdo, (int) $row['ResourceID']);
+                $isDonation = $row['RequestType'] === 'Donation';
+                $who = possessive($row['GardenerName']);
+                if ($decision === 'approve') {
+                    $action = $isDonation ? 'donation_accepted' : 'resource_request_approved';
+                    $summary = $isDonation
+                        ? "{$user['name']} accepted $who donation of {$chosenQty}x $item."
+                        : "{$user['name']} lent {$chosenQty}x $item to {$row['GardenerName']}.";
+                    if ($remainder > 0) $summary .= " $remainder of the $requestedQty requested " . ($remainder === 1 ? 'was' : 'were') . ' declined.';
+                } else {
+                    $action = $isDonation ? 'donation_rejected' : 'resource_request_rejected';
+                    $summary = "{$user['name']} declined $who " . ($isDonation ? "donation of {$chosenQty}x $item." : "request for {$chosenQty}x $item.");
+                    if ($remainder > 0) $summary .= " The other $remainder " . ($remainder === 1 ? 'is' : 'are') . ' still waiting for a decision.';
+                }
+                logAudit($pdo, 'resources', $action, $summary, [
+                    'actor' => auditActor($user), 'target' => ['resource', (int) $row['ResourceID'], $item],
+                    'reason' => $rejectionReason !== '' ? $rejectionReason : null,
+                ]);
+            };
 
             if ($decision === 'approve') {
                 $res = $pdo->prepare('SELECT TotalQty FROM RESOURCE WHERE ResourceID = ? FOR UPDATE');
@@ -1987,6 +2129,7 @@ try {
                         $pdo->prepare("UPDATE RESOURCE_TXN SET Status = 'Donated', ProcessedQty = ?, CoordID = ?, ApprovedAt = NOW() WHERE TxnID = ?")
                             ->execute([$chosenQty, $user['coord_id'], (int) $txnId]);
                     }
+                    $auditDecision();
                     $pdo->commit();
                     respond(['ok' => true]);
                 }
@@ -2043,6 +2186,7 @@ try {
                         ->execute([$user['coord_id'], $rejectionReason, (int) $txnId]);
                 }
             }
+            $auditDecision();
             $pdo->commit();
             respond(['ok' => true]);
         }
@@ -2081,7 +2225,12 @@ try {
 
                 $pdo->prepare("INSERT INTO PLOT (Label, Location, AreaSqM, GardenerID, Status) VALUES (?, ?, ?, NULL, 'Available')")
                     ->execute([$label, $location, $areaSqM]);
-                recordPlotEvent($pdo, 'Plot Added', 'staff', $user['name'], $label, (int) $pdo->lastInsertId(), null, null, $user['coord_id']);
+                $newPlotId = (int) $pdo->lastInsertId();
+                recordPlotEvent($pdo, 'Plot Added', 'staff', $user['name'], $label, $newPlotId, null, null, $user['coord_id']);
+                logAudit($pdo, 'plots', 'plot_added', "{$user['name']} added $label ($location, {$areaSqM} m²) to the garden map.", [
+                    'actor' => auditActor($user), 'target' => ['plot', $newPlotId, $label],
+                    'after' => ['City' => $location, 'Area (m²)' => $areaSqM],
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -2091,7 +2240,7 @@ try {
         }
 
         case 'update_plot_details': {
-            requireJsonPermission('plots.add');
+            $user = requireJsonPermission('plots.add');
             foreach (['plot_id', 'location', 'area_sqm'] as $field) {
                 if (isset($_POST[$field]) && !is_string($_POST[$field])) {
                     respond(['ok' => false, 'error' => 'Plot details must be submitted as text values.'], 422);
@@ -2109,24 +2258,29 @@ try {
             if (!preg_match('/^\d{1,6}(?:\.\d{1,2})?$/', $areaSqM) || (float) $areaSqM <= 0 || (float) $areaSqM > 100000) {
                 respond(['ok' => false, 'error' => 'Enter a plot area greater than 0 and no more than 100,000 m².'], 422);
             }
-            $update = $pdo->prepare('UPDATE PLOT SET Location = ?, AreaSqM = ? WHERE PltID = ?');
-            $update->execute([$location, $areaSqM, (int) $plotId]);
-            if ($update->rowCount() === 0) {
-                $exists = $pdo->prepare('SELECT 1 FROM PLOT WHERE PltID = ?');
-                $exists->execute([(int) $plotId]);
-                if (!$exists->fetchColumn()) respond(['ok' => false, 'error' => 'Plot not found.'], 404);
+            $current = $pdo->prepare('SELECT Label, Location, AreaSqM FROM PLOT WHERE PltID = ?');
+            $current->execute([(int) $plotId]);
+            $before = $current->fetch(PDO::FETCH_ASSOC);
+            if (!$before) respond(['ok' => false, 'error' => 'Plot not found.'], 404);
+            $pdo->prepare('UPDATE PLOT SET Location = ?, AreaSqM = ? WHERE PltID = ?')->execute([$location, $areaSqM, (int) $plotId]);
+            if ($before['Location'] !== $location || (float) $before['AreaSqM'] !== (float) $areaSqM) {
+                logAudit($pdo, 'plots', 'plot_updated', "{$user['name']} changed the details of {$before['Label']}.", [
+                    'actor' => auditActor($user), 'target' => ['plot', (int) $plotId, $before['Label']],
+                    'before' => ['City' => $before['Location'] ?: 'Not set', 'Area (m²)' => $before['AreaSqM'] ?? 'Not set'],
+                    'after' => ['City' => $location, 'Area (m²)' => $areaSqM],
+                ]);
             }
             respond(['ok' => true]);
         }
 
         case 'delete_plot': {
-            requireJsonPermission('plots.delete');
+            $user = requireJsonPermission('plots.delete');
             $plotId = $_POST['plot_id'] ?? '';
             if (!ctype_digit((string) $plotId)) {
                 respond(['ok' => false, 'error' => 'Invalid plot.'], 422);
             }
 
-            $plot = $pdo->prepare('SELECT GardenerID, Status FROM PLOT WHERE PltID = ?');
+            $plot = $pdo->prepare('SELECT Label, Location, AreaSqM, GardenerID, Status FROM PLOT WHERE PltID = ?');
             $plot->execute([(int) $plotId]);
             $row = $plot->fetch(PDO::FETCH_ASSOC);
             if (!$row) respond(['ok' => false, 'error' => 'Plot not found.'], 404);
@@ -2141,6 +2295,10 @@ try {
             }
 
             $pdo->prepare('DELETE FROM PLOT WHERE PltID = ?')->execute([(int) $plotId]);
+            logAudit($pdo, 'plots', 'plot_deleted', "{$user['name']} removed {$row['Label']} from the garden map.", [
+                'actor' => auditActor($user), 'target' => ['plot', (int) $plotId, $row['Label']],
+                'before' => ['City' => $row['Location'] ?: 'Not set', 'Area (m²)' => $row['AreaSqM'] ?? 'Not set', 'Status' => $row['Status']],
+            ]);
             respond(['ok' => true]);
         }
 
@@ -2240,9 +2398,10 @@ try {
             $totalQty = (int) $totalQtyRaw;
             $pdo->beginTransaction();
             try {
-                $resourceStmt = $pdo->prepare('SELECT ResourceID FROM RESOURCE WHERE ResourceID = ? FOR UPDATE');
+                $resourceStmt = $pdo->prepare('SELECT Name, TotalQty FROM RESOURCE WHERE ResourceID = ? FOR UPDATE');
                 $resourceStmt->execute([$resourceId]);
-                if ($resourceStmt->fetchColumn() === false) {
+                $resourceBefore = $resourceStmt->fetch(PDO::FETCH_ASSOC);
+                if ($resourceBefore === false) {
                     $pdo->rollBack();
                     respond(['ok' => false, 'error' => 'Resource not found.'], 404);
                 }
@@ -2258,6 +2417,12 @@ try {
                 $availableQty = $totalQty - $borrowedQty;
                 $pdo->prepare('UPDATE RESOURCE SET TotalQty = ?, AvailableQty = ? WHERE ResourceID = ?')
                     ->execute([$totalQty, $availableQty, $resourceId]);
+                if ((int) $resourceBefore['TotalQty'] !== $totalQty) {
+                    logAudit($pdo, 'resources', 'resource_stock_changed', "{$user['name']} changed the total stock of {$resourceBefore['Name']} from {$resourceBefore['TotalQty']} to {$totalQty}.", [
+                        'actor' => auditActor($user), 'target' => ['resource', $resourceId, $resourceBefore['Name']],
+                        'before' => ['Total' => (int) $resourceBefore['TotalQty']], 'after' => ['Total' => $totalQty],
+                    ]);
+                }
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -2357,6 +2522,10 @@ try {
             } else {
                 $pdo->prepare('DELETE FROM RESOURCE_TXN WHERE TxnID = ?')->execute([(int) $txnId]);
             }
+            $returnName = resourceName($pdo, (int) $row['ResourceID']);
+            logAudit($pdo, 'resources', 'resource_return_requested', "{$user['name']} asked {$row['GardenerName']} to return {$returnQty}x $returnName.", [
+                'actor' => auditActor($user), 'target' => ['resource', (int) $row['ResourceID'], $returnName], 'reason' => $reason,
+            ]);
 
             $pdo->commit();
             respond(['ok' => true]);
@@ -2437,6 +2606,9 @@ try {
                         $cropName,
                         $notes === '' ? null : $notes,
                     ]);
+                logAudit($pdo, 'crops', 'crop_catalog_requested', "{$user['name']} asked for $cropName to be added to the crop catalog.", [
+                    'actor' => auditActor($user), 'target' => ['crop_request', (int) $pdo->lastInsertId(), $cropName], 'reason' => $notes !== '' ? $notes : null,
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -2481,6 +2653,9 @@ try {
 
             $stmt = $pdo->prepare("INSERT INTO GARDEN_PLOTS (GardenerID, CropName, PlantedDate, EstHarvestDate, Notes) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$user['id'], $canonicalCropName, $planted, $harvest, $notes]);
+            logAudit($pdo, 'crops', 'crop_logged', "{$user['name']} started growing $canonicalCropName (planted $planted" . ($harvest !== null ? ", harvest expected $harvest" : '') . ').', [
+                'actor' => auditActor($user), 'target' => ['crop', (int) $pdo->lastInsertId(), $canonicalCropName], 'reason' => $notes !== '' ? $notes : null,
+            ]);
             respond(['ok' => true]);
         }
 
@@ -2520,6 +2695,10 @@ try {
                 $pdo->prepare("INSERT INTO CROP_LOG (GardenerID, GardenPlotID, PltID, CropName, MaintenanceNotes) VALUES (?, ?, ?, ?, ?)")
                     ->execute([$user['id'], $plotId, $pltId, htmlspecialchars($crop['CropName'], ENT_QUOTES, 'UTF-8'), htmlspecialchars($statusNote, ENT_QUOTES, 'UTF-8')]);
 
+                logAudit($pdo, 'crops', 'crop_status_changed', "{$user['name']} marked their {$crop['CropName']} as $status.", [
+                    'actor' => auditActor($user), 'target' => ['crop', $plotId, $crop['CropName']],
+                    'before' => ['Status' => $crop['Status']], 'after' => ['Status' => $status],
+                ]);
                 $pdo->commit();
                 respond(['ok' => true, 'history_added' => true]);
             } catch (Throwable $error) {
@@ -2613,6 +2792,9 @@ try {
                 $pdo->prepare("INSERT INTO PLOT_APPLICATION (GardenerID, PltID, Status, RequestType) VALUES (?, ?, 'Pending', 'Apply')")
                     ->execute([$user['id'], (int) $plotId]);
                 recordPlotEvent($pdo, 'Request Assignment', 'customer', $user['name'], $plot['Label'], (int) $plotId, (int) $user['id'], $user['name'], null, (int) $pdo->lastInsertId());
+                logAudit($pdo, 'plots', 'plot_requested', "{$user['name']} asked to be given {$plot['Label']}.", [
+                    'actor' => auditActor($user), 'target' => ['plot', (int) $plotId, $plot['Label']],
+                ]);
                 $pdo->commit();
             } catch (Throwable $error) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -3637,6 +3819,22 @@ try {
             }
             fclose($out);
             exit;
+        }
+
+        // A report exported in the browser (dashboard CSV, printed PDF): record it in the audit log.
+        case 'log_report_export': {
+            $user = requireJsonPermission('reports.export');
+            $reports = ['dashboard' => 'the dashboard report'];
+            $formats = ['csv' => 'downloaded', 'pdf' => 'saved or printed'];
+            $report = (string) ($_POST['report'] ?? '');
+            $format = (string) ($_POST['format'] ?? '');
+            if (!isset($reports[$report], $formats[$format])) {
+                respond(['ok' => false, 'error' => 'Unknown report.'], 422);
+            }
+            logAudit($pdo, 'admin', 'report_exported', "{$user['name']} {$formats[$format]} {$reports[$report]} (" . strtoupper($format) . ').', [
+                'actor' => auditActor($user), 'after' => ['Report' => $report, 'Format' => strtoupper($format)],
+            ]);
+            respond(['ok' => true]);
         }
 
         // ---------- Roles and permissions (section 6) ----------

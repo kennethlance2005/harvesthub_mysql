@@ -12,7 +12,7 @@ $profileId = ctype_digit((string) ($_GET['id'] ?? '')) ? (int) $_GET['id'] : 0;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Profile</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=50">
+<link rel="stylesheet" href="assets/style.css?v=52">
 </head>
 <body class="account-page">
 
@@ -85,7 +85,7 @@ $profileId = ctype_digit((string) ($_GET['id'] ?? '')) ? (int) $_GET['id'] : 0;
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=22"></script>
+<script src="assets/admin.js?v=23"></script>
 <script src="assets/people.js?v=2"></script>
 </body>
 </html>

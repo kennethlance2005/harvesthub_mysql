@@ -29,6 +29,16 @@ function removeDisallowedButtons(root = document) {
   });
 }
 
+// Records a report download/print in the audit log. Never blocks or breaks the export itself.
+function logReportExport(report, format) {
+  fetch('api.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'log_report_export', report, format }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 function showToast(message, type = 'success') {
   const toastEl = document.createElement('div');
   toastEl.className = `toast${type === 'danger' ? ' toast-danger' : ''}`;
@@ -1339,7 +1349,8 @@ document.addEventListener('DOMContentLoaded', () => {
         link.download = `HarvestHub_Analytics_${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(link);
         link.click();
-        
+        logReportExport('dashboard', 'csv');
+
         // Clean up memory
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
@@ -1357,8 +1368,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportPdfBtn = document.getElementById('export-pdf-btn');
   if (exportPdfBtn) {
     exportPdfBtn.addEventListener('click', () => {
+      logReportExport('dashboard', 'pdf');
       // Small timeout ensures any active tooltips close before capturing
-      setTimeout(() => window.print(), 100); 
+      setTimeout(() => window.print(), 100);
     });
   }
 });
