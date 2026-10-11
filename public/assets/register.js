@@ -20,8 +20,9 @@ let pendingVerificationEmail = '';
 
 const updateAgeRequirement = () => {
   const digits = ageInput.value.replace(/\D/g, '');
-  ageInput.value = digits.slice(0, 2);
-  const isValidAge = Number(ageInput.value) >= 18;
+  ageInput.value = digits.slice(0, 3);
+  const ageValue = Number(ageInput.value);
+  const isValidAge = ageValue >= 18 && ageValue <= 122;
   ageReq.classList.toggle('valid', isValidAge);
   ageReq.classList.toggle('invalid', !isValidAge);
 };
@@ -40,10 +41,10 @@ emailInput.addEventListener('input', updateEmailRequirement);
 emailInput.addEventListener('focus', () => emailReqs.classList.add('active'));
 emailInput.addEventListener('blur', () => emailReqs.classList.remove('active'));
 
-// Prevent typing numbers or special symbols into name fields
+// Allow letters plus common name punctuation while still blocking digits and other symbols.
 [firstNameInput, lastNameInput].forEach((input) => {
   input.addEventListener('input', () => {
-    input.value = input.value.replace(/[^A-Za-z\s\-']/g, '');
+    input.value = input.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s'’.-]/g, '');
   });
 });
 
@@ -93,23 +94,23 @@ form.addEventListener('submit', async (e) => {
   const password = document.getElementById('password').value;
   const confirmPassword = document.getElementById('confirm-password').value;
 
-  const namePattern = /^[A-Za-z\s\-']+$/;
+  const namePattern = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'’.-]+$/u;
   if (!firstName || !namePattern.test(firstName)) {
-    alertEl.textContent = 'First name must contain letters only.';
+    alertEl.textContent = 'First name contains unsupported characters.';
     alertEl.hidden = false;
     firstNameInput.focus();
     return;
   }
 
   if (!lastName || !namePattern.test(lastName)) {
-    alertEl.textContent = 'Last name must contain letters only.';
+    alertEl.textContent = 'Last name contains unsupported characters.';
     alertEl.hidden = false;
     lastNameInput.focus();
     return;
   }
 
-  if (!ageVal || isNaN(age) || age < 18 || age > 120) {
-    alertEl.textContent = 'You must be at least 18 years old to create an account.';
+  if (!ageVal || isNaN(age) || age < 18 || age > 122) {
+    alertEl.textContent = 'Age must be between 18 and 122 years old to create an account.';
     alertEl.hidden = false;
     ageInput.focus();
     return;

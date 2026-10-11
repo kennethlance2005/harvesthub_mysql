@@ -46,11 +46,11 @@ if ($user = currentUser()) {
       <div class="field-row">
         <div class="field">
           <label for="first-name">First Name <span class="required">*</span></label>
-          <input type="text" id="first-name" name="first_name" autocomplete="given-name" pattern="[A-Za-z\s\-']+" title="Letters only" required maxlength="25">
+          <input type="text" id="first-name" name="first_name" autocomplete="given-name" pattern="^[A-Za-zÀ-ÖØ-öø-ÿ\s'’.-]+$" title="Letters and common name punctuation" required maxlength="25">
         </div>
         <div class="field">
           <label for="last-name">Last Name <span class="required">*</span></label>
-          <input type="text" id="last-name" name="last_name" autocomplete="family-name" pattern="[A-Za-z\s\-']+" title="Letters only" required maxlength="25">
+          <input type="text" id="last-name" name="last_name" autocomplete="family-name" pattern="^[A-Za-zÀ-ÖØ-öø-ÿ\s'’.-]+$" title="Letters and common name punctuation" required maxlength="25">
         </div>
       </div>
 
@@ -58,9 +58,9 @@ if ($user = currentUser()) {
       <div class="field-row">
         <div class="field">
           <label for="age">Age <span class="required">*</span></label>
-          <input type="text" id="age" name="age" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" autocomplete="off" aria-describedby="age-reqs" required>
+          <input type="text" id="age" name="age" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" autocomplete="off" aria-describedby="age-reqs" required>
           <ul id="age-reqs" class="password-reqs" aria-live="polite">
-            <li id="age-req" class="invalid">At least 18 years old</li>
+            <li id="age-req" class="invalid">Age 18–122</li>
           </ul>
         </div>
         <div class="field">

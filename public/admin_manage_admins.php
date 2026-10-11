@@ -62,7 +62,7 @@ $navTitle = 'Manage Administrators';
                 </div>
                 <div class="field" style="margin: 0;">
                     <label>Age <span class="required">*</span></label>
-                    <input type="number" id="new-admin-age" min="18" max="120" placeholder="18" required>
+                    <input type="number" id="new-admin-age" min="18" max="122" placeholder="18" required>
                 </div>
                 
                 <!-- Row 2: Email Address | Temporary Password -->

@@ -409,16 +409,16 @@ try {
 
             if ($firstName === '' || mb_strlen($firstName) > 60) {
                 $errors[] = 'First name is required.';
-            } elseif (!preg_match("/^[A-Za-z\s\-']+$/u", $firstName)) {
-                $errors[] = 'First name must contain only letters.';
+            } elseif (!preg_match("/^[\p{L}\p{M}\s'’.-]+$/u", $firstName)) {
+                $errors[] = 'First name contains unsupported characters.';
             }
             if ($lastName === '' || mb_strlen($lastName) > 60) {
                 $errors[] = 'Last name is required.';
-            } elseif (!preg_match("/^[A-Za-z\s\-']+$/u", $lastName)) {
-                $errors[] = 'Last name must contain only letters.';
+            } elseif (!preg_match("/^[\p{L}\p{M}\s'’.-]+$/u", $lastName)) {
+                $errors[] = 'Last name contains unsupported characters.';
             }
-            if (!ctype_digit((string) $age) || (int) $age < 18 || (int) $age > 120) {
-                $errors[] = 'You must be at least 18 years old to register.';
+            if (!ctype_digit((string) $age) || (int) $age < 18 || (int) $age > 122) {
+                $errors[] = 'Age must be between 18 and 122 years old to register.';
             }
             if (!in_array($location, NCR_CITIES, true)) $errors[] = 'Please choose a valid NCR city.';
             if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) $errors[] = 'A valid email is required.';
@@ -3252,7 +3252,7 @@ try {
             $errors = [];
             if (empty($name)) $errors[] = 'Name is required.';
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Valid email required.';
-            if (!ctype_digit((string)$age) || (int)$age < 18 || (int)$age > 120) $errors[] = 'Age must be between 18 and 120.';
+            if (!ctype_digit((string)$age) || (int)$age < 18 || (int)$age > 122) $errors[] = 'Age must be between 18 and 122.';
             if (!in_array($location, NCR_CITIES, true)) $errors[] = 'Please select a valid NCR city.';
             if (!preg_match('/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,}$/', $password)) {
                 $errors[] = 'Password must be 8+ chars with an uppercase, lowercase, number, and special character.';
