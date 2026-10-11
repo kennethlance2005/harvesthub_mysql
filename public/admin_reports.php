@@ -14,7 +14,7 @@ $h = static fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Reports</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=59">
+<link rel="stylesheet" href="assets/style.css?v=60">
 </head>
 <body class="account-page">
 
@@ -106,7 +106,7 @@ $h = static fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=24"></script>
+<script src="assets/admin.js?v=25"></script>
 <script src="assets/reports.js?v=3"></script>
 </body>
 </html>

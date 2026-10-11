@@ -195,6 +195,33 @@
     });
   };
 
+  // A banner at the top of the page when something could not be loaded, so a
+  // list never sits on "Loading..." forever. Shown once per page.
+  //   if (!data.ok) { hhLoadFailed(data.error); return; }
+  window.hhLoadFailed = function (detail) {
+    if (document.getElementById('hh-load-failed')) return;
+    const banner = document.createElement('div');
+    banner.id = 'hh-load-failed';
+    banner.className = 'hh-load-failed';
+    banner.setAttribute('role', 'alert');
+    const text = document.createElement('p');
+    text.textContent = `Some information on this page couldn't be loaded${detail ? `: ${detail}` : '.'} Refresh the page to try again.`;
+    const refresh = document.createElement('button');
+    refresh.type = 'button';
+    refresh.className = 'btn btn-ghost btn-sm';
+    refresh.textContent = 'Refresh page';
+    refresh.addEventListener('click', () => window.location.reload());
+    banner.append(text, refresh);
+    (document.querySelector('main') || document.body).prepend(banner);
+  };
+
+  // A dropped connection inside a page script would otherwise fail silently.
+  window.addEventListener('unhandledrejection', event => {
+    if (event.reason instanceof TypeError && /fetch|network|load failed/i.test(String(event.reason.message))) {
+      window.hhLoadFailed('HarvestHub could not be reached. Check your internet connection');
+    }
+  });
+
   // A wider dialog for reviewing details before a decision.
   //   const choice = await hhDetails({ title, bodyHtml, actions: [{ label: 'Reject', value: 'reject', tone: 'danger' }, { label: 'Approve', value: 'approve' }] });
   // Resolves to the clicked action's value, or null when closed.

@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
             
-            if (!data.ok) return;
+            if (!data.ok) { hhLoadFailed(data.error); return; }
 
             const feedEl = document.getElementById('exchange-feed-list');
             const currentUserId = data.current_user_id; 
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
             
-            if (!data.ok) return;
+            if (!data.ok) { hhLoadFailed(data.error); return; }
 
             const myEl = document.getElementById('my-exchange-list');
 
@@ -148,15 +148,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <span class="ex-row-meta">Posted ${escapeHtml(formatExDate(p.CreatedAt))}</span>
                     </div>
-                    <button class="btn btn-ghost btn-sm close-post-btn" data-id="${p.PostID}">Close</button>
+                    <button class="btn btn-ghost btn-sm close-post-btn" data-id="${p.PostID}" data-name="${escapeHtml(p.ProduceName)}">Close</button>
                 </div>
             `).join('');
 
             // Attach Close Listeners
             document.querySelectorAll('.close-post-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
-                    btn.disabled = true; 
-                    const postId = e.target.getAttribute('data-id');
+                    const postId = btn.dataset.id;
+                    if (!await hhConfirm({
+                        title: `Close your ${btn.dataset.name} listing?`,
+                        message: 'It disappears from the exchange board and nobody can ask for it any more. A closed listing cannot be reopened; post a new one if you have more.',
+                        confirmText: 'Close listing',
+                        cancelText: 'Keep it open',
+                        tone: 'danger',
+                    })) return;
+                    btn.disabled = true;
                     try {
                         const res = await fetch('api.php', {
                             method: 'POST',
@@ -171,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             loadMyListings(); 
                         } else {
                             if (typeof showToast === 'function') showToast(result.error || 'Action failed.', 'danger');
-                            e.target.disabled = false;
+                            btn.disabled = false;
                         }
                     } catch (err) {
                         if (typeof showToast === 'function') showToast('Network error while closing the listing.', 'danger');
@@ -295,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
             
-            if (!data.ok) return;
+            if (!data.ok) { hhLoadFailed(data.error); return; }
 
             const pendingEl = document.getElementById('pending-claims-list');
 
@@ -312,8 +319,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <p class="ex-claim-pickup"><strong>Pickup:</strong> ${escapeHtml(c.PickupDetails)}</p>
                     <div class="ex-claim-actions">
-                        <button class="btn btn-sm btn-accent handle-claim-btn" data-id="${c.ClaimID}" data-status="Accepted">Accept</button>
-                        <button class="btn btn-sm btn-ghost ex-reject-btn handle-claim-btn" data-id="${c.ClaimID}" data-status="Rejected">Reject</button>
+                        <button class="btn btn-sm btn-accent handle-claim-btn" data-id="${c.ClaimID}" data-status="Accepted" data-produce="${escapeHtml(c.ProduceName)}" data-qty="${escapeHtml(c.QtyWanted)}">Accept</button>
+                        <button class="btn btn-sm btn-ghost ex-reject-btn handle-claim-btn" data-id="${c.ClaimID}" data-status="Rejected" data-produce="${escapeHtml(c.ProduceName)}" data-qty="${escapeHtml(c.QtyWanted)}">Reject</button>
                     </div>
                 </div>
             `).join('');
@@ -323,6 +330,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.addEventListener('click', async (e) => {
                     const claimId = btn.dataset.id;
                     const status = btn.dataset.status;
+                    const accepting = status === 'Accepted';
+                    if (!await hhConfirm(accepting ? {
+                        title: `Give ${btn.dataset.qty} of ${btn.dataset.produce}?`,
+                        message: `${btn.dataset.qty} is taken off your listing straight away, and the gardener sees that you agreed. Arrange the pickup with them as they described.`,
+                        confirmText: 'Accept request',
+                    } : {
+                        title: `Decline this request for ${btn.dataset.produce}?`,
+                        message: 'The gardener is told you declined. Your listing stays open for others.',
+                        confirmText: 'Decline request',
+                        cancelText: 'Keep it',
+                        tone: 'danger',
+                    })) return;
                     btn.disabled = true;
 
                     try {

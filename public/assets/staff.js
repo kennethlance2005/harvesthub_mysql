@@ -247,7 +247,7 @@ async function postAction(action, params) {
 async function loadApplications() {
   const res = await fetch('api.php?action=pending_applications');
   const data = await res.json();
-  if (!data.ok) return;
+  if (!data.ok) { hhLoadFailed(data.error); return; }
   applications = data.applications;
   currentGardenerId = data.current_gardener_id === null || data.current_gardener_id === undefined
     ? null
@@ -278,7 +278,7 @@ async function processApplication(appId, decision) {
 async function loadResourceTxns() {
   const res = await fetch('api.php?action=pending_resource_txns');
   const data = await res.json();
-  if (!data.ok) return;
+  if (!data.ok) { hhLoadFailed(data.error); return; }
   resourceTransactions = data.transactions;
   currentGardenerId = data.current_gardener_id === null || data.current_gardener_id === undefined
     ? null
@@ -332,7 +332,7 @@ async function processResourceTxn(txnId, decision, qty) {
 async function loadPlots() {
   const res = await fetch('api.php?action=all_plots');
   const data = await res.json();
-  if (!data.ok) return;
+  if (!data.ok) { hhLoadFailed(data.error); return; }
 
   if (data.current_gardener_id !== undefined) currentGardenerId = data.current_gardener_id === null ? null : Number(data.current_gardener_id);
   plots = data.plots;

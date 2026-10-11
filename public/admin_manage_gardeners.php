@@ -10,18 +10,26 @@ $navTitle = 'Manage Gardeners';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Gardeners</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=59">
+<link rel="stylesheet" href="assets/style.css?v=60">
 </head>
 <body class="account-page">
 <div class="app-layout">
   <?php include __DIR__ . '/admin_sidebar.php'; ?>
   <div class="main-content">
     <main class="wrap" id="top" style="max-width: 1200px; padding-top: 32px;">
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Manage Accounts</p>
+          <h1>Gardeners</h1>
+          <p class="text-muted">Approve new sign-ups and look after gardener accounts. Click a name to see that person&rsquo;s profile and history.</p>
+        </div>
+      </header>
       
       <?php if (can('registrations.review')): ?>
       <!-- Pending Gardener Requests -->
       <div class="panel" style="margin-bottom: 24px;">
         <p class="panel-title">Pending Gardener Requests</p>
+        <p class="text-muted panel-help">People who signed up and are waiting. Press <strong>Review</strong> to see their details, then approve them or decline with a reason they will see.</p>
         <div class="table-wrap">
           <table class="data-table admin-responsive-table">
             <thead><tr><th>Name</th><th>Email</th><th>Age</th><th>Location</th><th>Actions</th></tr></thead>
@@ -37,7 +45,7 @@ $navTitle = 'Manage Gardeners';
       <?php if (can('accounts.view')): ?>
       <div class="panel">
           <div class="admin-table-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <p class="panel-title" style="margin: 0;">Community Gardeners</p>
+          <div><p class="panel-title" style="margin: 0;">Community Gardeners</p><p class="text-muted panel-help"><strong>Archive</strong> stops someone signing in (you can restore them later). <strong>Enable Account</strong> unlocks an account after 3 wrong passwords. <strong>Roles</strong> gives someone extra permissions.</p></div>
           <div class="admin-table-controls">
             <input type="search" id="search-gardeners" data-table-search="gardeners-table" placeholder="Search gardeners...">
             <select class="admin-status-filter" data-status-filter="gardeners-table" aria-label="Filter by status">
@@ -62,6 +70,6 @@ $navTitle = 'Manage Gardeners';
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js?v=24"></script>
+<script src="assets/admin.js?v=25"></script>
 </body>
 </html>

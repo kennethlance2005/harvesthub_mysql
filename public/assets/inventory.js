@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('api.php?action=resources');
             const data = await res.json();
 
-            if (!data.ok) return;
+            if (!data.ok) { hhLoadFailed(data.error); return; }
             if (background && busyCount > 0) return;
 
             const sig = JSON.stringify(data);
@@ -276,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="inv-row-meta">${r.Status === 'Return Requested' ? 'The coordinator has asked for this item back.' : `Approved ${formatInvDate(r.ApprovedAt || r.RequestedAt)}`}</span>
                         </div>
                         <div class="inv-row-actions">
-                            <button class="btn btn-accent btn-sm inv-btn return-btn" data-txn="${r.TxnID}">Return item</button>
+                            <button class="btn btn-accent btn-sm inv-btn return-btn" data-txn="${r.TxnID}" data-name="${escapeHtml(`${r.Qty}× ${r.Name}`)}">Return item</button>
                         </div>
                     </div>
                 `).join('');
@@ -338,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="inv-row-actions">
                             <button class="btn btn-accent btn-sm inv-btn donate-personal-btn" type="button" data-id="${p.ItemID}" data-name="${escapeHtml(p.ItemName)}" data-qty="${p.Qty}" ${Number(p.HasPendingDonation) ? 'disabled' : ''}>Donate</button>
-                            <button class="btn btn-ghost btn-sm inv-btn remove-personal-btn" data-id="${p.ItemID}" ${Number(p.HasPendingDonation) ? 'disabled' : ''}>Remove</button>
+                            <button class="btn btn-ghost btn-sm inv-btn remove-personal-btn" data-id="${p.ItemID}" data-name="${escapeHtml(p.ItemName)}" ${Number(p.HasPendingDonation) ? 'disabled' : ''}>Remove</button>
                         </div>
                     </div>
                 `).join('');
@@ -395,7 +395,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Attach Return Listeners
             document.querySelectorAll('.return-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
-                    btn.disabled = true; 
+                    if (!await hhConfirm({
+                        title: `Return ${btn.dataset.name}?`,
+                        message: 'Only confirm once you have handed the item back to a coordinator. It goes back on the shared shelf and leaves your inventory.',
+                        confirmText: 'Yes, I returned it',
+                        cancelText: 'Not yet',
+                    })) return;
+                    btn.disabled = true;
                     const txnId = btn.dataset.txn;
                     busyCount++;
                     try {
@@ -424,7 +430,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // Attach Remove Listeners
             document.querySelectorAll('.remove-personal-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
-                    btn.disabled = true; 
+                    if (!await hhConfirm({
+                        title: `Remove ${btn.dataset.name}?`,
+                        message: 'This deletes it from your personal inventory. It cannot be undone, but you can add it again any time.',
+                        confirmText: 'Remove item',
+                        cancelText: 'Keep it',
+                        tone: 'danger',
+                    })) return;
+                    btn.disabled = true;
                     const itemId = btn.dataset.id;
                     busyCount++;
                     try {

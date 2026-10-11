@@ -10,7 +10,7 @@ $navTitle = 'Archived Accounts';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Archived Accounts</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=59">
+<link rel="stylesheet" href="assets/style.css?v=60">
 </head>
 <body class="account-page">
 
@@ -18,11 +18,18 @@ $navTitle = 'Archived Accounts';
   <?php include __DIR__ . '/admin_sidebar.php'; ?>
   <div class="main-content">
     <main class="wrap archived-accounts-page" id="top" style="max-width: 1200px; padding-top: 32px;">
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Manage Accounts</p>
+          <h1>Archived Accounts</h1>
+          <p class="text-muted">Archived accounts cannot sign in, but nothing is deleted: their history stays in the records and audit log. Unarchive someone to let them sign in again.</p>
+        </div>
+      </header>
       <div class="panel archived-accounts-panel">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
           <div>
-            <h2 style="margin-bottom: 4px;">Archived Accounts</h2>
-            <p class="text-muted" style="margin: 0;">These accounts are disabled and cannot log in. Unarchive them to restore access.</p>
+            <p class="panel-title" style="margin: 0;">All archived accounts</p>
+            <p class="text-muted panel-help">Unarchive gives the person access again with their old email and password. Gardeners get a fresh start: plots they had were released when they were archived.</p>
           </div>
           <input type="search" id="search-archived" data-table-search="archived-table" placeholder="Search by name or email..." style="border-radius: 10px;">
         </div>
@@ -61,6 +68,6 @@ $navTitle = 'Archived Accounts';
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=24"></script>
+<script src="assets/admin.js?v=25"></script>
 </body>
 </html>

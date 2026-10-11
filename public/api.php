@@ -72,7 +72,42 @@ try {
 }
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
+/**
+ * Technical error messages, reworded for people who don't know how the site
+ * works. Most only appear when a page sends something unexpected.
+ */
+const FRIENDLY_ERRORS = [
+    'Invalid request.' => 'Something about that did not go through. Refresh the page and try again.',
+    'Invalid action.' => 'Something about that did not go through. Refresh the page and try again.',
+    'Unknown action.' => 'That is not something HarvestHub can do from here. Refresh the page and try again.',
+    'Not authorized.' => 'You need to be logged in with the right account to do this. Please log in again.',
+    'Already processed.' => 'Someone has already handled this request. Refresh the page to see the latest.',
+    'Application already processed.' => 'Someone has already handled this request. Refresh the page to see the latest.',
+    'Invalid transaction.' => 'That item could not be found. It may already have been returned. Refresh the page.',
+    'Invalid plot.' => 'That plot could not be found. Refresh the page and try again.',
+    'Plot not found.' => 'That plot no longer exists. Refresh the page.',
+    'Resource not found.' => 'That item is no longer in the shared inventory. Refresh the page.',
+    'Invalid quantity.' => 'Enter a whole number for the quantity.',
+    'Invalid return quantity.' => 'Enter a whole number for how many to ask back.',
+    'Invalid status.' => 'Choose one of the statuses in the list.',
+    'Invalid listing id.' => 'That listing could not be found. It may have been closed.',
+    'Claim not found or access denied.' => 'That request could not be found. It may already have been answered.',
+    'Invalid application.' => 'That application could not be found. Refresh the page.',
+    'Application not found.' => 'That application could not be found. Refresh the page.',
+    'Invalid personal inventory item.' => 'That item could not be found in your inventory. Refresh the page.',
+    'Invalid plot return response.' => 'Something about that did not go through. Refresh the page and try again.',
+    'Invalid crop catalog review request.' => 'Something about that did not go through. Refresh the page and try again.',
+    'Unknown report.' => 'That report could not be found. Pick one from the list.',
+    'Unknown section.' => 'That part of the page could not be found. Refresh the page.',
+];
+
 function respond(array $data, int $status = 200): void {
+    if (isset($data['error']) && is_string($data['error'])) {
+        $data['error'] = FRIENDLY_ERRORS[$data['error']]
+            ?? (preg_match('/must be (submitted as )?text values\.$/', $data['error'])
+                ? 'Something about that did not go through. Refresh the page and try again.'
+                : $data['error']);
+    }
     http_response_code($status);
     echo json_encode($data);
     exit;

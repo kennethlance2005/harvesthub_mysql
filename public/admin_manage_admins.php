@@ -10,13 +10,20 @@ $navTitle = 'Manage Administrators';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Admins</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=59">
+<link rel="stylesheet" href="assets/style.css?v=60">
 </head>
 <body class="account-page">
 <div class="app-layout">
   <?php include __DIR__ . '/admin_sidebar.php'; ?>
   <div class="main-content">
     <main class="wrap" id="top" style="max-width: 1200px; padding-top: 32px;">
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Manage Accounts</p>
+          <h1>Administrators</h1>
+          <p class="text-muted">Administrators can do everything in HarvestHub. Only add people you trust to manage accounts, roles and reports.</p>
+        </div>
+      </header>
       
       <div style="display: flex; flex-direction: column; gap: 32px;">
           
@@ -24,6 +31,7 @@ $navTitle = 'Manage Administrators';
           <!-- Register New Administrator Form -->
           <div class="panel">
             <h2 style="margin-bottom: 4px;">Register New Administrator</h2>
+            <p class="text-muted panel-help">They sign in with this email and the temporary password you choose. Share it with them privately; they can change it with &ldquo;Forgot password&rdquo; on the sign-in page.</p>
             
             <form id="create-admin-form" novalidate>
               <div class="admin-form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1.5fr 100px; gap: 16px; align-items: start;">
@@ -97,7 +105,7 @@ $navTitle = 'Manage Administrators';
           <?php if (can('accounts.view')): ?>
           <div class="panel">
             <div class="admin-table-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <p class="panel-title" style="margin: 0;">Administrators</p>
+              <div><p class="panel-title" style="margin: 0;">Administrators</p><p class="text-muted panel-help">You cannot archive your own account, and HarvestHub always keeps at least one active administrator.</p></div>
               <div class="admin-table-controls">
             <input type="search" id="search-admins" data-table-search="admins-table" placeholder="Search administrators...">
             <select class="admin-status-filter" data-status-filter="admins-table" aria-label="Filter by status">
@@ -124,6 +132,6 @@ $navTitle = 'Manage Administrators';
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js?v=24"></script>
+<script src="assets/admin.js?v=25"></script>
 </body>
 </html>

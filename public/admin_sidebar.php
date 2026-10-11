@@ -17,16 +17,16 @@ $sidebarLink = static function (string $page, string $label) use ($currentPage):
 };
 $sidebarDropdown = static function (string $id, string $label, array $links) use ($currentPage): string {
     if (!$links) return '';
-    $open = isset($links[$currentPage]);
+    $current = isset($links[$currentPage]); // highlighted, but closed until clicked so it never covers the page
     $items = '';
     foreach ($links as $page => $text) {
         $active = $currentPage === $page ? ' active' : '';
         $items .= "<a href=\"$page\" class=\"sidebar-link$active\" style=\"padding: 8px 16px; font-size: 0.9em;\">$text</a>";
     }
     return '<div class="sidebar-dropdown">'
-        . "<button type=\"button\" class=\"sidebar-link dropdown-toggle" . ($open ? ' active' : '') . "\" aria-expanded=\"" . ($open ? 'true' : 'false') . "\" aria-controls=\"{$id}Menu\" style=\"width: 100%; text-align: left; background: none; border: none; font-family: inherit; font-size: inherit; cursor: pointer; display: flex; justify-content: space-between; align-items: center;\">"
-        . "$label <span class=\"chevron\" style=\"transform: " . ($open ? 'rotate(180deg)' : 'rotate(0)') . "; transition: transform 0.2s; font-size: 0.75rem;\">▼</span></button>"
-        . "<div class=\"dropdown-menu\" id=\"{$id}Menu\" style=\"display: " . ($open ? 'flex' : 'none') . "; flex-direction: column; padding-left: 12px; margin-top: 4px; gap: 4px;\">$items</div>"
+        . "<button type=\"button\" class=\"sidebar-link dropdown-toggle" . ($current ? ' active' : '') . "\" aria-expanded=\"" . 'false' . "\" aria-controls=\"{$id}Menu\" style=\"width: 100%; text-align: left; background: none; border: none; font-family: inherit; font-size: inherit; cursor: pointer; display: flex; justify-content: space-between; align-items: center;\">"
+        . "$label <span class=\"chevron\" style=\"transform: " . 'rotate(0)' . "; transition: transform 0.2s; font-size: 0.75rem;\">▼</span></button>"
+        . "<div class=\"dropdown-menu\" id=\"{$id}Menu\" style=\"display: " . 'none' . "; flex-direction: column; padding-left: 12px; margin-top: 4px; gap: 4px;\">$items</div>"
         . '</div>';
 };
 ?>
@@ -53,6 +53,7 @@ $sidebarDropdown = static function (string $id, string $label, array $links) use
   </nav>
 
   <div class="sidebar-footer" id="adminSidebarLogout">
+    <?= $sidebarLink('admin_help.php', 'Help') ?>
     <a href="logout.php" class="sidebar-link" style="color: #fca5a5;">Log Out</a>
   </div>
   </div>

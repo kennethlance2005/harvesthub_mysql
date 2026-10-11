@@ -10,18 +10,26 @@ $navTitle = 'Manage Coordinators';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Manage Coordinators</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=59">
+<link rel="stylesheet" href="assets/style.css?v=60">
 </head>
 <body class="account-page">
 <div class="app-layout">
   <?php include __DIR__ . '/admin_sidebar.php'; ?>
   <div class="main-content">
     <main class="wrap" id="top" style="max-width: 1200px; padding-top: 32px;">
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Manage Accounts</p>
+          <h1>Coordinators</h1>
+          <p class="text-muted">Coordinators run the garden day to day: they review plot and resource requests. Approve gardeners who apply, and look after current coordinators.</p>
+        </div>
+      </header>
       
       <?php if (can('coordinator_applications.review')): ?>
       <!-- Pending Coordinator Applications -->
       <div class="panel" style="margin-bottom: 24px;">
         <p class="panel-title">Pending Coordinator Applications</p>
+        <p class="text-muted panel-help">Gardeners who asked to become coordinators. Press <strong>Review</strong> to read their application and garden activity before deciding.</p>
         <div class="table-wrap">
           <table class="data-table admin-responsive-table">
             <thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Shift</th><th>Why they want to coordinate</th><th>Actions</th></tr></thead>
@@ -37,7 +45,7 @@ $navTitle = 'Manage Coordinators';
       <?php if (can('accounts.view')): ?>
       <div class="panel">
           <div class="admin-table-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <p class="panel-title" style="margin: 0;">Garden Coordinators</p>
+          <div><p class="panel-title" style="margin: 0;">Garden Coordinators</p><p class="text-muted panel-help"><strong>Remove role</strong> takes away coordinator tools but keeps their gardener account, if they have one. <strong>Archive</strong> stops them signing in at all.</p></div>
           <div class="admin-table-controls">
             <input type="search" id="search-coordinators" data-table-search="coordinators-table" placeholder="Search coordinators...">
             <select class="admin-status-filter" data-status-filter="coordinators-table" aria-label="Filter by status">
@@ -62,6 +70,6 @@ $navTitle = 'Manage Coordinators';
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js?v=24"></script>
+<script src="assets/admin.js?v=25"></script>
 </body>
 </html>

@@ -22,7 +22,7 @@ function dashCard(string $id, string $title, string $help, bool $wide = false): 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HarvestHub — Admin Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=59">
+<link rel="stylesheet" href="assets/style.css?v=60">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body class="account-page">
@@ -45,6 +45,18 @@ function dashCard(string $id, string $title, string $help, bool $wide = false): 
         </div>
         <?php endif; ?>
       </header>
+
+      <!-- First-visit pointer to the guide (hidden again once dismissed, in this browser) -->
+      <aside class="panel dash-welcome" id="dash-welcome" hidden>
+        <div>
+          <h2>New to HarvestHub?</h2>
+          <p class="text-muted">The five-minute guide explains your daily check, everyday tasks like approving sign-ups, and the words HarvestHub uses.</p>
+        </div>
+        <div class="dash-welcome-actions">
+          <a class="btn btn-accent btn-sm" href="admin_help.php">Read the guide</a>
+          <button type="button" class="btn btn-ghost btn-sm" id="dash-welcome-close">Don't show again</button>
+        </div>
+      </aside>
 
       <!-- One filter row for every chart -->
       <section class="panel dash-filters" aria-label="Time period">
@@ -108,7 +120,7 @@ function dashCard(string $id, string $title, string $help, bool $wide = false): 
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=24"></script>
-<script src="assets/dashboard.js?v=1"></script>
+<script src="assets/admin.js?v=25"></script>
+<script src="assets/dashboard.js?v=2"></script>
 </body>
 </html>

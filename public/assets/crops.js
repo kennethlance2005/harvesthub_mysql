@@ -279,6 +279,20 @@ document.addEventListener('DOMContentLoaded', () => {
       notes: String(fields.get('notes') || '').trim(),
       yield: String(fields.get('yield') || '').trim(),
     };
+    // Harvested and Failed finish the crop: ask before saving that change.
+    const savedStatus = form.querySelector('select[name="status"] option[selected]')?.value;
+    if ((values.status === 'Harvested' || values.status === 'Failed') && values.status !== savedStatus) {
+      const cropName = form.closest('.crop-accordion')?.querySelector('.crop-accordion-title strong')?.textContent?.trim() || 'this crop';
+      const confirmed = await hhConfirm({
+        title: `Mark ${cropName} as ${values.status.toLowerCase()}?`,
+        message: values.status === 'Harvested'
+          ? 'This finishes the crop. You can then offer it on the exchange board, but you can no longer log maintenance for it.'
+          : 'This finishes the crop as failed. You can no longer log maintenance for it.',
+        confirmText: `Mark as ${values.status.toLowerCase()}`,
+        cancelText: 'Go back',
+      });
+      if (!confirmed) return;
+    }
     button.disabled = true;
     button.textContent = 'Saving...';
     try {

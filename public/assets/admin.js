@@ -107,7 +107,7 @@ async function loadStats() {
 
   const res = await fetch('api.php?action=stats');
   const data = await res.json();
-  if (!data.ok) return;
+  if (!data.ok) { hhLoadFailed(data.error); return; }
 
   const cards = [
     ['Administrators', data.stats.admins],
@@ -131,9 +131,11 @@ async function loadStats() {
 }
 
 async function loadAccounts() {
+  // Only on pages that show an account table
+  if (!document.querySelector('#gardeners-table, #coordinators-table, #admins-table')) return;
   const res = await fetch('api.php?action=accounts');
   const data = await res.json();
-  if (!data.ok) return;
+  if (!data.ok) { hhLoadFailed(data.error); return; }
 
   // Render Gardeners if table exists
   const gardenersTable = document.getElementById('gardeners-table');
@@ -727,7 +729,7 @@ async function loadSignupRequests() {
 
   const res = await fetch('api.php?action=pending_signups');
   const data = await res.json();
-  if (!data.ok) return;
+  if (!data.ok) { hhLoadFailed(data.error); return; }
 
   const renderRow = (r) => `
     <tr data-name="${escapeHtml(r.FirstName + ' ' + r.LastName)}" data-location="${escapeHtml(r.Location || '')}">

@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
             
-            if (!data.ok) return;
+            if (!data.ok) { hhLoadFailed(data.error); return; }
 
             const cropOptions = document.getElementById('maintenance-crop-options');
             const maintenanceCropInput = document.getElementById('crop-name');
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="crop-row-actions">
                         <label class="sr-only" for="crop-status-${Number(p.PlotID)}">Status of ${escapeHtml(p.CropName)}</label>
-                        <select class="status-dropdown" id="crop-status-${Number(p.PlotID)}" data-id="${p.PlotID}">
+                        <select class="status-dropdown" id="crop-status-${Number(p.PlotID)}" data-id="${p.PlotID}" data-current="${escapeHtml(p.Status)}" data-name="${escapeHtml(p.CropName)}">
                             <option value="Planted" ${p.Status === 'Planted' ? 'selected' : ''}>Planted</option>
                             <option value="Harvested" ${p.Status === 'Harvested' ? 'selected' : ''}>Harvested</option>
                             <option value="Failed" ${p.Status === 'Failed' ? 'selected' : ''}>Failed</option>
@@ -84,7 +84,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 select.addEventListener('change', async (e) => {
                     const plotId = e.target.getAttribute('data-id');
                     const newStatus = e.target.value;
-                    
+                    // Harvested and Failed end the crop: no more maintenance can be logged for it.
+                    if (newStatus === 'Harvested' || newStatus === 'Failed') {
+                        const confirmed = await hhConfirm({
+                            title: `Mark ${select.dataset.name} as ${newStatus.toLowerCase()}?`,
+                            message: newStatus === 'Harvested'
+                                ? 'This finishes the crop. You can then offer it on the exchange board, but you can no longer log maintenance for it.'
+                                : 'This finishes the crop as failed. You can no longer log maintenance for it.',
+                            confirmText: `Mark as ${newStatus.toLowerCase()}`,
+                            cancelText: 'Keep it growing',
+                        });
+                        if (!confirmed) {
+                            select.value = select.dataset.current;
+                            return;
+                        }
+                    }
+
                     try {
                         const res = await fetch('api.php', {
                             method: 'POST',
@@ -284,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
 
-            if (!data.ok) return;
+            if (!data.ok) { hhLoadFailed(data.error); return; }
 
             gridEl.innerHTML = '';
 

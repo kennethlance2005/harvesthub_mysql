@@ -439,6 +439,18 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('beforeprint', () => Object.values(charts).forEach(c => c.resize()));
   window.addEventListener('afterprint', () => Object.values(charts).forEach(c => c.resize()));
 
+  // ---------- First-visit guide card (remembered in this browser only) ----------
+  const welcome = document.getElementById('dash-welcome');
+  if (welcome) {
+    let dismissed = false;
+    try { dismissed = localStorage.getItem('hh-guide-dismissed') === '1'; } catch (e) { /* storage blocked: just show it */ }
+    welcome.hidden = dismissed;
+    document.getElementById('dash-welcome-close').addEventListener('click', () => {
+      welcome.hidden = true;
+      try { localStorage.setItem('hh-guide-dismissed', '1'); } catch (e) { /* ignore */ }
+    });
+  }
+
   // ---------- Start ----------
   const query = new URLSearchParams(location.search);
   const startRange = query.get('range');

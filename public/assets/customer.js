@@ -304,7 +304,7 @@ async function loadCustomerDashboard() {
   try {
     const res = await fetch('api.php?action=customer_dashboard_overview');
     const data = await res.json();
-    if (!data.ok) return;
+    if (!data.ok) { hhLoadFailed(data.error); return; }
 
     const noticePanel = document.getElementById('archive-notice-panel');
     if (noticePanel && data.archive_notice) {
