@@ -84,7 +84,7 @@ $navTitle = 'My Crops';
 			<div id="crop-request-form">
 				<div class="field">
 					<label for="requested-crop-name">Common name <span class="required">*</span></label>
-					<input type="text" id="requested-crop-name" maxlength="60" required>
+					<input type="text" id="requested-crop-name" maxlength="60" aria-required="true">
 				</div>
 				<div class="field">
 					<label for="requested-crop-notes">Notes or source <span class="field-optional">(optional)</span></label>
