@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const historyRequests = dataReq.requests.filter(r => ['Rejected', 'Approved', 'Return Requested', 'Donated'].includes(r.Status));
             const borrowedItems = dataReq.requests.filter(r => ['Approved', 'Return Requested'].includes(r.Status));
             const donationRequests = dataReq.requests.filter(r => r.RequestType === 'Donation' && r.Status === 'Requested');
-            const rejectedRequests = dataReq.requests.filter(r => r.Status === 'Rejected');
+            const rejectedRequests = dataReq.requests.filter(r => r.Status === 'Rejected' && r.RequestType === 'Donation');
             const personalItems = dataPers.items;
 
             pendingLimit.count = borrowRequests.length;

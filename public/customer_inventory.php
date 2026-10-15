@@ -128,6 +128,6 @@ $navTitle = 'Resource Inventory';
   </form>
 </dialog>
 <script src="assets/app.js"></script>
-<script src="assets/inventory.js?v=17"></script>
+<script src="assets/inventory.js?v=18"></script>
 </body>
 </html>
