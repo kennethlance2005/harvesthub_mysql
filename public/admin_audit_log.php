@@ -109,7 +109,7 @@ $navTitle = 'Audit Log';
         <nav class="audit-pager" aria-label="Audit log pages">
           <button type="button" class="btn btn-ghost btn-sm" id="audit-prev">â† Newer</button>
           <span id="audit-page-label" class="text-muted"></span>
-          <button type="button" class="btn btn-ghost btn-sm" id="audit-next">Older â†’</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="audit-next">Older ➤</button>
         </nav>
       </section>
 

@@ -53,11 +53,11 @@ $link = static fn (string $page, string $text): string => canOpen($page)
         <dl class="help-tasks">
           <div>
             <dt>Approve someone who signed up</dt>
-            <dd>Go to <?= $link('admin_manage_gardeners.php', 'Manage Accounts â†’ Gardeners') ?>. Under <em>Pending Gardener Requests</em>, press <strong>Review</strong>, check their details, then <strong>Approve</strong>. If you decline, write a short reason: they will see it.</dd>
+            <dd>Go to <?= $link('admin_manage_gardeners.php', 'Manage Accounts ➤ Gardeners') ?>. Under <em>Pending Gardener Requests</em>, press <strong>Review</strong>, check their details, then <strong>Approve</strong>. If you decline, write a short reason: they will see it.</dd>
           </div>
           <div>
             <dt>Make a gardener a coordinator</dt>
-            <dd>Gardeners apply from their own dashboard. Their application appears in <?= $link('admin_manage_coordinators.php', 'Manage Accounts â†’ Coordinators') ?>. <strong>Review</strong> shows their answers and how active they have been in the garden.</dd>
+            <dd>Gardeners apply from their own dashboard. Their application appears in <?= $link('admin_manage_coordinators.php', 'Manage Accounts ➤ Coordinators') ?>. <strong>Review</strong> shows their answers and how active they have been in the garden.</dd>
           </div>
           <div>
             <dt>Someone can't sign in</dt>
@@ -81,8 +81,8 @@ $link = static fn (string $page, string $text): string => canOpen($page)
       <section class="panel help-section" id="find" aria-labelledby="find-title">
         <h2 id="find-title">3. Finding information</h2>
         <ul class="help-list">
-          <li><?= $link('admin_overview.php', 'Garden â†’ Overview') ?>: every plot, shared item, request, exchange listing and sign-up in one place, including finished and declined ones.</li>
-          <li><?= $link('admin_activity.php', 'Manage Accounts â†’ User Activity') ?>: who signed in when, and who has gone quiet. Click a name for that person&rsquo;s full profile and history.</li>
+          <li><?= $link('admin_overview.php', 'Garden ➤ Overview') ?>: every plot, shared item, request, exchange listing and sign-up in one place, including finished and declined ones.</li>
+          <li><?= $link('admin_activity.php', 'Manage Accounts ➤ User Activity') ?>: who signed in when, and who has gone quiet. Click a name for that person&rsquo;s full profile and history.</li>
           <li><?= $link('admin_reports.php', 'Reports') ?>: ready-made reports for any time period. Download them as a spreadsheet or save them as a PDF.</li>
           <li><?= $link('admin_audit_log.php', 'Audit Log') ?>: a permanent record of everything important that happened, who did it, and why.</li>
         </ul>

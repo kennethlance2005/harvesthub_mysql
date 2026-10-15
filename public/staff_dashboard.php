@@ -39,14 +39,14 @@ $navTitle = 'Coordinator Dashboard';
         <a class="coordinator-shortcut" href="staff_plots.php">
           <span class="shortcut-index">01</span>
           <span><strong>Plots</strong><small>Review applications and manage the plot map</small></span>
-          <span class="shortcut-arrow" aria-hidden="true">â†’</span>
+          <span class="shortcut-arrow" aria-hidden="true">➤</span>
         </a>
         <?php endif; ?>
         <?php if (canOpen('staff_inventory.php')): ?>
         <a class="coordinator-shortcut" href="staff_inventory.php">
           <span class="shortcut-index">02</span>
           <span><strong>Inventory</strong><small>Approve resource requests and check stock</small></span>
-          <span class="shortcut-arrow" aria-hidden="true">â†’</span>
+          <span class="shortcut-arrow" aria-hidden="true">➤</span>
         </a>
         <?php endif; ?>
       </section>
