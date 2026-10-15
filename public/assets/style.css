@@ -1490,6 +1490,8 @@ table.data-table {
 .signup-link:hover { border-bottom-color: var(--white); }
 
 .register-card { max-width: 780px; }
+.login-card .required,
+.login-card .required-mark { color: #ff6b6b; }
 
 /* Terms of Service checkbox (register page) */
 .terms-check {
