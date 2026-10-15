@@ -8,6 +8,47 @@ document.addEventListener('DOMContentLoaded', () => {
   let logs = [];
   let cropCatalog = [];
   let expandedPlotId = null;
+  const maintenanceCategories = [
+    {
+      name: 'Soil care',
+      actions: [
+        'Watered',
+        'Applied fertilizer',
+        'Added compost or mulch',
+        'Aerated soil',
+        'Checked soil pH / moisture levels',
+      ],
+    },
+    {
+      name: 'Plant care',
+      actions: [
+        'Pruned',
+        'Weeded surrounding area',
+        'Thinned out seedlings',
+        'Staked or added physical support (e.g., trellis)',
+        'Repotted or transplanted',
+      ],
+    },
+    {
+      name: 'Pest and disease management',
+      actions: [
+        'Treated for pests',
+        'Removed pests manually',
+        'Applied fungicide or disease treatment',
+        'Set pest traps',
+      ],
+    },
+    {
+      name: 'Inspection and harvest',
+      actions: [
+        'Inspected crop (Healthy/No action needed)',
+        'Harvested (Partial yield)',
+        'Harvested (Complete yield)',
+        'Recorded environmental damage (Frost, wind, heat stress)',
+        'Cleared dead crop',
+      ],
+    },
+  ];
 
   const localDateValue = (date = new Date()) => {
     const year = date.getFullYear();
@@ -117,9 +158,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     <label for="crop-date-${plotId}">Update date</label>
                     <input id="crop-date-${plotId}" type="date" name="logged_date" value="${localDateValue()}" required>
                   </div>
+                  <fieldset class="crop-maintenance-presets">
+                    <legend>Maintenance activities</legend>
+                    <p class="crop-maintenance-hint">Select all activities completed.</p>
+                    <div class="crop-maintenance-groups">
+                      ${maintenanceCategories.map((category, categoryIndex) => `
+                        <div class="crop-maintenance-group">
+                          <h4>${escapeHtml(category.name)}</h4>
+                          ${category.actions.map((action, actionIndex) => {
+                            const inputId = `crop-action-${plotId}-${categoryIndex}-${actionIndex}`;
+                            return `<label for="${inputId}"><input id="${inputId}" type="checkbox" name="maintenance_actions" value="${escapeHtml(action)}">${escapeHtml(action)}</label>`;
+                          }).join('')}
+                        </div>
+                      `).join('')}
+                    </div>
+                  </fieldset>
                   <div class="field crop-update-notes">
-                    <label for="crop-notes-${plotId}">Maintenance notes</label>
-                    <textarea id="crop-notes-${plotId}" name="notes" maxlength="1000" rows="1" placeholder="Watered, pruned, treated for pests..."></textarea>
+                    <label for="crop-notes-${plotId}">Additional notes (optional)</label>
+                    <textarea id="crop-notes-${plotId}" name="notes" maxlength="1000" rows="2" placeholder="Watered, pruned, treated for pests..."></textarea>
                   </div>
                   <div class="field">
                     <label for="crop-yield-${plotId}">Yield <span class="field-optional">(optional)</span></label>
@@ -276,9 +332,16 @@ document.addEventListener('DOMContentLoaded', () => {
       plot_id: form.dataset.cropForm,
       status: String(fields.get('status') || ''),
       logged_date: String(fields.get('logged_date') || ''),
-      notes: String(fields.get('notes') || '').trim(),
+      notes: [
+        ...fields.getAll('maintenance_actions').map(action => String(action)),
+        String(fields.get('notes') || '').trim(),
+      ].filter(Boolean).join('\n'),
       yield: String(fields.get('yield') || '').trim(),
     };
+    if (values.notes.length > 1000) {
+      if (typeof showToast === 'function') showToast('Maintenance activities and notes must be 1,000 characters or fewer.', 'danger');
+      return;
+    }
     // Harvested and Failed finish the crop: ask before saving that change.
     const savedStatus = form.querySelector('select[name="status"] option[selected]')?.value;
     if ((values.status === 'Harvested' || values.status === 'Failed') && values.status !== savedStatus) {
