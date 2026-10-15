@@ -42,11 +42,18 @@ const updateEmailRequirement = () => {
   const isValidEmail = emailInput.value.trim() !== '' && emailInput.validity.valid;
   emailReq.classList.toggle('valid', isValidEmail);
   emailReq.classList.toggle('invalid', !isValidEmail);
+  return isValidEmail;
 };
 
 emailInput.addEventListener('input', updateEmailRequirement);
 emailInput.addEventListener('focus', () => emailReqs.classList.add('active'));
-emailInput.addEventListener('blur', () => emailReqs.classList.remove('active'));
+emailInput.addEventListener('blur', () => {
+  if (updateEmailRequirement()) {
+    emailReqs.classList.remove('active');
+  } else {
+    emailReqs.classList.add('active');
+  }
+});
 
 // First names allow printable symbols; last names are restricted to letters and spaces.
 firstNameInput.addEventListener('input', () => {
