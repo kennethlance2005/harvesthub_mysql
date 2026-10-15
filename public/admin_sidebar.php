@@ -63,16 +63,40 @@ $sidebarDropdown = static function (string $id, string $label, array $links) use
 <script>
 // Open and close the sidebar dropdowns (Garden, Manage Accounts)
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.sidebar .dropdown-toggle').forEach(btn => {
+  const dropdowns = Array.from(document.querySelectorAll('.sidebar .sidebar-dropdown'));
+
+  const setDropdownOpen = (dropdown, isOpen) => {
+    const btn = dropdown.querySelector('.dropdown-toggle');
     const menu = document.getElementById(btn.getAttribute('aria-controls'));
     const chevron = btn.querySelector('.chevron');
     if (!menu) return;
+
+    menu.style.display = isOpen ? 'flex' : 'none';
+    btn.setAttribute('aria-expanded', String(isOpen));
+    if (chevron) chevron.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+  };
+
+  dropdowns.forEach(dropdown => {
+    const btn = dropdown.querySelector('.dropdown-toggle');
+    const menu = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!menu) return;
     btn.addEventListener('click', () => {
       const isExpanded = menu.style.display === 'flex';
-      menu.style.display = isExpanded ? 'none' : 'flex';
-      btn.setAttribute('aria-expanded', String(!isExpanded));
-      if (chevron) chevron.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(180deg)';
+      dropdowns.forEach(otherDropdown => setDropdownOpen(otherDropdown, false));
+      if (!isExpanded) setDropdownOpen(dropdown, true);
     });
+  });
+
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.sidebar-dropdown')) {
+      dropdowns.forEach(dropdown => setDropdownOpen(dropdown, false));
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      dropdowns.forEach(dropdown => setDropdownOpen(dropdown, false));
+    }
   });
 });
 
