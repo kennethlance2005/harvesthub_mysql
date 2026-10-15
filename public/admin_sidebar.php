@@ -29,9 +29,11 @@ $sidebarDropdown = static function (string $id, string $label, array $pages) use
     <span class="sprout">🌱</span> HarvestHub
   </div>
 
-  <button class="sidebar-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="adminSidebarNav adminSidebarLogout">
+  <button class="sidebar-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="adminSidebarUser adminSidebarNav adminSidebarLogout">
     <span></span><span></span><span></span>
   </button>
+
+  <?php $sidebarUserId = 'adminSidebarUser'; include __DIR__ . '/sidebar_identity.php'; ?>
 
   <?php if (hasCustomRoleAssignment()): ?>
     <?php include __DIR__ . '/sidebar_role_groups.php'; ?>

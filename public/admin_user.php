@@ -10,9 +10,9 @@ $profileId = ctype_digit((string) ($_GET['id'] ?? '')) ? (int) $_GET['id'] : 0;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HarvestHub — Profile</title>
+<title>HarvestHub â€” Profile</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=60">
+<link rel="stylesheet" href="assets/style.css?v=63">
 </head>
 <body class="account-page">
 
@@ -20,7 +20,7 @@ $profileId = ctype_digit((string) ($_GET['id'] ?? '')) ? (int) $_GET['id'] : 0;
   <?php include __DIR__ . '/admin_sidebar.php'; ?>
   <div class="main-content">
     <main class="wrap gardener-page profile-page" id="top" data-profile-type="<?= htmlspecialchars($profileType, ENT_QUOTES, 'UTF-8') ?>" data-profile-id="<?= $profileId ?>">
-      <a class="profile-back" href="admin_activity.php">← All people</a>
+      <a class="profile-back" href="admin_activity.php">â† All people</a>
 
       <header class="page-head profile-head" id="profile-head">
         <div>

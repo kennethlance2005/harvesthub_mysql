@@ -183,6 +183,54 @@ function hasCustomRoleAssignment(): bool {
     }
 }
 
+/** Built-in and custom role names for the current signed-in account. */
+function currentUserRoleLabels(): array {
+    $user = currentUser();
+    if (!$user) return [];
+
+    $labels = [];
+    $builtInLabels = [
+        'admin' => 'Administrator',
+        'staff' => 'Coordinator',
+        'customer' => 'Gardener',
+    ];
+    foreach ($user['roles'] as $role) {
+        if (isset($builtInLabels[$role])) $labels[] = $builtInLabels[$role];
+    }
+
+    $accounts = [];
+    if (!empty($user['ids']['customer'])) $accounts[] = ['gardener', (int) $user['ids']['customer']];
+    if (!empty($user['ids']['staff'])) $accounts[] = ['coordinator', (int) $user['ids']['staff']];
+    if (!$accounts) return $labels;
+
+    $conditions = [];
+    $params = [];
+    foreach ($accounts as [$type, $id]) {
+        $conditions[] = '(UR.AccountType = ? AND UR.AccountID = ?)';
+        $params[] = $type;
+        $params[] = $id;
+    }
+
+    try {
+        require_once __DIR__ . '/../db.php';
+        $stmt = getDb()->prepare('
+            SELECT DISTINCT R.Name
+            FROM USER_ROLE UR
+            JOIN ROLE R ON R.RoleID = UR.RoleID
+            WHERE ' . implode(' OR ', $conditions) . '
+            ORDER BY R.Name
+        ');
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $name) {
+            if (!in_array($name, $labels, true)) $labels[] = $name;
+        }
+    } catch (Throwable $e) {
+        error_log('HarvestHub: could not load role labels for navigation: ' . $e->getMessage());
+    }
+
+    return $labels;
+}
+
 /**
  * Page guard for admin and coordinator pages: sends visitors to the login
  * page and shows a friendly "no access" page to people without permission.

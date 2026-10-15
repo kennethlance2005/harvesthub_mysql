@@ -8,11 +8,11 @@ $navTitle = 'My Crops';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HarvestHub — My Crops</title>
+<title>HarvestHub â€” My Crops</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=62">
+<link rel="stylesheet" href="assets/style.css?v=63">
 </head>
 <body class="account-page">
 <div class="app-layout">
@@ -75,7 +75,7 @@ $navTitle = 'My Crops';
 			<textarea id="plot-notes" maxlength="1000" rows="3" placeholder="e.g., Used organic compost"></textarea>
 		</div>
 		<div class="crop-catalog-request-toggle">
-			<p>Can’t find your crop?</p>
+			<p>Canâ€™t find your crop?</p>
 			<button type="button" class="btn btn-ghost btn-sm" id="show-crop-request">Request it for the catalog</button>
 		</div>
 		<section id="crop-request-panel" class="crop-catalog-request-panel" hidden aria-labelledby="crop-request-title">

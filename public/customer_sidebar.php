@@ -13,9 +13,7 @@ $sidebarNavLabel = 'Role navigation';
       <span></span><span></span><span></span>
     </button>
 
-    <div class="sidebar-user" id="customerSidebarUser">
-      <?= htmlspecialchars($user['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>
-    </div>
+    <?php $sidebarUserId = 'customerSidebarUser'; include __DIR__ . '/sidebar_identity.php'; ?>
 
     <?php if (hasCustomRoleAssignment()): ?>
       <?php include __DIR__ . '/sidebar_role_groups.php'; ?>

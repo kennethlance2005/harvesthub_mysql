@@ -9,11 +9,11 @@ $firstName = explode(' ', trim($user['name']))[0];
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HarvestHub — Dashboard</title>
+<title>HarvestHub â€” Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=60">
+<link rel="stylesheet" href="assets/style.css?v=63">
 </head>
 <body class="account-page">
 
@@ -45,7 +45,7 @@ $firstName = explode(' ', trim($user['name']))[0];
         <p>To resolve this, please return borrowed items and request unassignment of any plots assigned to you.</p>
         <p class="dash-notice-links">
           <a href="customer_inventory.php">Go to Resource Inventory</a>
-          <span aria-hidden="true"> · </span>
+          <span aria-hidden="true"> Â· </span>
           <a href="customer_plots.php">Go to My Plots</a>
         </p>
       </section>
@@ -54,18 +54,18 @@ $firstName = explode(' ', trim($user['name']))[0];
       <div class="dash-kpis">
         <a class="panel dash-kpi" href="customer_plots.php">
           <span class="dash-kpi-label">Active plots</span>
-          <span class="dash-kpi-value" id="kpi-plots">–</span>
-          <span class="dash-kpi-link">View my plots <span aria-hidden="true">→</span></span>
+          <span class="dash-kpi-value" id="kpi-plots">â€“</span>
+          <span class="dash-kpi-link">View my plots <span aria-hidden="true">â†’</span></span>
         </a>
         <a class="panel dash-kpi" href="customer_inventory.php">
           <span class="dash-kpi-label">Pending resource requests</span>
-          <span class="dash-kpi-value" id="kpi-resources">–</span>
-          <span class="dash-kpi-link">Go to inventory <span aria-hidden="true">→</span></span>
+          <span class="dash-kpi-value" id="kpi-resources">â€“</span>
+          <span class="dash-kpi-link">Go to inventory <span aria-hidden="true">â†’</span></span>
         </a>
         <a class="panel dash-kpi" href="customer_exchange.php">
           <span class="dash-kpi-label">My exchange listings</span>
-          <span class="dash-kpi-value" id="kpi-listings">–</span>
-          <span class="dash-kpi-link">Open exchange board <span aria-hidden="true">→</span></span>
+          <span class="dash-kpi-value" id="kpi-listings">â€“</span>
+          <span class="dash-kpi-link">Open exchange board <span aria-hidden="true">â†’</span></span>
         </a>
       </div>
 
@@ -136,7 +136,7 @@ $firstName = explode(' ', trim($user['name']))[0];
               <select id="coordinator-experience" name="gardening_experience" required>
                 <option value="" selected disabled>Select your experience</option>
                 <option value="Beginner">Beginner</option>
-                <option value="1-2 years">1–2 years</option>
+                <option value="1-2 years">1â€“2 years</option>
                 <option value="3+ years">3+ years</option>
               </select>
             </div>

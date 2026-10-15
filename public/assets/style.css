@@ -1799,6 +1799,9 @@ table.data-table {
 }
 
 .sidebar-user {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin: 0;
   padding-left: 22px;
   border-left: 1px solid rgba(255, 255, 255, 0.18);
@@ -1808,6 +1811,8 @@ table.data-table {
   overflow-wrap: anywhere;
   flex-shrink: 0;
 }
+.sidebar-user-name { color: #d1d9d3; }
+.sidebar-user-roles { color: #a0aec0; font-size: 0.76rem; font-weight: 500; }
 
 .sidebar-nav {
   display: flex;
