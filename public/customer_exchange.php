@@ -105,6 +105,13 @@ $navTitle = 'Exchange Board';
             </div>
           </section>
 
+          <section class="panel ex-card" aria-labelledby="my-claims-title">
+            <h2 class="panel-title" id="my-claims-title">My claim requests</h2>
+            <div id="my-claims-list" class="ex-list" aria-live="polite">
+              <p class="ex-empty">Loading your claim requests...</p>
+            </div>
+          </section>
+
         </div>
 
       </div>
@@ -141,6 +148,6 @@ $navTitle = 'Exchange Board';
   </div>
 </div>
 <script src="assets/app.js"></script>
-<script src="assets/exchange.js?v=5"></script>
+<script src="assets/exchange.js?v=7"></script>
 </body>
 </html>

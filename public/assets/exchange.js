@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="badge badge-brown">${escapeHtml(p.Qty)}</span>
                         </div>
                         ${p.Description ? `<p class="ex-row-desc">${escapeHtml(p.Description)}</p>` : ''}
-                        <span class="ex-row-meta">Posted ${escapeHtml(formatExDate(p.CreatedAt))}</span>
+                        <span class="ex-row-meta">Listed by ${escapeHtml(p.GardenerName || 'Unknown gardener')} · Posted ${escapeHtml(formatExDate(p.CreatedAt))}</span>
                     </div>
                     ${isMine
                         ? '<span class="badge badge-neutral">Your listing</span>'
@@ -331,30 +331,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     const claimId = btn.dataset.id;
                     const status = btn.dataset.status;
                     const accepting = status === 'Accepted';
-                    if (!await hhConfirm(accepting ? {
-                        title: `Give ${btn.dataset.qty} of ${btn.dataset.produce}?`,
-                        message: `${btn.dataset.qty} is taken off your listing straight away, and the gardener sees that you agreed. Arrange the pickup with them as they described.`,
-                        confirmText: 'Accept request',
-                    } : {
-                        title: `Decline this request for ${btn.dataset.produce}?`,
-                        message: 'The gardener is told you declined. Your listing stays open for others.',
-                        confirmText: 'Decline request',
-                        cancelText: 'Keep it',
-                        tone: 'danger',
-                    })) return;
+                    let reason = '';
+                    if (accepting) {
+                        if (!await hhConfirm({
+                            title: `Give ${btn.dataset.qty} of ${btn.dataset.produce}?`,
+                            message: `${btn.dataset.qty} is taken off your listing straight away, and the gardener sees that you agreed. Arrange the pickup with them as they described.`,
+                            confirmText: 'Accept request',
+                        })) return;
+                    } else {
+                        reason = await hhPrompt({
+                            title: `Decline this request for ${btn.dataset.produce}?`,
+                            message: 'The gardener will see your explanation. Your listing stays open for others.',
+                            label: 'Reason for declining',
+                            placeholder: 'Explain why you are declining this request.',
+                            confirmText: 'Decline request',
+                            cancelText: 'Keep it',
+                            tone: 'danger',
+                        });
+                        if (reason === null) return;
+                    }
                     btn.disabled = true;
 
                     try {
                         const res = await fetch('api.php', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: new URLSearchParams({ action: 'handle_claim_request', claim_id: claimId, status: status })
+                            body: new URLSearchParams({ action: 'handle_claim_request', claim_id: claimId, status: status, reason })
                         });
                         const result = await res.json();
                         
                         if (result.ok) {
                             if (typeof showToast === 'function') showToast(`Request ${status.toLowerCase()}!`, 'success');
-                            loadPendingRequests(); 
+                            loadPendingRequests();
                         } else {
                             if (typeof showToast === 'function') showToast(result.error || 'Action failed.', 'danger');
                             btn.disabled = false;
@@ -372,8 +380,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function loadMyClaims() {
+        try {
+            const res = await fetch('api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ action: 'my_exchange_claims' })
+            });
+            const data = await res.json();
+            if (!data.ok) { hhLoadFailed(data.error); return; }
+
+            const myClaimsEl = document.getElementById('my-claims-list');
+            if (data.claims.length === 0) {
+                myClaimsEl.innerHTML = '<p class="ex-empty">You have not requested any listings yet.</p>';
+                return;
+            }
+
+            const statusClass = { Pending: 'badge-brown', Accepted: 'badge-green', Rejected: 'badge-neutral' };
+            myClaimsEl.innerHTML = data.claims.map(claim => `
+                <div class="ex-claim">
+                    <div class="ex-row-title">
+                        <strong>${escapeHtml(claim.ProduceName)}</strong>
+                        <span class="badge ${statusClass[claim.Status] || 'badge-neutral'}">${escapeHtml(claim.Status)}</span>
+                    </div>
+                    <p class="ex-claim-pickup">Requested ${escapeHtml(claim.QtyWanted)}</p>
+                    ${claim.Status === 'Rejected' && claim.RejectionReason
+                        ? `<p class="ex-claim-pickup"><strong>Reason:</strong> ${escapeHtml(claim.RejectionReason)}</p>`
+                        : ''}
+                </div>
+            `).join('');
+        } catch (err) {
+            console.error('Error loading your claim requests:', err);
+            document.getElementById('my-claims-list').innerHTML = '<p class="ex-empty ex-error">Failed to load your claim requests.</p>';
+        }
+    }
+
     // Initialize the page
     loadExchangeFeed();
     loadMyListings();
     loadPendingRequests();
+    loadMyClaims();
 });

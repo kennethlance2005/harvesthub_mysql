@@ -14,3 +14,5 @@ For local XAMPP, copy `secrets.local.example.php` to `secrets.local.php` and ent
 For an existing database, apply `migrations/20261010_email_verification.sql` once. Fresh installations get the verification table and password-reset email throttle field from `schema.sql`. Codes expire after 10 minutes, allow five verification attempts, and can be resent once per minute. Password-reset messages are also limited to one per email per minute.
 
 For existing databases missing the status fields from the signup request table, apply `migrations/20261011_signup_request_status_fields.sql` once. It ensures `RejectionReason` and the unique `StatusToken` field required by registration status links are present.
+
+For existing databases, apply `migrations/20261015_exchange_claim_rejection_reason.sql` once. It adds the required rejection explanation field for exchange claim requests; fresh installations get it from `schema.sql`.

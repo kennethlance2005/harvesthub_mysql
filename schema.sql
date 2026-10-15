@@ -393,6 +393,7 @@ CREATE TABLE IF NOT EXISTS EXCHANGE_CLAIMS (
     QtyWanted VARCHAR(50) NOT NULL,
     PickupDetails TEXT NOT NULL,
     Status ENUM('Pending', 'Accepted', 'Rejected') DEFAULT 'Pending',
+    RejectionReason VARCHAR(1000) NULL,
     CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

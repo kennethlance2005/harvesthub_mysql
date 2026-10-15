@@ -1234,7 +1234,13 @@ try {
 
         case 'exchange_feed': {
             $user = requireJsonRole('customer');
-            $stmt = $pdo->query("SELECT * FROM EXCHANGE_BOARD WHERE Status = 'Active' ORDER BY CreatedAt DESC");
+            $stmt = $pdo->query("
+                SELECT B.*, G.Name AS GardenerName
+                FROM EXCHANGE_BOARD B
+                JOIN COMMUNITY_GARDENER G ON G.GardenerID = B.GardenerID
+                WHERE B.Status = 'Active'
+                ORDER BY B.CreatedAt DESC
+            ");
             respond([
                 'ok' => true, 
                 'current_user_id' => $user['id'], // Added so JS knows who is logged in
@@ -1338,13 +1344,30 @@ try {
             respond(['ok' => true, 'claims' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         }
 
+        case 'my_exchange_claims': {
+            $user = requireJsonRole('customer');
+            $stmt = $pdo->prepare("
+                SELECT c.ClaimID, c.QtyWanted, c.Status, c.RejectionReason, c.CreatedAt, b.ProduceName
+                FROM EXCHANGE_CLAIMS c
+                JOIN EXCHANGE_BOARD b ON b.PostID = c.PostID
+                WHERE c.RequesterID = ?
+                ORDER BY c.CreatedAt DESC
+            ");
+            $stmt->execute([$user['id']]);
+            respond(['ok' => true, 'claims' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        }
+
         case 'handle_claim_request': {
             $user = requireJsonRole('customer');
             $claimId = (int)($_POST['claim_id'] ?? 0);
             $status = $_POST['status'] ?? ''; // 'Accepted' or 'Rejected'
+            $rejectionReason = trim($_POST['reason'] ?? '');
 
             if (!in_array($status, ['Accepted', 'Rejected'])) {
                 respond(['ok' => false, 'error' => 'Invalid action.'], 422);
+            }
+            if ($status === 'Rejected' && ($rejectionReason === '' || mb_strlen($rejectionReason) > 1000)) {
+                respond(['ok' => false, 'error' => 'A rejection reason of 1 to 1000 characters is required.'], 422);
             }
 
             // 1. Fetch the claim and board data to verify ownership and check quantities
@@ -1389,8 +1412,8 @@ try {
             }
 
             // 3. Finally, update the claim's status
-            $stmt = $pdo->prepare("UPDATE EXCHANGE_CLAIMS SET Status = ? WHERE ClaimID = ?");
-            $stmt->execute([$status, $claimId]);
+            $stmt = $pdo->prepare("UPDATE EXCHANGE_CLAIMS SET Status = ?, RejectionReason = ? WHERE ClaimID = ?");
+            $stmt->execute([$status, $status === 'Rejected' ? $rejectionReason : null, $claimId]);
             $requester = $postData['RequesterName'] ?: 'another gardener';
             logAudit($pdo, 'exchange', $status === 'Accepted' ? 'claim_accepted' : 'claim_rejected',
                 $status === 'Accepted'
