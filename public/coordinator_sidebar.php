@@ -1,4 +1,8 @@
-<?php $currentPage = basename($_SERVER['PHP_SELF']); ?>
+<?php
+$currentPage = basename($_SERVER['PHP_SELF']);
+$sidebarNavId = 'coordinatorSidebarNav';
+$sidebarNavLabel = 'Role navigation';
+?>
 <aside class="sidebar coordinator-sidebar">
   <div class="sidebar-inner">
     <div class="sidebar-brand"><span class="sprout">🌱</span> HarvestHub</div>
@@ -6,6 +10,9 @@
       <span></span><span></span><span></span>
     </button>
     <div class="sidebar-user" id="coordinatorSidebarUser"><?= htmlspecialchars($user['name'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
+    <?php if (hasCustomRoleAssignment()): ?>
+      <?php include __DIR__ . '/sidebar_role_groups.php'; ?>
+    <?php else: ?>
     <nav class="sidebar-nav" id="coordinatorSidebarNav" aria-label="Coordinator navigation">
       <?php if (canOpen('staff_dashboard.php')): ?><a href="staff_dashboard.php" class="sidebar-link <?= $currentPage === 'staff_dashboard.php' ? 'active' : '' ?>">Dashboard</a><?php endif; ?>
       <?php if (canOpen('staff_plots.php')): ?><a href="staff_plots.php" class="sidebar-link <?= $currentPage === 'staff_plots.php' ? 'active' : '' ?>">Plots</a><?php endif; ?>
@@ -19,6 +26,7 @@
       <a href="customer_exchange.php" class="sidebar-link <?= $currentPage === 'customer_exchange.php' ? 'active' : '' ?>">Exchange Board</a>
       <?php endif; ?>
     </nav>
+    <?php endif; ?>
     <div class="sidebar-footer" id="coordinatorSidebarLogout"><a href="logout.php" class="sidebar-link coordinator-logout">Log Out</a></div>
   </div>
 </aside>

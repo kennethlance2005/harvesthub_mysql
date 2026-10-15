@@ -1,6 +1,7 @@
 <?php
-// Get the current filename (e.g., 'customer_dashboard.php')
 $currentPage = basename($_SERVER['PHP_SELF']);
+$sidebarNavId = 'customerSidebarNav';
+$sidebarNavLabel = 'Role navigation';
 ?>
 <aside class="sidebar">
   <div class="sidebar-inner">
@@ -16,35 +17,27 @@ $currentPage = basename($_SERVER['PHP_SELF']);
       <?= htmlspecialchars($user['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>
     </div>
 
+    <?php if (hasCustomRoleAssignment()): ?>
+      <?php include __DIR__ . '/sidebar_role_groups.php'; ?>
+    <?php else: ?>
     <nav class="sidebar-nav" id="customerSidebarNav" aria-label="Customer navigation">
-      <a href="customer_dashboard.php" class="sidebar-link <?= $currentPage === 'customer_dashboard.php' ? 'active' : '' ?>">
-        Dashboard
-      </a>
-      <a href="customer_crops.php" class="sidebar-link <?= $currentPage === 'customer_crops.php' ? 'active' : '' ?>">
-        My Crops
-      </a>
-      <a href="customer_plots.php" class="sidebar-link <?= $currentPage === 'customer_plots.php' ? 'active' : '' ?>">
-        My Plots
-      </a>
-      <a href="customer_inventory.php" class="sidebar-link <?= $currentPage === 'customer_inventory.php' ? 'active' : '' ?>">
-        Resource Inventory
-      </a>
-      <a href="customer_exchange.php" class="sidebar-link <?= $currentPage === 'customer_exchange.php' ? 'active' : '' ?>">
-        Exchange Board
-      </a>
+      <a href="customer_dashboard.php" class="sidebar-link <?= $currentPage === 'customer_dashboard.php' ? 'active' : '' ?>">Dashboard</a>
+      <a href="customer_crops.php" class="sidebar-link <?= $currentPage === 'customer_crops.php' ? 'active' : '' ?>">My Crops</a>
+      <a href="customer_plots.php" class="sidebar-link <?= $currentPage === 'customer_plots.php' ? 'active' : '' ?>">My Plots</a>
+      <a href="customer_inventory.php" class="sidebar-link <?= $currentPage === 'customer_inventory.php' ? 'active' : '' ?>">Resource Inventory</a>
+      <a href="customer_exchange.php" class="sidebar-link <?= $currentPage === 'customer_exchange.php' ? 'active' : '' ?>">Exchange Board</a>
       <?php $toolsPage = firstOpenablePage(['staff_dashboard.php', 'staff_plots.php', 'staff_inventory.php', 'staff_records.php']); ?>
       <?php if ($toolsPage): ?>
-      <a href="<?= $toolsPage ?>" class="sidebar-link">
-        <?= hasRole('staff') ? 'Coordinator Workspace' : 'Garden Tools' ?>
+      <a href="<?= htmlspecialchars($toolsPage, ENT_QUOTES, 'UTF-8') ?>" class="sidebar-link">
+        <?= hasRole('staff') ? 'Coordinator Workspace' : 'Coordinator Tools' ?>
       </a>
       <?php endif; ?>
-      <?php $adminPage = firstOpenablePage(array_keys(array_filter(PAGE_PERMISSIONS, fn ($perms, $page) => str_starts_with($page, 'admin_'), ARRAY_FILTER_USE_BOTH))); ?>
+      <?php $adminPage = firstOpenablePage(array_keys(array_filter(PAGE_PERMISSIONS, static fn ($perms, $page) => str_starts_with($page, 'admin_'), ARRAY_FILTER_USE_BOTH))); ?>
       <?php if ($adminPage): ?>
-      <a href="<?= $adminPage ?>" class="sidebar-link">
-        Admin Tools
-      </a>
+      <a href="<?= htmlspecialchars($adminPage, ENT_QUOTES, 'UTF-8') ?>" class="sidebar-link">Admin Tools</a>
       <?php endif; ?>
     </nav>
+    <?php endif; ?>
 
     <div class="sidebar-footer" id="customerSidebarLogout">
       <a href="logout.php" class="sidebar-link" style="color: #fca5a5;">Log Out</a>

@@ -148,6 +148,41 @@ function canOpen(string $page): bool {
     return canAny(PAGE_PERMISSIONS[$page] ?? []);
 }
 
+/** Whether the current gardener/coordinator account has an assigned custom role. */
+function hasCustomRoleAssignment(): bool {
+    static $checked = false;
+    static $hasCustomRole = false;
+    if ($checked) return $hasCustomRole;
+    $checked = true;
+
+    $user = currentUser();
+    if (!$user) return false;
+
+    $accounts = [];
+    if (!empty($user['ids']['customer'])) $accounts[] = ['gardener', (int) $user['ids']['customer']];
+    if (!empty($user['ids']['staff'])) $accounts[] = ['coordinator', (int) $user['ids']['staff']];
+    if (!$accounts) return false;
+
+    $conditions = [];
+    $params = [];
+    foreach ($accounts as [$type, $id]) {
+        $conditions[] = '(AccountType = ? AND AccountID = ?)';
+        $params[] = $type;
+        $params[] = $id;
+    }
+
+    try {
+        require_once __DIR__ . '/../db.php';
+        $stmt = getDb()->prepare('SELECT 1 FROM USER_ROLE WHERE ' . implode(' OR ', $conditions) . ' LIMIT 1');
+        $stmt->execute($params);
+        $hasCustomRole = $stmt->fetchColumn() !== false;
+        return $hasCustomRole;
+    } catch (Throwable $e) {
+        error_log('HarvestHub: could not check custom role assignments for navigation: ' . $e->getMessage());
+        return false;
+    }
+}
+
 /**
  * Page guard for admin and coordinator pages: sends visitors to the login
  * page and shows a friendly "no access" page to people without permission.
