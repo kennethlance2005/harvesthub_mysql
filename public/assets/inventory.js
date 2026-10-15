@@ -87,25 +87,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 const availableQty = Number(r.AvailableQty) || 0;
                 const isAvailable = availableQty > 0;
                 const myPendingQty = Number(r.MyPendingQty) || 0;
+                const requestableQty = Math.max(0, availableQty - myPendingQty);
                 lastAvailability[r.ResourceID] = availableQty;
                 const changed = previousAvailability !== null
                     && previousAvailability[r.ResourceID] !== undefined
                     && previousAvailability[r.ResourceID] !== availableQty;
 
                 let action;
-                if (myPendingQty > 0) {
-                    action = `<span class="badge badge-brown" title="Cancel it under My requests to change the quantity.">Requested (${myPendingQty})</span>`;
-                } else if (isAvailable) {
+                if (requestableQty > 0) {
                     const typed = Number(typedQty[r.ResourceID]);
-                    const qtyValue = Number.isInteger(typed) && typed >= 1 ? Math.min(typed, availableQty) : 1;
+                    const qtyValue = Number.isInteger(typed) && typed >= 1 ? Math.min(typed, requestableQty) : 1;
                     action = `
                     <form class="inline-request-form inv-request-form" data-id="${r.ResourceID}" novalidate>
+                        ${myPendingQty > 0 ? `<span class="badge badge-brown" title="Already pending for this item.">Requested (${myPendingQty})</span>` : ''}
                         <label class="inv-qty">
                             <span>Qty <span class="required">*</span></span>
-                            <input type="number" name="qty" min="1" max="${availableQty}" value="${qtyValue}" required>
+                            <input type="number" name="qty" min="1" max="${requestableQty}" value="${qtyValue}" required>
                         </label>
                         <button type="submit" class="btn btn-accent btn-sm inv-btn" ${atLimit ? 'disabled title="You have reached the pending request limit."' : ''}>Request</button>
                     </form>`;
+                } else if (myPendingQty > 0) {
+                    action = `<span class="badge badge-brown" title="You have a pending request for all currently available units.">Requested (${myPendingQty})</span>`;
+                } else if (isAvailable) {
+                    action = '<span class="badge badge-neutral">Unavailable to request</span>';
                 } else {
                     action = '<span class="badge badge-neutral">Out of stock</span>';
                 }

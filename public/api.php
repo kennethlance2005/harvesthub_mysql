@@ -1463,23 +1463,20 @@ try {
                 SELECT GREATEST(0, R.TotalQty - COALESCE((
                     SELECT SUM(T.Qty) FROM RESOURCE_TXN T
                     WHERE T.ResourceID = R.ResourceID AND T.Status IN ('Approved', 'Return Requested')
-                ), 0)) AS AvailableQty
+                ), 0)) AS AvailableQty,
+                COALESCE((
+                    SELECT SUM(T.Qty) FROM RESOURCE_TXN T
+                    WHERE T.ResourceID = R.ResourceID AND T.GardenerID = ? AND T.Status = 'Requested' AND T.RequestType = 'Borrow'
+                ), 0) AS MyPendingQty
                 FROM RESOURCE R WHERE R.ResourceID = ? FOR UPDATE
             ");
-            $res->execute([(int) $resourceId]);
-            $available = $res->fetchColumn();
-            if ($available === false || (int) $qty > (int) $available) {
+            $res->execute([$user['id'], (int) $resourceId]);
+            $resourceAvailability = $res->fetch(PDO::FETCH_ASSOC);
+            $available = $resourceAvailability ? (int) $resourceAvailability['AvailableQty'] : 0;
+            $myPendingQty = $resourceAvailability ? (int) $resourceAvailability['MyPendingQty'] : 0;
+            if (!$resourceAvailability || (int) $qty > $available - $myPendingQty) {
                 $pdo->rollBack();
                 respond(['ok' => false, 'error' => 'Not enough of that resource available.'], 409);
-            }
-
-            // Only one pending request per resource: the gardener must cancel the
-            // existing one before asking for a different quantity.
-            $existing = $pdo->prepare("SELECT TxnID FROM RESOURCE_TXN WHERE GardenerID = ? AND ResourceID = ? AND Status = 'Requested' AND RequestType = 'Borrow' FOR UPDATE");
-            $existing->execute([$user['id'], (int) $resourceId]);
-            if ($existing->fetchColumn()) {
-                $pdo->rollBack();
-                respond(['ok' => false, 'error' => 'You already have a pending request for this item. Cancel it first if you need a different quantity.'], 409);
             }
 
             $pdo->prepare("INSERT INTO RESOURCE_TXN (GardenerID, ResourceID, Qty, Status) VALUES (?, ?, ?, 'Requested')")
