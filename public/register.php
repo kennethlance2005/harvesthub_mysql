@@ -50,7 +50,7 @@ if ($user = currentUser()) {
         </div>
         <div class="field">
           <label for="last-name">Last Name <span class="required">*</span></label>
-          <input type="text" id="last-name" name="last_name" autocomplete="family-name" pattern=".*" title="Use letters, numbers, or symbols as needed" required maxlength="25">
+          <input type="text" id="last-name" name="last_name" autocomplete="family-name" pattern="[\p{L}\p{M}\s]+" title="Use letters only" required maxlength="25">
         </div>
       </div>
 
@@ -140,6 +140,6 @@ if ($user = currentUser()) {
 </div>
 
 <script src="assets/password-toggle.js?v=1"></script>
-<script src="assets/register.js?v=9"></script>
+<script src="assets/register.js?v=13"></script>
 </body>
 </html>

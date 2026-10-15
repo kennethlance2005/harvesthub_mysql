@@ -25,11 +25,18 @@ const updateAgeRequirement = () => {
   const isValidAge = ageValue >= 18 && ageValue <= 122;
   ageReq.classList.toggle('valid', isValidAge);
   ageReq.classList.toggle('invalid', !isValidAge);
+  return isValidAge;
 };
 
 ageInput.addEventListener('input', updateAgeRequirement);
 ageInput.addEventListener('focus', () => ageReqs.classList.add('active'));
-ageInput.addEventListener('blur', () => ageReqs.classList.remove('active'));
+ageInput.addEventListener('blur', () => {
+  if (updateAgeRequirement()) {
+    ageReqs.classList.remove('active');
+  } else {
+    ageReqs.classList.add('active');
+  }
+});
 
 const updateEmailRequirement = () => {
   const isValidEmail = emailInput.value.trim() !== '' && emailInput.validity.valid;
@@ -41,11 +48,12 @@ emailInput.addEventListener('input', updateEmailRequirement);
 emailInput.addEventListener('focus', () => emailReqs.classList.add('active'));
 emailInput.addEventListener('blur', () => emailReqs.classList.remove('active'));
 
-// Allow all printable symbols, while stripping only control characters.
-[firstNameInput, lastNameInput].forEach((input) => {
-  input.addEventListener('input', () => {
-    input.value = input.value.replace(/[\u0000-\u001F\u007F]/g, '');
-  });
+// First names allow printable symbols; last names are restricted to letters and spaces.
+firstNameInput.addEventListener('input', () => {
+  firstNameInput.value = firstNameInput.value.replace(/[\u0000-\u001F\u007F]/g, '');
+});
+lastNameInput.addEventListener('input', () => {
+  lastNameInput.value = lastNameInput.value.replace(/[^\p{L}\p{M}\s]/gu, '');
 });
 
 // ---------- Request Account button: disabled until every field is filled ----------
@@ -102,8 +110,8 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
-  if (!lastName || !namePattern.test(lastName)) {
-    alertEl.textContent = 'Last name contains unsupported characters.';
+  if (!lastName || !/^[\p{L}\p{M}\s]+$/u.test(lastName)) {
+    alertEl.textContent = 'Last name may contain letters and spaces only.';
     alertEl.hidden = false;
     lastNameInput.focus();
     return;
@@ -269,47 +277,44 @@ restartRegistrationButton.addEventListener('click', () => {
   updateSubmitState();
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    const passwordInput = document.getElementById('password');
-    const reqList = document.getElementById('password-reqs');
-    
-    if (passwordInput && reqList) {
-        // 1. Show the checklist when the user clicks the password field
-        passwordInput.addEventListener('focus', () => {
-            reqList.classList.add('active');
-        });
+const passwordInput = document.getElementById('password');
+const passwordReqs = document.getElementById('password-reqs');
+const passwordChecks = [
+  ['req-length', value => value.length >= 8],
+  ['req-upper', value => /[A-Z]/.test(value)],
+  ['req-lower', value => /[a-z]/.test(value)],
+  ['req-num', value => /\d/.test(value)],
+  ['req-special', value => /[\W_]/.test(value)],
+];
 
-        // 2. Hide the checklist when they click away (only if empty or fully valid)
-        passwordInput.addEventListener('blur', () => {
-            const isValid = document.querySelectorAll('.password-reqs li.valid').length === 5;
-            if (passwordInput.value === '' || isValid) {
-                reqList.classList.remove('active');
-            }
-        });
+const updatePasswordRequirements = (showIfInvalid = true) => {
+  const value = passwordInput.value;
+  let isValid = true;
 
-        // 3. The live validation checker
-        passwordInput.addEventListener('input', function() {
-            const val = this.value;
-            
-            const toggleValid = (id, isValid) => {
-                const el = document.getElementById(id);
-                if (isValid) {
-                    el.classList.add('valid');
-                    el.classList.remove('invalid');
-                } else {
-                    el.classList.add('invalid');
-                    el.classList.remove('valid');
-                }
-            };
+  passwordChecks.forEach(([id, check]) => {
+    const requirement = document.getElementById(id);
+    const meetsRequirement = check(value);
+    requirement.classList.toggle('valid', meetsRequirement);
+    requirement.classList.toggle('invalid', !meetsRequirement);
+    isValid = isValid && meetsRequirement;
+  });
 
-            toggleValid('req-length', val.length >= 8);
-            toggleValid('req-upper', /[A-Z]/.test(val));
-            toggleValid('req-lower', /[a-z]/.test(val));
-            toggleValid('req-num', /\d/.test(val));
-            toggleValid('req-special', /[\W_]/.test(val));
-        });
-    }
+  if (!isValid && showIfInvalid) {
+    passwordReqs.classList.add('active');
+  }
+  return isValid;
+};
+
+passwordInput.addEventListener('focus', () => passwordReqs.classList.add('active'));
+passwordInput.addEventListener('input', updatePasswordRequirements);
+passwordInput.addEventListener('blur', () => {
+  if (updatePasswordRequirements(false)) {
+    passwordReqs.classList.remove('active');
+  } else {
+    passwordReqs.classList.add('active');
+  }
 });
+updatePasswordRequirements(false);
 
 // Prevent copy, cut, and paste in password fields
 document.addEventListener('DOMContentLoaded', () => {

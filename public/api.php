@@ -475,8 +475,8 @@ try {
                 $errors[] = 'Last name contains unsupported characters.';
             } elseif ($lastName === '' || mb_strlen($lastName) > 60) {
                 $errors[] = 'Last name is required.';
-            } elseif (!preg_match("/^[\p{L}\p{N}\p{M}\p{P}\p{S}\s]+$/u", $lastName)) {
-                $errors[] = 'Last name contains unsupported characters.';
+            } elseif (!preg_match("/^[\p{L}\p{M}\s]+$/u", $lastName)) {
+                $errors[] = 'Last name may contain letters and spaces only.';
             }
             if (!ctype_digit((string) $age) || (int) $age < 18 || (int) $age > 122) {
                 $errors[] = 'Age must be between 18 and 122 years old to register.';
