@@ -16,3 +16,7 @@ For an existing database, apply `migrations/20261010_email_verification.sql` onc
 For existing databases missing the status fields from the signup request table, apply `migrations/20261011_signup_request_status_fields.sql` once. It ensures `RejectionReason` and the unique `StatusToken` field required by registration status links are present.
 
 For existing databases, apply `migrations/20261015_exchange_claim_rejection_reason.sql` to add the rejection explanation field used by exchange claim requests. The migration is safe to re-run and is a no-op if the column already exists; fresh installations get it from `schema.sql`.
+
+For an existing database missing either plot-application reason field, apply `migrations/20261016_plot_application_reason_fields.sql`. It safely adds `RequestReason` and `RejectionReason` only when absent; fresh installations already include both in `schema.sql`.
+
+If Admin Reports fails with an unknown `RejectionReason` column, apply `migrations/20261017_admin_report_rejection_reasons.sql`. It safely ensures the rejection-reason columns used by request and rejection reports exist on resource, plot, coordinator, and signup requests.
