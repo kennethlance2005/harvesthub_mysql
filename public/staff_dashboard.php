@@ -8,7 +8,7 @@ $navTitle = 'Coordinator Dashboard';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HarvestHub â€” Coordinator Dashboard</title>
+<title>HarvestHub — Coordinator Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -29,9 +29,9 @@ $navTitle = 'Coordinator Dashboard';
       </header>
 
       <section class="coordinator-stat-grid" id="coordinator-stats" aria-label="Garden overview">
-        <div class="stat-card"><div class="stat-value">â€”</div><div class="stat-label">Pending resource requests</div></div>
-        <div class="stat-card"><div class="stat-value">â€”</div><div class="stat-label">Available plots</div></div>
-        <div class="stat-card"><div class="stat-value">â€”</div><div class="stat-label">Resource types</div></div>
+        <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Pending resource requests</div></div>
+        <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Available plots</div></div>
+        <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Resource types</div></div>
       </section>
 
       <section class="coordinator-shortcuts" aria-label="Coordinator work areas">

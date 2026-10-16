@@ -7,7 +7,7 @@ $user = requirePageAccess();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HarvestHub â€” Plots</title>
+<title>HarvestHub — Plots</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -53,14 +53,14 @@ $user = requirePageAccess();
               <label class="sr-only" for="new-plot-location">Plot city <span class="required">*</span></label>
               <select id="new-plot-location" required>
                 <option value="" selected disabled>Select city</option>
-                <option>Caloocan</option><option>Las PiÃ±as</option><option>Makati</option><option>Malabon</option>
+                <option>Caloocan</option><option>Las Piñas</option><option>Makati</option><option>Malabon</option>
                 <option>Mandaluyong</option><option>Manila</option><option>Marikina</option><option>Muntinlupa</option>
-                <option>Navotas</option><option>ParaÃ±aque</option><option>Pasay</option><option>Pasig</option>
+                <option>Navotas</option><option>Parañaque</option><option>Pasay</option><option>Pasig</option>
                 <option>Pateros</option><option>Quezon City</option><option>San Juan</option><option>Taguig</option>
                 <option>Valenzuela</option>
               </select>
               <label class="sr-only" for="new-plot-area">Plot area in square meters</label>
-              <input id="new-plot-area" type="number" min="0.01" max="100000" step="0.01" placeholder="Area (mÂ²)" required>
+              <input id="new-plot-area" type="number" min="0.01" max="100000" step="0.01" placeholder="Area (m²)" required>
               <button class="btn btn-accent btn-sm" type="submit">Add plot</button>
             </form>
             <?php endif; ?>
@@ -86,15 +86,15 @@ $user = requirePageAccess();
       <label for="edit-plot-location">City <span class="required">*</span></label>
       <select id="edit-plot-location" required>
         <option value="" disabled>Select city</option>
-        <option>Caloocan</option><option>Las PiÃ±as</option><option>Makati</option><option>Malabon</option>
+        <option>Caloocan</option><option>Las Piñas</option><option>Makati</option><option>Malabon</option>
         <option>Mandaluyong</option><option>Manila</option><option>Marikina</option><option>Muntinlupa</option>
-        <option>Navotas</option><option>ParaÃ±aque</option><option>Pasay</option><option>Pasig</option>
+        <option>Navotas</option><option>Parañaque</option><option>Pasay</option><option>Pasig</option>
         <option>Pateros</option><option>Quezon City</option><option>San Juan</option><option>Taguig</option>
         <option>Valenzuela</option>
       </select>
     </div>
     <div class="field hh-dialog-field">
-      <label for="edit-plot-area">Area (mÂ²) <span class="required">*</span></label>
+      <label for="edit-plot-area">Area (m²) <span class="required">*</span></label>
       <input id="edit-plot-area" type="number" min="0.01" max="100000" step="0.01" required>
     </div>
     <div class="hh-dialog-actions">

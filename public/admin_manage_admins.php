@@ -8,7 +8,7 @@ $navTitle = 'Manage Administrators';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HarvestHub â€” Manage Admins</title>
+<title>HarvestHub — Manage Admins</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css?v=63">
 </head>
@@ -50,7 +50,7 @@ $navTitle = 'Manage Administrators';
                     <select id="new-admin-location" required>
                         <option value="">Select city...</option>
                         <option value="Caloocan">Caloocan</option>
-                        <option value="Las PiÃ±as">Las PiÃ±as</option>
+                        <option value="Las Piñas">Las Piñas</option>
                         <option value="Makati">Makati</option>
                         <option value="Malabon">Malabon</option>
                         <option value="Mandaluyong">Mandaluyong</option>
@@ -58,7 +58,7 @@ $navTitle = 'Manage Administrators';
                         <option value="Marikina">Marikina</option>
                         <option value="Muntinlupa">Muntinlupa</option>
                         <option value="Navotas">Navotas</option>
-                        <option value="ParaÃ±aque">ParaÃ±aque</option>
+                        <option value="Parañaque">Parañaque</option>
                         <option value="Pasay">Pasay</option>
                         <option value="Pasig">Pasig</option>
                         <option value="Pateros">Pateros</option>
