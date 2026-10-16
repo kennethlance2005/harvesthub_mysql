@@ -9,9 +9,9 @@
 return [
     'smtp_host' => 'smtp.gmail.com',
     'smtp_port' => '587',
-    'smtp_username' => '',
-    'smtp_password' => '',
-    'smtp_from_email' => '',
-    'smtp_from_name' => 'HarvestHub',
+    'smtp_username' => 'silasmanlulu2005@2gmail.com',
+    'smtp_password' => 'sgjh tnag sbkv baxf',
+    'smtp_from_email' => 'silasmanlulu2005@gmail.com',
+    'smtp_from_name' => 'HarvestHub1',
     'smtp_secure' => 'tls',
 ];
