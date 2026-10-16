@@ -85,7 +85,7 @@ $profileId = ctype_digit((string) ($_GET['id'] ?? '')) ? (int) $_GET['id'] : 0;
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=25"></script>
+<script src="assets/admin.js?v=26"></script>
 <script src="assets/people.js?v=2"></script>
 </body>
 </html>

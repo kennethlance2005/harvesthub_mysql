@@ -132,6 +132,6 @@ $navTitle = 'Manage Administrators';
 <?php include __DIR__ . '/admin_modal_archive.php'; ?>
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container"></div>
-<script src="assets/admin.js?v=25"></script>
+<script src="assets/admin.js?v=26"></script>
 </body>
 </html>

@@ -87,7 +87,7 @@ $navTitle = 'Roles and Permissions';
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=25"></script>
+<script src="assets/admin.js?v=26"></script>
 <script src="assets/roles.js?v=1"></script>
 </body>
 </html>

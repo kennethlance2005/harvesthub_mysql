@@ -44,7 +44,7 @@ function showToast(message, type = 'success') {
   toastEl.className = `toast${type === 'danger' ? ' toast-danger' : ''}`;
   toastEl.textContent = message;
   document.getElementById('toast-container').appendChild(toastEl);
-  setTimeout(() => toastEl.remove(), 3500);
+  setTimeout(() => toastEl.remove(), message.length > 80 ? 7000 : 3500); // longer messages stay up long enough to read
 }
 
 function filterTableByName(inputId, tableId) {
@@ -765,7 +765,10 @@ async function processSignup(requestId, decision, reason = '') {
   });
   const data = await res.json();
   if (data.ok) {
-    showToast(`Account request ${decision === 'approve' ? 'approved & created' : 'rejected'}.`, 'success');
+    const emailNote = data.email_sent
+      ? ` An email was sent to ${data.email}.`
+      : ` The email to ${data.email} could not be sent, so please let them know yourself.`;
+    showToast(`Account request ${decision === 'approve' ? 'approved & created' : 'rejected'}.${emailNote}`, data.email_sent ? 'success' : 'danger');
     loadSignupRequests();
     loadAccounts();
     loadStats();

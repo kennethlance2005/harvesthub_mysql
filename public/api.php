@@ -61,6 +61,37 @@ function sendResetEmail(string $toEmail, string $resetLink): bool {
     );
 }
 
+/** Full web address of a page next to this one, e.g. https://site/login.php (works behind Render's proxy). */
+function appPageUrl(string $page): string {
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
+        || ($_SERVER['SERVER_PORT'] ?? '') == 443;
+    $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+    return ($https ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $dir . '/' . $page;
+}
+
+/** Tells an applicant their sign-up was approved or declined. Returns whether the email went out. */
+function sendSignupDecisionEmail(string $toEmail, string $firstName, bool $approved, string $reason = ''): bool {
+    $name = htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8');
+    $loginUrl = appPageUrl('login.php');
+    $loginLink = htmlspecialchars($loginUrl, ENT_QUOTES, 'UTF-8');
+    if ($approved) {
+        return sendHarvestHubEmail(
+            $toEmail,
+            'Your HarvestHub account is ready',
+            "<h2>Welcome to HarvestHub, {$name}!</h2><p>An administrator approved your registration. You can now log in with the email and password you signed up with.</p><p><a href=\"{$loginLink}\">Log in to HarvestHub</a></p>",
+            "Welcome to HarvestHub, {$firstName}!\n\nAn administrator approved your registration. You can now log in with the email and password you signed up with: {$loginUrl}"
+        );
+    }
+    $why = nl2br(htmlspecialchars($reason, ENT_QUOTES, 'UTF-8'));
+    return sendHarvestHubEmail(
+        $toEmail,
+        'Your HarvestHub registration was declined',
+        "<h2>Hello {$name},</h2><p>An administrator reviewed your HarvestHub registration and declined it for this reason:</p><blockquote style=\"border-left:4px solid #c2571a;margin:0;padding:8px 12px\">{$why}</blockquote><p>If you think this was a mistake, you are welcome to sign up again.</p>",
+        "Hello {$firstName},\n\nAn administrator reviewed your HarvestHub registration and declined it for this reason:\n\n{$reason}\n\nIf you think this was a mistake, you are welcome to sign up again."
+    );
+}
+
 header('Content-Type: application/json');
 
 try {
@@ -3499,7 +3530,9 @@ try {
                 throw $error;
             }
 
-            respond(['ok' => true]);
+            // Sent after saving, so a mail problem never undoes the decision.
+            $emailSent = sendSignupDecisionEmail($row['Email'], $row['FirstName'], $decision === 'approve', $reason);
+            respond(['ok' => true, 'email_sent' => $emailSent, 'email' => $row['Email']]);
         }
 
         case 'create_admin': {

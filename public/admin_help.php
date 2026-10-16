@@ -119,6 +119,6 @@ $link = static fn (string $page, string $text): string => canOpen($page)
 
 <?php include __DIR__ . '/account_footer.php'; ?>
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
-<script src="assets/admin.js?v=25"></script>
+<script src="assets/admin.js?v=26"></script>
 </body>
 </html>
