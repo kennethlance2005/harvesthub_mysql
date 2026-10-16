@@ -20,3 +20,7 @@ For existing databases, apply `migrations/20261015_exchange_claim_rejection_reas
 For an existing database missing either plot-application reason field, apply `migrations/20261016_plot_application_reason_fields.sql`. It safely adds `RequestReason` and `RejectionReason` only when absent; fresh installations already include both in `schema.sql`.
 
 If Admin Reports fails with an unknown `RejectionReason` column, apply `migrations/20261017_admin_report_rejection_reasons.sql`. It safely ensures the rejection-reason columns used by request and rejection reports exist on resource, plot, coordinator, and signup requests.
+
+Shortcut: `php tools/sync_schema.php` adds everything an existing database is missing compared with `schema.sql` (tables, columns, roles, permissions, triggers) without deleting anything or adding demo data. Add `--dry-run` to only list what it would change. The live server runs it automatically every time it starts. On XAMPP, run it as `C:\xampp\php\php.exe tools/sync_schema.php`.
+
+Sign-up codes: if the verification email cannot be sent, the code is shown on screen instead when the site runs on your own computer, or when the server has the environment variable `SIGNUP_SHOW_CODE=1` (for demos on hosts that block email, such as Render's free plan).

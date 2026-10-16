@@ -50,6 +50,9 @@ function sendHarvestHubEmail(string $toEmail, string $subject, string $htmlBody,
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
+        // Give up quickly when a network blocks email, instead of PHPMailer's
+        // five-minute default that leaves the page hanging.
+        $mail->Timeout = 10;
         $mail->Host = $config['host'];
         $mail->SMTPAuth = true;
         $mail->Username = $config['username'];

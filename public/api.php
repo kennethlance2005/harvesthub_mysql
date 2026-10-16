@@ -259,6 +259,17 @@ function cleanPersonName(string $value): ?string {
     return trim(preg_replace('/\s+/u', ' ', $value));
 }
 
+/**
+ * Whether a sign-up code may be shown on screen when the email can't be sent.
+ * Meant for demos: hosts that block email (Render's free plan) or a teammate's
+ * computer without email settings. Turned on by the SIGNUP_SHOW_CODE=1
+ * environment variable, and always on for requests from this computer.
+ */
+function signupCodeFallbackAllowed(): bool {
+    return getenv('SIGNUP_SHOW_CODE') === '1'
+        || in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+}
+
 /** A resource's name for audit summaries ("Rake"), or "a resource" if it is gone. */
 function resourceName(PDO $pdo, int $resourceId): string {
     $stmt = $pdo->prepare('SELECT Name FROM RESOURCE WHERE ResourceID = ?');
@@ -536,6 +547,9 @@ try {
                 "Your HarvestHub email verification code is {$code}. It expires in 10 minutes. If you did not request it, ignore this email."
             );
             if (!$emailSent) {
+                if (signupCodeFallbackAllowed()) {
+                    respond(['ok' => true, 'email' => $email, 'shown_code' => $code]);
+                }
                 $pdo->prepare('DELETE FROM SIGNUP_EMAIL_VERIFICATION WHERE Email = ? AND CodeHash = ?')->execute([$email, $codeHash]);
                 respond(['ok' => false, 'error' => 'We could not send a verification code right now. Please try again later.'], 503);
             }
@@ -574,6 +588,9 @@ try {
                 "Your new HarvestHub email verification code is {$code}. It expires in 10 minutes."
             );
             if (!$emailSent) {
+                if (signupCodeFallbackAllowed()) {
+                    respond(['ok' => true, 'shown_code' => $code]);
+                }
                 respond(['ok' => false, 'error' => 'We could not send a verification code right now. Please try again later.'], 503);
             }
             respond(['ok' => true]);
