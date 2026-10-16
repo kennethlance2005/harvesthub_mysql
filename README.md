@@ -23,4 +23,4 @@ If Admin Reports fails with an unknown `RejectionReason` column, apply `migratio
 
 Shortcut: `php tools/sync_schema.php` adds everything an existing database is missing compared with `schema.sql` (tables, columns, roles, permissions, triggers) without deleting anything or adding demo data. Add `--dry-run` to only list what it would change. The live server runs it automatically every time it starts. On XAMPP, run it as `C:\xampp\php\php.exe tools/sync_schema.php`.
 
-Sign-up codes: if the verification email cannot be sent, the code is shown on screen instead when the site runs on your own computer, or when the server has the environment variable `SIGNUP_SHOW_CODE=1` (for demos on hosts that block email, such as Render's free plan).
+Sign-up codes: if the verification email cannot be sent, sign-up stops with an error. Only when the server has the environment variable `SIGNUP_SHOW_CODE=1` is the code shown on screen instead (for demos on hosts that block email, such as Render's free plan).

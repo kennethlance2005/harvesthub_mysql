@@ -261,13 +261,12 @@ function cleanPersonName(string $value): ?string {
 
 /**
  * Whether a sign-up code may be shown on screen when the email can't be sent.
- * Meant for demos: hosts that block email (Render's free plan) or a teammate's
- * computer without email settings. Turned on by the SIGNUP_SHOW_CODE=1
- * environment variable, and always on for requests from this computer.
+ * Meant for demos on hosts that block email (Render's free plan). Off unless
+ * the server sets the SIGNUP_SHOW_CODE=1 environment variable; otherwise a
+ * failed email stops sign-up with an error.
  */
 function signupCodeFallbackAllowed(): bool {
-    return getenv('SIGNUP_SHOW_CODE') === '1'
-        || in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+    return getenv('SIGNUP_SHOW_CODE') === '1';
 }
 
 /** A resource's name for audit summaries ("Rake"), or "a resource" if it is gone. */
