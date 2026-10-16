@@ -15,7 +15,12 @@ function smtpConfig(): array {
         'secure' => getenv('SMTP_SECURE') ?: 'tls',
     ];
 
+    // secrets.local.php (private, not in Git) wins; otherwise the group's shared
+    // settings in secrets.local.example.php are used, so a fresh pull works as-is.
     $localFile = __DIR__ . '/../secrets.local.php';
+    if (!is_file($localFile)) {
+        $localFile = __DIR__ . '/../secrets.local.example.php';
+    }
     if (is_file($localFile)) {
         $secrets = require $localFile;
         foreach ($config as $key => $value) {
