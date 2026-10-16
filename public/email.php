@@ -13,6 +13,7 @@ function smtpConfig(): array {
         'from_email' => getenv('SMTP_FROM_EMAIL') ?: '',
         'from_name' => getenv('SMTP_FROM_NAME') ?: 'HarvestHub',
         'secure' => getenv('SMTP_SECURE') ?: 'tls',
+        'brevo_api_key' => getenv('BREVO_API_KEY') ?: '',
     ];
 
     // secrets.local.php (private, not in Git) wins; otherwise the group's shared
@@ -24,7 +25,7 @@ function smtpConfig(): array {
     if (is_file($localFile)) {
         $secrets = require $localFile;
         foreach ($config as $key => $value) {
-            $secret = $secrets['smtp_' . $key] ?? null;
+            $secret = $secrets[$key === 'brevo_api_key' ? $key : 'smtp_' . $key] ?? null;
             if ($value === '' && is_string($secret) && $secret !== '') {
                 $config[$key] = $secret;
             }
@@ -37,8 +38,42 @@ function smtpConfig(): array {
     return $config;
 }
 
+/**
+ * Sends through Brevo's web API. It uses the normal HTTPS port, so it works on
+ * networks and hosts that block email ports (school Wi-Fi, hotspots, Render).
+ */
+function sendViaBrevo(array $config, string $toEmail, string $subject, string $htmlBody, string $textBody): bool {
+    $payload = json_encode([
+        'sender' => ['name' => $config['from_name'], 'email' => $config['from_email']],
+        'to' => [['email' => $toEmail]],
+        'subject' => $subject,
+        'htmlContent' => $htmlBody,
+        'textContent' => $textBody,
+    ]);
+    $context = stream_context_create(['http' => [
+        'method' => 'POST',
+        'header' => "api-key: {$config['brevo_api_key']}\r\nContent-Type: application/json\r\nAccept: application/json\r\n",
+        'content' => $payload,
+        'timeout' => 10,
+        'ignore_errors' => true,
+    ]]);
+    $response = @file_get_contents('https://api.brevo.com/v3/smtp/email', false, $context);
+    $status = 0;
+    foreach ($http_response_header ?? [] as $header) {
+        if (preg_match('#^HTTP/\S+\s+(\d{3})#', $header, $match)) $status = (int) $match[1];
+    }
+    if ($status >= 200 && $status < 300) return true;
+    error_log("HarvestHub: Brevo email delivery failed (HTTP $status): " . substr((string) $response, 0, 300));
+    return false;
+}
+
 function sendHarvestHubEmail(string $toEmail, string $subject, string $htmlBody, string $textBody): bool {
     $config = smtpConfig();
+    // Brevo first when a key is set; Gmail SMTP below stays as the fallback.
+    if ($config['brevo_api_key'] !== '' && filter_var($config['from_email'], FILTER_VALIDATE_EMAIL)
+        && sendViaBrevo($config, $toEmail, $subject, $htmlBody, $textBody)) {
+        return true;
+    }
     foreach (['host', 'username', 'password', 'from_email'] as $required) {
         if ($config[$required] === '') {
             error_log('HarvestHub: SMTP is not fully configured; email was not sent.');
