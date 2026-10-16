@@ -43,8 +43,9 @@ function getDb(): PDO {
         $config = require __DIR__ . '/db_config.php';
         
         $dsn = sprintf(
-            'mysql:host=%s;dbname=%s;charset=%s',
+            'mysql:host=%s;port=%s;dbname=%s;charset=%s',
             $config['host'],
+            $config['port'],
             $config['dbname'],
             $config['charset']
         );

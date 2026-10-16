@@ -1,7 +1,14 @@
 FROM php:8.2-apache
 
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
 # Install the required MySQL PDO extensions
 RUN docker-php-ext-install pdo pdo_mysql mysqli
+
+WORKDIR /var/www/html
+
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
 # Copy the HarvestHub project files into the container's web directory
 COPY . /var/www/html/

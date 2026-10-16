@@ -7,7 +7,7 @@ For an existing database, also apply `migrations/20261007_add_login_attempt_lock
 
 ## Email delivery and registration verification
 
-Email verification codes for new registrations and password-reset links are sent through Gmail SMTP using PHPMailer. Install the dependency from this directory with `composer install`.
+Email verification codes for new registrations and password-reset links are sent through Gmail SMTP using PHPMailer. Install the dependency from this directory with `composer install`. The Render Docker build installs the locked Composer dependencies automatically.
 
 For local XAMPP, copy `secrets.local.example.php` to `secrets.local.php` and enter your Gmail address as both `smtp_username` and `smtp_from_email`, plus a Google App Password as `smtp_password`. Do not use your regular Google password or commit `secrets.local.php`. On a hosted server, configure the same values as `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`, and `SMTP_SECURE` environment variables. Gmail uses `smtp.gmail.com`, port `587`, and `tls`.
 
@@ -15,4 +15,4 @@ For an existing database, apply `migrations/20261010_email_verification.sql` onc
 
 For existing databases missing the status fields from the signup request table, apply `migrations/20261011_signup_request_status_fields.sql` once. It ensures `RejectionReason` and the unique `StatusToken` field required by registration status links are present.
 
-For existing databases, apply `migrations/20261015_exchange_claim_rejection_reason.sql` once. It adds the required rejection explanation field for exchange claim requests; fresh installations get it from `schema.sql`.
+For existing databases, apply `migrations/20261015_exchange_claim_rejection_reason.sql` to add the rejection explanation field used by exchange claim requests. The migration is safe to re-run and is a no-op if the column already exists; fresh installations get it from `schema.sql`.
