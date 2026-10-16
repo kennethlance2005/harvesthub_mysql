@@ -7,7 +7,7 @@ For an existing database, also apply `migrations/20261007_add_login_attempt_lock
 
 ## Email delivery and registration verification
 
-Email verification codes for new registrations and password-reset links are sent through Gmail SMTP using PHPMailer. Install the dependency from this directory with `composer install`. The Render Docker build installs the locked Composer dependencies automatically.
+Email verification codes for new registrations and password-reset links are sent through Gmail SMTP using PHPMailer. Install the dependency from this directory with `composer install`. The Render Docker build installs the locked Composer dependencies and the PHP `mbstring` extension required by registration validation automatically.
 
 For local XAMPP, copy `secrets.local.example.php` to `secrets.local.php` and enter your Gmail address as both `smtp_username` and `smtp_from_email`, plus a Google App Password as `smtp_password`. Do not use your regular Google password or commit `secrets.local.php`. On a hosted server, configure the same values as `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`, and `SMTP_SECURE` environment variables. Gmail uses `smtp.gmail.com`, port `587`, and `tls`.
 
