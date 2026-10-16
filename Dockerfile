@@ -8,7 +8,10 @@ RUN docker-php-ext-install pdo pdo_mysql mysqli
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
 # Copy the HarvestHub project files into the container's web directory
 COPY . /var/www/html/
