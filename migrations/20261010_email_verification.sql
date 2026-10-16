@@ -1,4 +1,4 @@
-CREATE TABLE SIGNUP_EMAIL_VERIFICATION (
+CREATE TABLE IF NOT EXISTS SIGNUP_EMAIL_VERIFICATION (
     Email        VARCHAR(190)  NOT NULL PRIMARY KEY,
     FirstName    VARCHAR(60)   NOT NULL,
     LastName     VARCHAR(60)   NOT NULL,
@@ -13,5 +13,18 @@ CREATE TABLE SIGNUP_EMAIL_VERIFICATION (
     INDEX idx_signup_email_verification_expiry (ExpiresAt)
 ) ENGINE=InnoDB;
 
-ALTER TABLE PASSWORD_RESET
-    ADD COLUMN LastSentAt DATETIME NULL;
+SET @has_password_reset_last_sent_at = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'PASSWORD_RESET'
+      AND COLUMN_NAME = 'LastSentAt'
+);
+SET @migration_sql = IF(
+    @has_password_reset_last_sent_at = 0,
+    'ALTER TABLE PASSWORD_RESET ADD COLUMN LastSentAt DATETIME NULL',
+    'SELECT 1'
+);
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
