@@ -22,3 +22,7 @@ RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available
 # Set a default port fallback and expose it
 ENV PORT=10000
 EXPOSE ${PORT}
+
+# Before Apache starts, add anything the database is missing compared with
+# schema.sql (new tables/columns from teammates). It never deletes data.
+CMD ["sh", "-c", "php /var/www/html/tools/sync_schema.php; exec apache2-foreground"]

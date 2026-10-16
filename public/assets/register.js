@@ -192,6 +192,7 @@ form.addEventListener('submit', async (e) => {
       verificationEmail.textContent = data.email;
       form.hidden = true;
       verifyForm.hidden = false;
+      showCodeOnScreen(data.shown_code);
       verificationCode.focus();
     } else {
       alertEl.textContent = (data.errors || [data.error]).filter(Boolean).join(' ') || 'Could not submit request.';
@@ -206,6 +207,19 @@ form.addEventListener('submit', async (e) => {
     updateSubmitState();
   }
 });
+
+// When the server couldn't email the code (demo hosting or no email settings),
+// it sends the code back instead; show it and fill it in.
+const shownCodeEl = document.getElementById('shown-code');
+function showCodeOnScreen(code) {
+  if (!code) {
+    shownCodeEl.hidden = true;
+    return;
+  }
+  shownCodeEl.textContent = `The email could not be sent, so here is your code: ${code}. It has been filled in for you.`;
+  shownCodeEl.hidden = false;
+  verificationCode.value = code;
+}
 
 verificationCode.addEventListener('input', () => {
   verificationCode.value = verificationCode.value.replace(/\D/g, '').slice(0, 6);
@@ -266,6 +280,8 @@ resendCodeButton.addEventListener('click', async () => {
     if (!data.ok) {
       alertEl.textContent = data.error || 'Could not resend the verification code.';
       alertEl.hidden = false;
+    } else {
+      showCodeOnScreen(data.shown_code);
     }
   } catch (err) {
     alertEl.textContent = 'Network error. Please try again.';
