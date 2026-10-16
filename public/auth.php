@@ -10,6 +10,19 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Log people out after this many seconds without opening a page or using the site.
+const SESSION_IDLE_TIMEOUT = 3;
+
+if (isset($_SESSION['user'])) {
+    $lastActivity = $_SESSION['last_activity'] ?? time();
+    if (time() - $lastActivity > SESSION_IDLE_TIMEOUT) {
+        unset($_SESSION['user'], $_SESSION['last_activity']);
+        $_SESSION['timed_out'] = true;
+    } else {
+        $_SESSION['last_activity'] = time();
+    }
+}
+
 function currentUser(): ?array {
     $user = $_SESSION['user'] ?? null;
     if (!$user) return null;

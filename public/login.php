@@ -7,6 +7,10 @@ if ($user = currentUser()) {
 
 // Retrieve the saved email if it exists
 $savedEmail = $_COOKIE['remembered_email'] ?? '';
+
+// Shown once after auth.php logged someone out for being idle.
+$timedOut = !empty($_SESSION['timed_out']);
+unset($_SESSION['timed_out']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -54,7 +58,7 @@ $savedEmail = $_COOKIE['remembered_email'] ?? '';
       </div>
 
       <button type="submit" class="btn btn-light btn-block" disabled>Log in</button>
-      <p class="form-alert" id="login-alert" role="alert" hidden></p>
+      <p class="form-alert" id="login-alert" role="alert"<?= $timedOut ? '' : ' hidden' ?>><?= $timedOut ? 'You were logged out because you were inactive. Please log in again.' : '' ?></p>
     </form>
 
     <p class="demo-hint" id="demo-hint">
